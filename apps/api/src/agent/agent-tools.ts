@@ -45,6 +45,41 @@ async function audited<T>(
   return result;
 }
 
+/** "all"/"todas"/"*" del modelo = sin filtro de caja. */
+const ALL_BOXES = new Set(['all', 'todas', 'todos', '*']);
+
+/**
+ * Resuelve nombre de caja → id. Devuelve undefined si el nombre significa
+ * "todas". Si no existe, error con las cajas disponibles para que el modelo
+ * se recupere solo en el siguiente paso.
+ */
+async function resolveBox(
+  ctx: AgentToolsContext,
+  boxName: string | undefined,
+): Promise<{ boxId?: string; error?: { error: string; availableBoxes: string[]; hint: string } }> {
+  if (!boxName || ALL_BOXES.has(boxName.trim().toLowerCase())) return {};
+  const all = await ctx.boxes.findAll(ctx.userId);
+  const box = all.find((b) => b.name.toLowerCase() === boxName.trim().toLowerCase());
+  if (box) return { boxId: box.id };
+  return {
+    error: {
+      error: `No existe una caja llamada "${boxName}"`,
+      availableBoxes: all.filter((b) => b.active).map((b) => b.name),
+      hint: 'Omite boxName para buscar en TODAS las cajas.',
+    },
+  };
+}
+
+/** Agrega boxName legible a cada movimiento (el modelo no debe ver solo UUIDs). */
+async function withBoxNames<T extends { boxId: string | null }>(
+  ctx: AgentToolsContext,
+  txs: T[],
+): Promise<(T & { boxName: string | null })[]> {
+  const all = await ctx.boxes.findAll(ctx.userId);
+  const names = new Map(all.map((b) => [b.id, b.name]));
+  return txs.map((t) => ({ ...t, boxName: t.boxId ? (names.get(t.boxId) ?? null) : null }));
+}
+
 export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
   return {
     getBoxBalances: tool({
@@ -57,22 +92,27 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
 
     listTransactions: tool({
       description:
-        'Lista movimientos del usuario con filtros opcionales. Fechas en YYYY-MM-DD (zona America/Lima). Úsala para "qué gasté", "movimientos de ayer/esta semana".',
+        'Lista los movimientos más recientes del usuario. TODOS los filtros son opcionales: ' +
+        'sin type trae ingresos+gastos+tránsitos juntos; sin boxName busca en TODAS las cajas; ' +
+        'sin fechas trae lo más reciente. Para "mis últimos N movimientos" llama SOLO con limit=N. ' +
+        'Fechas en YYYY-MM-DD (zona America/Lima).',
       inputSchema: z.object({
-        type: z.enum(TransactionType).optional().describe('income | expense | transit'),
-        boxName: z.string().optional().describe('Nombre de la caja, ej "Ocio"'),
+        type: z
+          .enum(TransactionType)
+          .optional()
+          .describe('income | expense | transit. OMITIR para todos los tipos.'),
+        boxName: z
+          .string()
+          .optional()
+          .describe('Nombre exacto de UNA caja, ej "Ocio". OMITIR para todas las cajas.'),
         from: z.string().optional().describe('Fecha desde, YYYY-MM-DD'),
         to: z.string().optional().describe('Fecha hasta, YYYY-MM-DD'),
         limit: z.number().int().min(1).max(100).default(30),
       }),
       execute: async (args) =>
         audited(ctx, 'listTransactions', args, async () => {
-          let boxId: string | undefined;
-          if (args.boxName) {
-            const all = await ctx.boxes.findAll(ctx.userId);
-            boxId = all.find((b) => b.name.toLowerCase() === args.boxName!.toLowerCase())?.id;
-            if (!boxId) return { error: `No existe una caja llamada "${args.boxName}"` };
-          }
+          const { boxId, error } = await resolveBox(ctx, args.boxName);
+          if (error) return error;
           const txs = await ctx.transactions.list(ctx.userId, {
             type: args.type,
             boxId,
@@ -82,7 +122,80 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
             limit: args.limit,
             offset: 0,
           });
-          return txs.map(toTransactionDto);
+          return withBoxNames(ctx, txs.map(toTransactionDto));
+        }),
+    }),
+
+    searchTransactions: tool({
+      description:
+        'Busca movimientos por texto en la nota/descripción (ej "taxi", "Claude", "supermercado"). ' +
+        'Úsala para "cuánto gasté en X", "cuándo pagué Y". Devuelve coincidencias con total sumado.',
+      inputSchema: z.object({
+        query: z.string().min(1).describe('Texto a buscar en las notas'),
+        from: z.string().optional().describe('Fecha desde, YYYY-MM-DD'),
+        to: z.string().optional().describe('Fecha hasta, YYYY-MM-DD'),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'searchTransactions', args, async () => {
+          const txs = await ctx.transactions.list(ctx.userId, {
+            from: args.from,
+            to: args.to,
+            includeVoided: false,
+            limit: 300,
+            offset: 0,
+          });
+          const q = args.query.toLowerCase();
+          const matches = txs
+            .map(toTransactionDto)
+            .filter((t) => t.note?.toLowerCase().includes(q))
+            .slice(0, args.limit);
+          const total = matches.reduce((s, t) => s + t.amount, 0);
+          return { matches: await withBoxNames(ctx, matches), count: matches.length, total };
+        }),
+    }),
+
+    getSpendingByBox: tool({
+      description:
+        'Gasto agregado POR CAJA en un rango de fechas: total, cantidad de movimientos y % del ' +
+        'asignado. Úsala para "en qué me excedo", "en qué caja gasto más", comparativas del mes.',
+      inputSchema: z.object({
+        from: z.string().describe('Fecha desde, YYYY-MM-DD'),
+        to: z.string().describe('Fecha hasta, YYYY-MM-DD'),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'getSpendingByBox', args, async () => {
+          const txs = await ctx.transactions.list(ctx.userId, {
+            type: TransactionType.EXPENSE,
+            from: args.from,
+            to: args.to,
+            includeVoided: false,
+            limit: 500,
+            offset: 0,
+          });
+          const balances = await ctx.boxes.withBalances(ctx.userId);
+          const byBox = new Map<string, { total: number; count: number }>();
+          for (const t of txs) {
+            if (!t.boxId) continue;
+            const acc = byBox.get(t.boxId) ?? { total: 0, count: 0 };
+            acc.total += Number(t.amount);
+            acc.count += 1;
+            byBox.set(t.boxId, acc);
+          }
+          return balances
+            .filter((b) => b.active)
+            .map((b) => {
+              const agg = byBox.get(b.id) ?? { total: 0, count: 0 };
+              return {
+                boxName: b.name,
+                spent: Math.round(agg.total * 100) / 100,
+                movements: agg.count,
+                allocated: b.allocated,
+                pctOfAllocated:
+                  b.allocated > 0 ? Math.round((agg.total / b.allocated) * 100) : null,
+              };
+            })
+            .sort((a, b) => b.spent - a.spent);
         }),
     }),
 

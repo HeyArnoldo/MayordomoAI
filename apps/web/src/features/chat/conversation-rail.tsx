@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import {
-  useCreateConversation,
   useDeleteConversation,
   useRenameConversation,
   useTogglePin,
@@ -77,13 +76,14 @@ export function ConversationRail({
   conversations,
   activeId,
   onSelect,
+  onNew,
 }: {
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  /** Abre un borrador local — la conversación se persiste recién al primer mensaje. */
+  onNew: () => void;
 }) {
-  const create = useCreateConversation();
-
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-surface">
       <div className="flex items-center justify-between p-3">
@@ -92,12 +92,7 @@ export function ConversationRail({
         </span>
       </div>
       <div className="px-3 pb-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start gap-2"
-          onClick={() => create.mutate(undefined, { onSuccess: (c) => onSelect(c.id) })}
-        >
+        <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={onNew}>
           <Plus className="size-4" /> Nueva conversación
         </Button>
       </div>

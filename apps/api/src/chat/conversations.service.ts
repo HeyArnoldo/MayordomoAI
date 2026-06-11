@@ -81,7 +81,7 @@ export class ConversationsService {
     });
   }
 
-  /** Persiste un mensaje y refresca lastAt + auto-título en el primer turno. */
+  /** Persiste un mensaje y refresca lastAt. */
   async appendMessage(
     conv: Conversation,
     role: MessageRole,
@@ -93,10 +93,14 @@ export class ConversationsService {
       this.messages.create({ conversationId: conv.id, role, content, channel, toolCalls }),
     );
     conv.lastAt = new Date();
-    if (!conv.isSystem && conv.title === 'Nueva conversación' && role === MessageRole.USER) {
-      conv.title = content.length > 60 ? `${content.slice(0, 57)}...` : content;
-    }
     await this.conversations.save(conv);
     return msg;
+  }
+
+  /** Título automático (generado por IA tras el primer intercambio). */
+  async setTitle(conv: Conversation, title: string): Promise<void> {
+    if (conv.isSystem) return;
+    conv.title = title;
+    await this.conversations.save(conv);
   }
 }

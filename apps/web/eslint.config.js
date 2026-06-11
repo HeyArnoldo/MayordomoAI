@@ -5,8 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  // ui/ son componentes generados por shadcn: no los linteamos.
-  { ignores: ['dist', 'src/components/ui'] },
+  // ui/ y ai-elements/ son componentes generados (shadcn / ai-elements): no los linteamos.
+  { ignores: ['dist', 'src/components/ui', 'src/components/ai-elements'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

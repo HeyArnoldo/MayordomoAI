@@ -152,6 +152,14 @@ export class ChatController {
           Channel.WEB,
           toolCalls.length > 0 ? toolCalls : null,
         );
+
+        // Título según contexto tras el primer intercambio (no el mensaje a secas).
+        if (conv.title === 'Nueva conversación' && last) {
+          const userText = uiMessageText(last);
+          const suggested = await this.agent.suggestTitle(userText, text);
+          const fallback = userText.length > 60 ? `${userText.slice(0, 57)}...` : userText;
+          await this.conversations.setTitle(conv, suggested ?? fallback);
+        }
       } catch {
         // El stream pudo cortarse; no rompemos la respuesta HTTP.
       }
