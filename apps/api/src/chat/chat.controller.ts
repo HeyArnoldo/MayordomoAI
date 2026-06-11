@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { convertToModelMessages, UIMessage } from 'ai';
 import {
@@ -19,9 +33,17 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { User } from '../users/user.entity';
 import { AgentService } from '../agent/agent.service';
+import { TranscriptionService } from '../whatsapp/transcription.service';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
 import { ConversationsService } from './conversations.service';
+
+/** Forma mínima del file de multer (evita depender de @types/multer). */
+interface UploadedAudio {
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
+}
 
 function toConversationDto(c: Conversation): ConversationDto {
   return {
@@ -62,7 +84,29 @@ export class ChatController {
   constructor(
     private readonly conversations: ConversationsService,
     private readonly agent: AgentService,
+    private readonly transcription: TranscriptionService,
   ) {}
+
+  /**
+   * Nota de voz del chat web → texto. El audio NO se almacena: se transcribe
+   * y se descarta; el texto vuelve al composer para que el usuario lo edite.
+   */
+  @Post('chat/transcribe')
+  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async transcribe(
+    @CurrentUser() user: User,
+    @UploadedFile() file: UploadedAudio | undefined,
+  ): Promise<{ text: string }> {
+    if (!file?.buffer?.length) throw new BadRequestException('Falta el audio');
+    const text = await this.transcription.transcribe(
+      file.buffer,
+      user.id,
+      file.mimetype || 'audio/webm',
+      Channel.WEB,
+    );
+    if (!text) throw new BadRequestException('No se pudo transcribir el audio');
+    return { text };
+  }
 
   @Get('conversations')
   async list(@CurrentUser() user: User): Promise<ConversationDto[]> {

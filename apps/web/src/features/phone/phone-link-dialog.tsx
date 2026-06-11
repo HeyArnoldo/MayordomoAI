@@ -12,8 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { CodeInput, useCodeInput } from './code-input';
+import { PhoneNumberInput } from './phone-number-input';
 
 const E164 = /^\+[1-9]\d{7,14}$/;
 const RESEND_SECONDS = 60;
@@ -41,7 +41,7 @@ export function PhoneLinkDialog({
 }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<'phone' | 'code'>('phone');
-  const [e164, setE164] = useState('+51');
+  const [e164, setE164] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const codeInput = useCodeInput();
 
@@ -67,7 +67,7 @@ export function PhoneLinkDialog({
   const close = () => {
     onOpenChange(false);
     setStep('phone');
-    setE164('+51');
+    setE164('');
     codeInput.reset();
   };
 
@@ -145,18 +145,10 @@ export function PhoneLinkDialog({
               </div>
             )}
 
-            <Input
-              type="tel"
-              inputMode="tel"
-              autoFocus
-              value={e164}
-              onChange={(e) => setE164(e.target.value.replace(/[^\d+]/g, ''))}
-              placeholder="+51 987 654 321"
-              className="h-12 rounded-[14px] font-mono text-[15px] font-semibold"
-            />
+            <PhoneNumberInput initialE164={current?.e164} onChange={setE164} autoFocus />
             <p className="text-[12px] text-ink-3">
-              Formato internacional, ej.: +51987654321. Un número solo puede pertenecer a una
-              cuenta.
+              Solo dígitos — el código del país se elige a la izquierda. Un número solo puede
+              pertenecer a una cuenta.
             </p>
 
             {changing && (

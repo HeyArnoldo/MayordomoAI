@@ -14,4 +14,11 @@ export const chatApi = {
   },
   messages: async (id: string): Promise<Message[]> =>
     (await api.get(`/conversations/${id}/messages`)).data,
+  /** Nota de voz del mic → texto (el audio no se guarda). */
+  transcribe: async (audio: Blob): Promise<string> => {
+    const form = new FormData();
+    form.append('audio', audio, 'voice.webm');
+    const { data } = await api.post<{ text: string }>('/chat/transcribe', form);
+    return data.text;
+  },
 };

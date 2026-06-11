@@ -20,7 +20,12 @@ export class TranscriptionService {
     );
   }
 
-  async transcribe(audio: Buffer, userId?: string, mimeType = 'audio/ogg'): Promise<string | null> {
+  async transcribe(
+    audio: Buffer,
+    userId?: string,
+    mimeType = 'audio/ogg',
+    channel: Channel = Channel.WHATSAPP,
+  ): Promise<string | null> {
     if (!this.enabled()) {
       this.logger.warn('[dev] transcripción saltada: faltan credenciales de IA');
       return null;
@@ -67,7 +72,7 @@ export class TranscriptionService {
         model,
         inputTokens: data.usage?.input_tokens,
         outputTokens: data.usage?.output_tokens,
-        channel: Channel.WHATSAPP,
+        channel,
       });
     }
     return data.text?.trim() ?? null;

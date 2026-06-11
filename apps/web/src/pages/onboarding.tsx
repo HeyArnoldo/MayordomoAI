@@ -9,7 +9,7 @@ import { useMe } from '@/hooks/use-auth';
 import { usersApi } from '@/services/users.api';
 import { AuthShell, MobileBrandHeader } from '@/components/mayordomo/auth-shell';
 import { CodeInput, useCodeInput } from '@/features/phone/code-input';
-import { Input } from '@/components/ui/input';
+import { PhoneNumberInput } from '@/features/phone/phone-number-input';
 
 const E164 = /^\+[1-9]\d{7,14}$/;
 const RESEND_SECONDS = 60;
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<'phone' | 'code'>('phone');
-  const [e164, setE164] = useState('+51');
+  const [e164, setE164] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -169,17 +169,10 @@ function PhoneStep(props: {
         }}
         className="mt-7"
       >
-        <Input
-          type="tel"
-          inputMode="tel"
-          autoFocus
-          value={props.e164}
-          onChange={(e) => props.onChange(e.target.value.replace(/[^\d+]/g, ''))}
-          placeholder="+51 987 654 321"
-          className="h-[50px] rounded-[14px] font-mono text-[16px] font-semibold"
-        />
+        <PhoneNumberInput onChange={props.onChange} autoFocus />
         <p className="mt-2 text-[12px] text-ink-3">
-          Formato internacional, ej.: +51987654321. Un número solo puede pertenecer a una cuenta.
+          Solo dígitos — el código del país se elige a la izquierda. Un número solo puede pertenecer
+          a una cuenta.
         </p>
 
         <button

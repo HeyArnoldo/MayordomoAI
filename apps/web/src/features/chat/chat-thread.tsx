@@ -46,11 +46,14 @@ import {
   PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
+  PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  usePromptInputController,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+import { Spinner } from '@/components/ui/spinner';
 import {
   ChainOfThought,
   ChainOfThoughtContent,
@@ -173,6 +176,75 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
         {done && <ChainOfThoughtStep icon={CheckCircle2} label="Listo" status="complete" />}
       </ChainOfThoughtContent>
     </ChainOfThought>
+  );
+}
+
+/**
+ * Mic del composer: graba con MediaRecorder, transcribe en el backend (mismo
+ * motor que las notas de voz de WhatsApp) y deja el texto EN el input para
+ * que el usuario lo revise antes de enviar — la transcripción puede fallar.
+ */
+function MicButton() {
+  const { textInput } = usePromptInputController();
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+
+  const supported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices);
+
+  const stop = () => {
+    recorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size < 1_000) return; // click accidental: nada que transcribir
+        setTranscribing(true);
+        try {
+          const text = await chatApi.transcribe(blob);
+          const prev = textInput.value.trim();
+          textInput.setInput(prev ? `${prev} ${text}` : text);
+        } catch {
+          toast.error('No se pudo transcribir — intenta de nuevo o escribe el mensaje');
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+    } catch {
+      toast.error('Sin acceso al micrófono — revisa los permisos del navegador');
+    }
+  };
+
+  if (!supported) return null;
+
+  return (
+    <PromptInputButton
+      onClick={() => (recording ? stop() : void start())}
+      disabled={transcribing}
+      title={recording ? 'Detener y transcribir' : 'Dictar por voz'}
+      className={cn(recording && 'bg-negative-soft text-negative hover:text-negative')}
+    >
+      {transcribing ? (
+        <Spinner className="size-4" />
+      ) : recording ? (
+        <Square className="size-4 animate-pulse" />
+      ) : (
+        <Mic className="size-4" />
+      )}
+    </PromptInputButton>
   );
 }
 
@@ -312,27 +384,28 @@ export function ChatThread({
   };
 
   const promptBox = (
-    <PromptInput
-      onSubmit={handleSubmit}
-      className="rounded-2xl border-line bg-surface shadow-float"
-    >
-      <PromptInputBody>
-        <PromptInputTextarea placeholder="Escribe un mensaje…" className="min-h-12 text-[15px]" />
-      </PromptInputBody>
-      <PromptInputFooter>
-        <PromptInputTools>
-          <PromptInputButton disabled title="Adjuntos — próximamente">
-            <Plus className="size-4" />
-          </PromptInputButton>
-        </PromptInputTools>
-        <div className="flex items-center gap-1">
-          <PromptInputButton disabled title="Notas de voz — por WhatsApp">
-            <Mic className="size-4" />
-          </PromptInputButton>
-          <PromptInputSubmit status={status} onStop={stop} />
-        </div>
-      </PromptInputFooter>
-    </PromptInput>
+    // Provider: el MicButton necesita escribir el texto transcrito en el input.
+    <PromptInputProvider>
+      <PromptInput
+        onSubmit={handleSubmit}
+        className="rounded-2xl border-line bg-surface shadow-float"
+      >
+        <PromptInputBody>
+          <PromptInputTextarea placeholder="Escribe un mensaje…" className="min-h-12 text-[15px]" />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputTools>
+            <PromptInputButton disabled title="Adjuntos — próximamente">
+              <Plus className="size-4" />
+            </PromptInputButton>
+          </PromptInputTools>
+          <div className="flex items-center gap-1">
+            <MicButton />
+            <PromptInputSubmit status={status} onStop={stop} />
+          </div>
+        </PromptInputFooter>
+      </PromptInput>
+    </PromptInputProvider>
   );
 
   const errorBox = error && (
