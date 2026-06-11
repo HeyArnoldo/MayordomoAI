@@ -25,7 +25,11 @@ export function TransactionRow({
   const isIncome = tx.type === TransactionType.INCOME;
   const isTransit = tx.type === TransactionType.TRANSIT;
   const voided = tx.status === TransactionStatus.VOIDED;
-  const color = box ? boxColor(box.name) : isIncome ? 'var(--positive)' : 'var(--ink-3)';
+  const color = box
+    ? boxColor(box.name, box.colorKey)
+    : isIncome
+      ? 'var(--positive)'
+      : 'var(--ink-3)';
   const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
   const label = box?.name ?? (isIncome ? 'Ingreso' : 'Tránsito');
 

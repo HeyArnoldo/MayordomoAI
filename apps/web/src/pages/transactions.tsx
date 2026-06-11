@@ -101,7 +101,7 @@ export default function TransactionsPage() {
           >
             <span
               className="size-2 rounded-full"
-              style={{ backgroundColor: boxColor(activeBox.name) }}
+              style={{ backgroundColor: boxColor(activeBox.name, activeBox.colorKey) }}
             />
             {activeBox.name}
             <X className="size-3.5 text-ink-3" />

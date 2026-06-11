@@ -6,6 +6,7 @@ import type {
   CreateTransactionInput,
   ToolAudit,
   Transaction,
+  UpdateBoxInput,
 } from '@app/contracts';
 import { api } from '@/lib/api';
 
@@ -13,6 +14,8 @@ export const boxesApi = {
   list: async (): Promise<Box[]> => (await api.get('/boxes')).data,
   balances: async (): Promise<BoxBalance[]> => (await api.get('/boxes/balances')).data,
   create: async (input: CreateBoxInput): Promise<Box> => (await api.post('/boxes', input)).data,
+  update: async (id: string, input: UpdateBoxInput): Promise<Box> =>
+    (await api.patch(`/boxes/${id}`, input)).data,
   updateAllocation: async (input: AllocationInput): Promise<Box[]> =>
     (await api.put('/boxes/allocation', input)).data,
 };

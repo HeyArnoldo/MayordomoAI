@@ -96,7 +96,7 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
             {boxes
               .filter((b) => b.active)
               .map((b) => {
-                const color = boxColor(b.name);
+                const color = boxColor(b.name, b.colorKey);
                 const selected = boxId === b.id;
                 return (
                   <button

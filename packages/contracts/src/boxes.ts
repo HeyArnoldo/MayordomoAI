@@ -10,12 +10,30 @@ export enum BoxScope {
   BUSINESS = 'business',
 }
 
+/**
+ * Colores de caja como TOKENS del design (no hex): la UI los resuelve a
+ * var(--caja-<key>), que se adapta solo al modo claro/oscuro.
+ */
+export const BOX_COLOR_KEYS = [
+  'ahorro',
+  'varios',
+  'pasajes',
+  'ocio',
+  'diezmo',
+  'snacks',
+  'ofrenda',
+  'empresa',
+] as const;
+export const boxColorKeySchema = z.enum(BOX_COLOR_KEYS);
+export type BoxColorKey = z.infer<typeof boxColorKeySchema>;
+
 export const createBoxSchema = z.object({
   name: z.string().min(1).max(60),
   // Puntos porcentuales (25 = 25%). El set personal activo debe sumar 100.
   pct: z.number().min(0).max(100).multipleOf(0.01),
   type: z.enum(BoxType),
   scope: z.enum(BoxScope).default(BoxScope.PERSONAL),
+  colorKey: boxColorKeySchema.nullish(),
   sortOrder: z.number().int().min(0).optional(),
 });
 export type CreateBoxInput = z.infer<typeof createBoxSchema>;
@@ -25,6 +43,7 @@ export const updateBoxSchema = z.object({
   pct: z.number().min(0).max(100).multipleOf(0.01).optional(),
   type: z.enum(BoxType).optional(),
   scope: z.enum(BoxScope).optional(),
+  colorKey: boxColorKeySchema.nullable().optional(),
   sortOrder: z.number().int().min(0).optional(),
   active: z.boolean().optional(),
 });
@@ -49,6 +68,8 @@ export const boxSchema = z.object({
   pct: z.number(),
   type: z.enum(BoxType),
   scope: z.enum(BoxScope),
+  // null = el color se deduce del nombre (set conocido) o cae al gris de Varios.
+  colorKey: boxColorKeySchema.nullable(),
   sortOrder: z.number().int(),
   active: z.boolean(),
   createdAt: z.string(),

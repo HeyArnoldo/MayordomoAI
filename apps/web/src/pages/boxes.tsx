@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Minus, PackagePlus, Plus, TriangleAlert } from 'lucide-react';
+import { Check, Minus, PackagePlus, Pencil, Plus, TriangleAlert } from 'lucide-react';
+import type { BoxBalance } from '@app/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Money } from '@/components/mayordomo/money';
 import { NewBoxDialog } from '@/features/boxes/new-box-dialog';
+import { EditBoxDialog } from '@/features/boxes/edit-box-dialog';
 import { useBoxBalances, useUpdateAllocation } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
@@ -14,6 +16,7 @@ export default function BoxesPage() {
   const { data: boxes = [], isLoading } = useBoxBalances();
   const update = useUpdateAllocation();
   const [pcts, setPcts] = useState<Record<string, number>>({});
+  const [editing, setEditing] = useState<BoxBalance | null>(null);
 
   const editable = boxes.filter((b) => b.active && b.scope === 'personal');
 
@@ -74,7 +77,7 @@ export default function BoxesPage() {
 
       <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
         {editable.map((b, i) => {
-          const color = boxColor(b.name);
+          const color = boxColor(b.name, b.colorKey);
           const pct = pcts[b.id] ?? b.pct;
           return (
             <div
@@ -95,6 +98,13 @@ export default function BoxesPage() {
                     fondo
                   </span>
                 )}
+                <button
+                  onClick={() => setEditing(b)}
+                  className="shrink-0 rounded-lg p-1 text-ink-3 transition-colors hover:bg-surface-alt hover:text-ink"
+                  title="Editar caja"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Money value={b.allocated} className="hidden text-xs text-ink-3 sm:inline" />
@@ -106,9 +116,23 @@ export default function BoxesPage() {
                 >
                   <Minus className="size-3.5" />
                 </Button>
-                <span className="money w-12 text-center text-sm font-semibold text-ink">
-                  {pct}%
-                </span>
+                {/* % editable a mano; los ± siguen para ajustes rápidos */}
+                <div className="relative">
+                  <input
+                    value={pct}
+                    inputMode="decimal"
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(',', '.');
+                      if (!/^\d{0,3}(\.\d{0,2})?$/.test(raw)) return;
+                      const n = raw === '' ? 0 : parseFloat(raw);
+                      if (n <= 100) setPcts((p) => ({ ...p, [b.id]: n }));
+                    }}
+                    className="money h-8 w-[64px] rounded-lg border border-line bg-surface pr-5 text-center text-sm font-semibold text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  />
+                  <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[11px] text-ink-3">
+                    %
+                  </span>
+                </div>
                 <Button
                   variant="outline"
                   size="icon"
@@ -135,6 +159,8 @@ export default function BoxesPage() {
       <p className="text-center text-xs text-ink-3">
         Los cambios aplican a ingresos futuros — el historial conserva su reparto original.
       </p>
+
+      <EditBoxDialog box={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

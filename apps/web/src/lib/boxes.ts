@@ -1,11 +1,17 @@
-import type { BoxBalance } from '@app/contracts';
+import type { BoxBalance, BoxColorKey } from '@app/contracts';
+import { BOX_COLOR_KEYS } from '@app/contracts';
 
-/** Color de caja: las 8 del set conocido mapean a los tokens del design. */
-const KNOWN = ['ahorro', 'varios', 'pasajes', 'ocio', 'diezmo', 'snacks', 'ofrenda', 'empresa'];
-
-export function boxColor(name: string): string {
+/**
+ * Color de caja: el colorKey elegido por el usuario manda; sin él, las 8 del
+ * set conocido mapean por nombre a los tokens del design. Siempre CSS vars —
+ * se adaptan solas al modo oscuro.
+ */
+export function boxColor(name: string, colorKey?: BoxColorKey | null): string {
+  if (colorKey) return `var(--caja-${colorKey})`;
   const slug = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  return KNOWN.includes(slug) ? `var(--caja-${slug})` : 'var(--caja-varios)';
+  return (BOX_COLOR_KEYS as readonly string[]).includes(slug)
+    ? `var(--caja-${slug})`
+    : 'var(--caja-varios)';
 }
 
 /** Alerta por excepción, como el design: sobregiro / agotada / queda poco. */

@@ -47,7 +47,11 @@ export function TransactionDetailDialog({
   const isIncome = tx.type === TransactionType.INCOME;
   const isTransit = tx.type === TransactionType.TRANSIT;
   const voided = tx.status === TransactionStatus.VOIDED;
-  const color = box ? boxColor(box.name) : isIncome ? 'var(--positive)' : 'var(--ink-3)';
+  const color = box
+    ? boxColor(box.name, box.colorKey)
+    : isIncome
+      ? 'var(--positive)'
+      : 'var(--ink-3)';
   const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
 
   const rows: Array<[string, string]> = [
@@ -113,7 +117,12 @@ export function TransactionDetailDialog({
                 <div key={s.boxId} className="flex items-center gap-2.5">
                   <span
                     className="size-2.5 rounded-[3px]"
-                    style={{ backgroundColor: boxColor(s.name) }}
+                    style={{
+                      backgroundColor: boxColor(
+                        s.name,
+                        boxes.find((b) => b.id === s.boxId)?.colorKey,
+                      ),
+                    }}
                   />
                   <span className="flex-1 text-[12.5px] text-ink-2">
                     {s.name} <span className="text-ink-3">· {s.pct}%</span>

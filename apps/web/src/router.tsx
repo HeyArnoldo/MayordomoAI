@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AdminRoute, OnboardedRoute, ProtectedRoute } from '@/components/protected-route';
 import { AppLayout } from '@/layouts/app-layout';
 
@@ -12,7 +12,7 @@ const HomePage = lazy(() => import('@/pages/home'));
 const ChatPage = lazy(() => import('@/pages/chat'));
 const TransactionsPage = lazy(() => import('@/pages/transactions'));
 const BoxesPage = lazy(() => import('@/pages/boxes'));
-const AgentTrailPage = lazy(() => import('@/pages/agent-trail'));
+const SettingsPage = lazy(() => import('@/pages/settings'));
 const AdminPage = lazy(() => import('@/pages/admin'));
 
 export const router = createBrowserRouter([
@@ -34,7 +34,9 @@ export const router = createBrowserRouter([
               { path: '/movimientos', element: <TransactionsPage /> },
               { path: '/chat', element: <ChatPage /> },
               { path: '/cajas', element: <BoxesPage /> },
-              { path: '/agente', element: <AgentTrailPage /> },
+              { path: '/configuracion', element: <SettingsPage /> },
+              // El historial de razonamiento ahora vive dentro de Configuración.
+              { path: '/agente', element: <Navigate to="/configuracion" replace /> },
               {
                 element: <AdminRoute />,
                 children: [{ path: '/admin', element: <AdminPage /> }],

@@ -17,7 +17,7 @@ export function EnvelopeCard({
   compact?: boolean;
   onClick?: () => void;
 }) {
-  const color = boxColor(box.name);
+  const color = boxColor(box.name, box.colorKey);
   const isFund = box.accumulated !== null;
   const over = box.balance < 0;
   const pctUsed = box.allocated > 0 ? (box.spent / box.allocated) * 100 : 0;

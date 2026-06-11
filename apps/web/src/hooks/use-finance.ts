@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AllocationInput, CreateBoxInput, CreateTransactionInput } from '@app/contracts';
+import type {
+  AllocationInput,
+  CreateBoxInput,
+  CreateTransactionInput,
+  UpdateBoxInput,
+} from '@app/contracts';
 import { agentApi, boxesApi, transactionsApi } from '@/services/finance.api';
 
 export function useBoxBalances() {
@@ -42,6 +47,15 @@ export function useCreateBox() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: (input: CreateBoxInput) => boxesApi.create(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateBox() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateBoxInput }) =>
+      boxesApi.update(id, input),
     onSuccess: invalidate,
   });
 }

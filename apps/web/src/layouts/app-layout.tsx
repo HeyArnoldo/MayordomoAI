@@ -9,17 +9,15 @@ import {
   PackageOpen,
   PanelLeft,
   Plus,
+  Settings,
   ShieldCheck,
   Sun,
-  Trash2,
-  Wrench,
 } from 'lucide-react';
 import { UserRole } from '@app/contracts';
 import { useLogout, useMe } from '@/hooks/use-auth';
 import { Mark, Wordmark } from '@/components/mayordomo/mark';
 import { RegistroDialog } from '@/features/registro/registro-dialog';
-import { PhoneLinkDialog } from '@/features/phone/phone-link-dialog';
-import { DeleteAccountDialog } from '@/features/account/delete-account-dialog';
+import { applyAccent, getAccent } from '@/lib/accent';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,7 +34,7 @@ const NAV = [
   { to: '/movimientos', label: 'Movimientos', icon: List },
   { to: '/chat', label: 'Conversaciones', icon: MessageCircle },
   { to: '/cajas', label: 'Cajas y reparto', icon: PackageOpen },
-  { to: '/agente', label: 'Razonamiento', icon: Wrench },
+  { to: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
 const ADMIN_NAV = { to: '/admin', label: 'Administración', icon: ShieldCheck };
@@ -46,7 +44,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/movimientos': 'Movimientos',
   '/chat': 'Conversaciones',
   '/cajas': 'Cajas y reparto',
-  '/agente': 'Historial de razonamiento',
+  '/configuracion': 'Configuración',
   '/admin': 'Administración',
 };
 
@@ -78,14 +76,16 @@ export function AppLayout() {
   const { pathname } = useLocation();
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [expanded, setExpanded] = useState(() => localStorage.getItem('sidebar') !== 'collapsed');
-  // Dialogs del menú de perfil: viven fuera del dropdown (Radix los desmonta).
-  const [phoneOpen, setPhoneOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  // Acento persistido (Configuración → Apariencia): se aplica al montar la app.
+  useEffect(() => {
+    applyAccent(getAccent());
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('sidebar', expanded ? 'expanded' : 'collapsed');
@@ -180,9 +180,6 @@ export function AppLayout() {
                 {user?.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setPhoneOpen(true)}>
-                <MessageCircle className="size-4" /> WhatsApp
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDark((d) => !d)}>
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 {dark ? 'Modo claro' : 'Modo oscuro'}
@@ -190,15 +187,8 @@ export function AppLayout() {
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="size-4" /> Cerrar sesión
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="size-4" /> Eliminar cuenta
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <PhoneLinkDialog open={phoneOpen} onOpenChange={setPhoneOpen} />
-          <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
         </div>
       </aside>
 
@@ -212,7 +202,21 @@ export function AppLayout() {
           <h1 className="hidden text-[15px] font-bold text-ink lg:block">
             {PAGE_TITLES[pathname] ?? 'MayordomoAI'}
           </h1>
-          <DarkToggle dark={dark} onToggle={() => setDark((d) => !d)} />
+          <div className="flex items-center gap-1">
+            {/* Configuración accesible desde mobile (la tabbar no la incluye) */}
+            <NavLink
+              to="/configuracion"
+              className={({ isActive }) =>
+                cn(
+                  'flex size-9 items-center justify-center rounded-lg lg:hidden',
+                  isActive ? 'text-brand' : 'text-ink-2',
+                )
+              }
+            >
+              <Settings className="size-4" />
+            </NavLink>
+            <DarkToggle dark={dark} onToggle={() => setDark((d) => !d)} />
+          </div>
         </header>
 
         {/* pb-16 = altura exacta de la tabbar; más padding deja una franja visible */}

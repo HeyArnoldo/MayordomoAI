@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { BoxScope, BoxType } from '@app/contracts';
+import { BoxColorKey, BoxScope, BoxType } from '@app/contracts';
 import { User } from '../users/user.entity';
 
 /**
@@ -38,6 +38,10 @@ export class Box {
 
   @Column({ type: 'enum', enum: BoxScope, default: BoxScope.PERSONAL })
   scope: BoxScope;
+
+  // Token de color del design (var(--caja-<key>)). Null = se deduce del nombre.
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  colorKey: BoxColorKey | null;
 
   @Column({ type: 'int', default: 0 })
   sortOrder: number;

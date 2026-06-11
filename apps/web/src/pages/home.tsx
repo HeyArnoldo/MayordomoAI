@@ -75,7 +75,10 @@ export default function DashboardPage() {
         >
           <div>
             <div className="flex items-center gap-2">
-              <TrendingUp className="size-4" style={{ color: boxColor(fund.name) }} />
+              <TrendingUp
+                className="size-4"
+                style={{ color: boxColor(fund.name, fund.colorKey) }}
+              />
               <span className="text-sm font-bold text-ink">{fund.name}</span>
             </div>
             <p className="mt-1 text-xs text-ink-2">

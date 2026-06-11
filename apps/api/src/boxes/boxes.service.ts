@@ -31,6 +31,7 @@ export function toBoxDto(b: Box): BoxDto {
     pct: parseFloat(b.pct),
     type: b.type,
     scope: b.scope,
+    colorKey: b.colorKey,
     sortOrder: b.sortOrder,
     active: b.active,
     createdAt: b.createdAt.toISOString(),
@@ -68,6 +69,7 @@ export class BoxesService {
         pct: input.pct.toFixed(2),
         type: input.type,
         scope: input.scope,
+        colorKey: input.colorKey ?? null,
         sortOrder: input.sortOrder ?? (max ?? 0) + 1,
       }),
     );
@@ -79,6 +81,7 @@ export class BoxesService {
     if (input.pct !== undefined) box.pct = input.pct.toFixed(2);
     if (input.type !== undefined) box.type = input.type;
     if (input.scope !== undefined) box.scope = input.scope;
+    if (input.colorKey !== undefined) box.colorKey = input.colorKey;
     if (input.sortOrder !== undefined) box.sortOrder = input.sortOrder;
     if (input.active !== undefined) box.active = input.active;
     return this.repo.save(box);
