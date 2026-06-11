@@ -15,6 +15,13 @@
 :root {
   --radius: 1rem;
 
+  /*
+   * Matiz de los neutrales: fondos, bordes y texto llevan un tinte sutil
+   * del MISMO matiz que el acento (cada data-accent lo redefine). L y C
+   * vienen de la paleta original — con verde el render es idéntico al hex.
+   */
+  --tint-hue: 158;
+
   /* acento — verde dinero (default) */
   --brand: #0e7a4d;
   --brand-soft: #e2f1e9;
@@ -22,13 +29,13 @@
 
   /* neutrales light */
   --surface: #ffffff;
-  --surface-alt: #ebefeb;
-  --inset: #f6f8f6;
-  --ink: #16211a;
-  --ink-2: #5d6a62;
-  --ink-3: #94a09a;
-  --line: #e3e8e3;
-  --line-strong: #cfd8cf;
+  --surface-alt: oklch(0.948 0.007 var(--tint-hue));
+  --inset: oklch(0.977 0.003 var(--tint-hue));
+  --ink: oklch(0.235 0.02 var(--tint-hue));
+  --ink-2: oklch(0.511 0.02 var(--tint-hue));
+  --ink-3: oklch(0.694 0.016 var(--tint-hue));
+  --line: oklch(0.926 0.0085 var(--tint-hue));
+  --line-strong: oklch(0.873 0.0156 var(--tint-hue));
   --positive: #0e7a4d;
   --negative: #bb4540;
   --negative-soft: #f7e9e8;
@@ -45,11 +52,11 @@
   --caja-empresa: #41599e;
 
   /* sombras */
-  --shadow-card: 0 1px 2px rgba(20, 40, 28, 0.06);
-  --shadow-float: 0 16px 40px rgba(20, 40, 28, 0.12);
+  --shadow-card: 0 1px 2px oklch(0.3 0.02 var(--tint-hue) / 0.06);
+  --shadow-float: 0 16px 40px oklch(0.3 0.02 var(--tint-hue) / 0.12);
 
   /* mapeo shadcn */
-  --background: #f2f5f2;
+  --background: oklch(0.967 0.005 var(--tint-hue));
   --foreground: var(--ink);
   --card: var(--surface);
   --card-foreground: var(--ink);
@@ -83,28 +90,30 @@
 }
 
 :root[data-accent='teal'] {
+  --tint-hue: 215;
   --brand: #0f7e96;
   --brand-soft: #e1f0f3;
 }
 
 :root[data-accent='indigo'] {
+  --tint-hue: 268;
   --brand: #41599e;
   --brand-soft: #e7eaf5;
 }
 
 .dark {
   --brand: #34d399;
-  --brand-soft: #16332455;
-  --on-brand: #0b1410;
+  --brand-soft: oklch(0.27 0.04 var(--tint-hue) / 0.33);
+  --on-brand: oklch(0.18 0.013 var(--tint-hue));
 
-  --surface: #141c17;
-  --surface-alt: #1a241e;
-  --inset: #101813;
-  --ink: #edf3ee;
-  --ink-2: #94a39a;
-  --ink-3: #5f6e65;
-  --line: #232f28;
-  --line-strong: #314037;
+  --surface: oklch(0.217 0.015 var(--tint-hue));
+  --surface-alt: oklch(0.248 0.018 var(--tint-hue));
+  --inset: oklch(0.199 0.0156 var(--tint-hue));
+  --ink: oklch(0.958 0.009 var(--tint-hue));
+  --ink-2: oklch(0.701 0.021 var(--tint-hue));
+  --ink-3: oklch(0.523 0.023 var(--tint-hue));
+  --line: oklch(0.292 0.021 var(--tint-hue));
+  --line-strong: oklch(0.355 0.025 var(--tint-hue));
   --positive: #34d399;
   --negative: #f07b72;
   --negative-soft: #3a211f;
@@ -122,17 +131,15 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.45);
 
-  --background: #0c120f;
+  --background: oklch(0.175 0.011 var(--tint-hue));
 }
 
 :root.dark[data-accent='teal'] {
   --brand: #53c8de;
-  --brand-soft: #13313955;
 }
 
 :root.dark[data-accent='indigo'] {
   --brand: #93a8e8;
-  --brand-soft: #1d274555;
 }
 
 @theme inline {
