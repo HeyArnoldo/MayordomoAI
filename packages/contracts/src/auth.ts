@@ -5,6 +5,13 @@ export enum UserRole {
   USER = 'user',
 }
 
+/** Allowlist: solo cuentas activas usan el bot y el dashboard completo. */
+export enum UserEstado {
+  PENDIENTE = 'pendiente',
+  ACTIVA = 'activa',
+  SUSPENDIDA = 'suspendida',
+}
+
 export const registerSchema = z.object({
   email: z.email().max(160),
   password: z.string().min(8).max(72),
@@ -24,6 +31,7 @@ export const authUserSchema = z.object({
   name: z.string(),
   avatarUrl: z.string().nullable(),
   role: z.enum(UserRole),
+  estado: z.enum(UserEstado),
   createdAt: z.string(),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;

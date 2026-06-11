@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { UserRole } from '@app/contracts';
+import { UserEstado, UserRole } from '@app/contracts';
 
 @Entity('users')
 export class User {
@@ -30,6 +30,10 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role: UserRole;
+
+  // Allowlist: el signup queda 'pendiente' hasta que un admin lo active.
+  @Column({ type: 'enum', enum: UserEstado, default: UserEstado.PENDIENTE })
+  estado: UserEstado;
 
   @CreateDateColumn()
   createdAt: Date;

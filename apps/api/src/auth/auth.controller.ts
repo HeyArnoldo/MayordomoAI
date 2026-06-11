@@ -27,6 +27,7 @@ function toAuthUser(user: User): AuthUser {
     name: user.name,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    estado: user.estado,
     createdAt: user.createdAt.toISOString(),
   };
 }
