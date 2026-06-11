@@ -5,13 +5,17 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  DollarSign,
   ListOrdered,
   Mic,
   PenLine,
   PieChart,
   Plus,
+  RefreshCw,
   Search,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   TrendingDown,
   Undo2,
   Volume2,
@@ -20,8 +24,10 @@ import {
 } from 'lucide-react';
 import type { Message as PersistedMessage } from '@app/contracts';
 import { MessageRole } from '@app/contracts';
+import { toast } from 'sonner';
 import { Mark } from '@/components/mayordomo/mark';
 import { useMe } from '@/hooks/use-auth';
+import { cn } from '@/lib/utils';
 import { chatApi } from '@/services/chat.api';
 import {
   Conversation,
@@ -54,15 +60,32 @@ import {
 import { Suggestion } from '@/components/ai-elements/suggestion';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 
-/** Mapea historial persistido → UIMessages para hidratar useChat. */
+/**
+ * Mapea historial persistido → UIMessages para hidratar useChat.
+ * Los toolCalls guardados se hidratan como parts para que la cadena de
+ * razonamiento también se vea al recargar, no solo en vivo.
+ */
 function toUIMessages(history: PersistedMessage[]): UIMessage[] {
   return history
     .filter((m) => m.role !== MessageRole.TOOL)
-    .map((m) => ({
-      id: m.id,
-      role: m.role === MessageRole.USER ? ('user' as const) : ('assistant' as const),
-      parts: [{ type: 'text' as const, text: m.content }],
-    }));
+    .map((m) => {
+      const toolParts = (Array.isArray(m.toolCalls) ? m.toolCalls : [])
+        .filter((t): t is { toolName: string; toolCallId?: string; input?: unknown } =>
+          Boolean(t && typeof t === 'object' && 'toolName' in t),
+        )
+        .map((t, i) => ({
+          type: `tool-${t.toolName}`,
+          toolCallId: t.toolCallId ?? `${m.id}-tool-${i}`,
+          state: 'output-available' as const,
+          input: t.input,
+          output: null,
+        }));
+      return {
+        id: m.id,
+        role: m.role === MessageRole.USER ? ('user' as const) : ('assistant' as const),
+        parts: [...toolParts, { type: 'text' as const, text: m.content }] as UIMessage['parts'],
+      };
+    });
 }
 
 function greeting(): string {
@@ -86,6 +109,7 @@ const TOOL_LABELS: Record<string, { label: string; icon: typeof Wrench }> = {
   searchTransactions: { label: 'Buscando en tus movimientos', icon: Search },
   getSpendingByBox: { label: 'Sumando gastos por caja', icon: PieChart },
   getTopExpenses: { label: 'Buscando tus gastos más grandes', icon: TrendingDown },
+  getExchangeRate: { label: 'Consultando tipo de cambio', icon: DollarSign },
   registerTransaction: { label: 'Registrando el movimiento', icon: PenLine },
   voidTransaction: { label: 'Anulando el movimiento', icon: Undo2 },
 };
@@ -95,6 +119,26 @@ function toolMeta(type: string) {
   return TOOL_LABELS[name] ?? { label: name, icon: Wrench };
 }
 
+/**
+ * Partes del mensaje en orden cronológico, agrupando solo tools CONSECUTIVAS:
+ * texto → razonamiento → texto se renderiza tal cual ocurrió, no todo junto.
+ */
+type Segment = { kind: 'text'; text: string } | { kind: 'tools'; tools: ToolUIPart[] };
+
+function segmentParts(parts: UIMessage['parts']): Segment[] {
+  const segments: Segment[] = [];
+  for (const part of parts) {
+    if (part.type === 'text' && part.text) {
+      segments.push({ kind: 'text', text: part.text });
+    } else if (part.type.startsWith('tool-')) {
+      const last = segments.at(-1);
+      if (last?.kind === 'tools') last.tools.push(part as ToolUIPart);
+      else segments.push({ kind: 'tools', tools: [part as ToolUIPart] });
+    }
+  }
+  return segments;
+}
+
 /** Cadena de razonamiento estilo Claude: colapsada en una línea, pasos al abrir. */
 function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
   const first = toolMeta(tools[0].type);
@@ -102,7 +146,10 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
 
   return (
     <ChainOfThought defaultOpen={false}>
-      <ChainOfThoughtHeader>{headerLabel}</ChainOfThoughtHeader>
+      {/* w-fit: chevron pegado al texto, no empujado al borde derecho */}
+      <ChainOfThoughtHeader className="w-fit [&>span]:flex-none">
+        {headerLabel}
+      </ChainOfThoughtHeader>
       <ChainOfThoughtContent>
         {tools.map((tool, i) => {
           const meta = toolMeta(tool.type);
@@ -129,10 +176,20 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
   );
 }
 
-/** Copiar + leer en voz alta, debajo de cada respuesta del asistente. */
-function AssistantActions({ text }: { text: string }) {
+/** Copiar, leer en voz alta, feedback y reintentar — fila estilo Claude. */
+function AssistantActions({
+  text,
+  onRetry,
+  hoverOnly = false,
+}: {
+  text: string;
+  onRetry?: () => void;
+  /** Mensajes pasados: acciones visibles solo al pasar el mouse. */
+  hoverOnly?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
 
   const copy = async () => {
     await navigator.clipboard.writeText(text);
@@ -154,8 +211,19 @@ function AssistantActions({ text }: { text: string }) {
     setSpeaking(true);
   };
 
+  const vote = (v: 'up' | 'down') => {
+    setVoted(v);
+    toast.success(v === 'up' ? '¡Gracias por el feedback!' : 'Gracias, lo tendremos en cuenta.');
+  };
+
   return (
-    <MessageActions className="-ml-1.5 text-ink-3">
+    <MessageActions
+      className={cn(
+        '-ml-1.5 text-ink-3',
+        hoverOnly &&
+          'opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100',
+      )}
+    >
       <MessageAction tooltip={copied ? 'Copiado' : 'Copiar'} label="Copiar" onClick={copy}>
         {copied ? <Check className="size-3.5 text-positive" /> : <Copy className="size-3.5" />}
       </MessageAction>
@@ -166,6 +234,27 @@ function AssistantActions({ text }: { text: string }) {
           onClick={speak}
         >
           {speaking ? <Square className="size-3.5" /> : <Volume2 className="size-3.5" />}
+        </MessageAction>
+      )}
+      <MessageAction
+        tooltip="Buena respuesta"
+        label="Buena respuesta"
+        onClick={() => vote('up')}
+        disabled={voted !== null}
+      >
+        <ThumbsUp className={cn('size-3.5', voted === 'up' && 'text-positive')} />
+      </MessageAction>
+      <MessageAction
+        tooltip="Mala respuesta"
+        label="Mala respuesta"
+        onClick={() => vote('down')}
+        disabled={voted !== null}
+      >
+        <ThumbsDown className={cn('size-3.5', voted === 'down' && 'text-negative')} />
+      </MessageAction>
+      {onRetry && (
+        <MessageAction tooltip="Reintentar" label="Reintentar" onClick={onRetry}>
+          <RefreshCw className="size-3.5" />
         </MessageAction>
       )}
     </MessageActions>
@@ -190,7 +279,7 @@ export function ChatThread({
   // debe ser estable para no perder el stream, así que va aparte.
   const convRef = useRef<string | null>(conversationId);
   const [chatId] = useState(() => conversationId ?? `draft-${Date.now()}`);
-  const { messages, sendMessage, status, stop, error } = useChat({
+  const { messages, sendMessage, regenerate, status, stop, error } = useChat({
     id: chatId,
     messages: initialMessages,
     transport: new DefaultChatTransport({
@@ -297,31 +386,37 @@ export function ChatThread({
               .filter((p) => p.type === 'text')
               .map((p) => p.text)
               .join('\n');
-            const toolParts = m.parts.filter((p): p is ToolUIPart => p.type.startsWith('tool-'));
+            const segments = segmentParts(m.parts);
             return (
               <Message key={m.id} from={m.role}>
                 {/* Asistente plano sobre el fondo; usuario en burbuja suave a la derecha. */}
                 <MessageContent className="group-[.is-user]:rounded-2xl group-[.is-user]:bg-surface-alt group-[.is-user]:text-ink">
-                  {/* Tools agrupadas como cadena de razonamiento, encima del texto. */}
-                  {toolParts.length > 0 && (
-                    <ToolChain tools={toolParts} done={Boolean(fullText) || !(busy && isLast)} />
-                  )}
-                  {m.parts.map((part, i) => {
-                    if (part.type === 'text') {
+                  {segments.map((seg, i) => {
+                    if (seg.kind === 'text') {
                       return m.role === 'assistant' ? (
-                        <MessageResponse key={i}>{part.text}</MessageResponse>
+                        <MessageResponse key={i}>{seg.text}</MessageResponse>
                       ) : (
                         <p key={i} className="whitespace-pre-wrap">
-                          {part.text}
+                          {seg.text}
                         </p>
                       );
                     }
-                    return null;
+                    // Cadena cerrada si hay algo después (texto siguiente) o terminó el stream.
+                    const done = i < segments.length - 1 || !(busy && isLast);
+                    return <ToolChain key={i} tools={seg.tools} done={done} />;
                   })}
                 </MessageContent>
                 {/* Acciones solo cuando el mensaje terminó de streamear. */}
                 {m.role === 'assistant' && fullText && !(busy && isLast) && (
-                  <AssistantActions text={fullText} />
+                  <AssistantActions
+                    text={fullText}
+                    hoverOnly={!isLast}
+                    onRetry={
+                      isLast && convRef.current
+                        ? () => void regenerate({ body: { conversationId: convRef.current } })
+                        : undefined
+                    }
+                  />
                 )}
               </Message>
             );
@@ -329,6 +424,15 @@ export function ChatThread({
 
           {busy && messages.at(-1)?.role === 'user' && (
             <Shimmer className="text-sm">Pensando…</Shimmer>
+          )}
+
+          {/* Firma del mayordomo al cerrar su último mensaje, como claude.ai */}
+          {!busy && messages.at(-1)?.role === 'assistant' && (
+            <>
+              <div className="pt-1 pb-6">
+                <Mark size={22} />
+              </div>
+            </>
           )}
 
           {errorBox}

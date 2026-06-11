@@ -127,12 +127,12 @@ export class ChatController {
 
     const last = body.messages.at(-1);
     if (last?.role === 'user') {
-      await this.conversations.appendMessage(
-        conv,
-        MessageRole.USER,
-        uiMessageText(last),
-        Channel.WEB,
-      );
+      // En un "reintentar" el último user ya está persistido: no duplicar.
+      const text = uiMessageText(last);
+      const prev = await this.conversations.lastMessage(conv.id);
+      if (!(prev?.role === MessageRole.USER && prev.content === text)) {
+        await this.conversations.appendMessage(conv, MessageRole.USER, text, Channel.WEB);
+      }
     }
 
     const modelMessages = await convertToModelMessages(body.messages);

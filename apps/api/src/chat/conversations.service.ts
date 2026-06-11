@@ -73,6 +73,14 @@ export class ConversationsService {
     await this.conversations.remove(conv);
   }
 
+  /** Último mensaje del hilo (para dedup en regeneraciones). */
+  lastMessage(conversationId: string): Promise<Message | null> {
+    return this.messages.findOne({
+      where: { conversationId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   listMessages(userId: string, conversationId: string): Promise<Message[]> {
     return this.messages.find({
       where: { conversationId, conversation: { userId } },

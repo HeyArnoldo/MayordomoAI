@@ -283,6 +283,29 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
         }),
     }),
 
+    getExchangeRate: tool({
+      description:
+        'Tipo de cambio actual entre dos monedas (códigos ISO, ej PEN→USD). ' +
+        'Úsala cuando pidan montos en dólares u otra moneda — NO pidas el tipo de cambio al usuario.',
+      inputSchema: z.object({
+        from: z.string().length(3).describe('Moneda origen, ej "PEN"'),
+        to: z.string().length(3).describe('Moneda destino, ej "USD"'),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'getExchangeRate', args, async () => {
+          try {
+            const res = await fetch(`https://open.er-api.com/v6/latest/${args.from.toUpperCase()}`);
+            if (!res.ok) return { error: 'El servicio de tipo de cambio no respondió.' };
+            const data = (await res.json()) as { rates?: Record<string, number> };
+            const rate = data.rates?.[args.to.toUpperCase()];
+            if (!rate) return { error: `No hay tasa para ${args.to}` };
+            return { from: args.from.toUpperCase(), to: args.to.toUpperCase(), rate };
+          } catch {
+            return { error: 'El servicio de tipo de cambio no respondió.' };
+          }
+        }),
+    }),
+
     voidTransaction: tool({
       description:
         'Anula un movimiento (soft delete, recalcula saldos). SIEMPRE pide confirmación al usuario antes de anular.',

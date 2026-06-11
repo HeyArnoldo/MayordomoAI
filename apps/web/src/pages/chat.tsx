@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessageCircle, Pencil, Pin, Trash2 } from 'lucide-react';
+import { ChevronDown, MessageCircle, PanelLeft, Pencil, Pin, Trash2 } from 'lucide-react';
 import { Channel, type Conversation } from '@app/contracts';
 import { ConversationRail } from '@/features/chat/conversation-rail';
 import { ChatThread } from '@/features/chat/chat-thread';
@@ -20,7 +20,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /** Header minimal estilo claude.ai: título + chevron con acciones del hilo. */
-function ThreadHeader({ conv, onDeleted }: { conv: Conversation; onDeleted: () => void }) {
+function ThreadHeader({
+  conv,
+  onDeleted,
+  inset,
+}: {
+  conv: Conversation;
+  onDeleted: () => void;
+  /** Deja lugar al botón de expandir el rail cuando está colapsado. */
+  inset?: boolean;
+}) {
   const rename = useRenameConversation();
   const togglePin = useTogglePin();
   const remove = useDeleteConversation();
@@ -36,7 +45,9 @@ function ThreadHeader({ conv, onDeleted }: { conv: Conversation; onDeleted: () =
     // Overlay con degradado: los mensajes se desvanecen bajo el header en
     // lugar de cortarse. pointer-events solo en la fila interactiva.
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-background via-background/90 to-transparent pb-7">
-      <div className="pointer-events-auto flex h-12 items-center gap-2 px-4">
+      <div
+        className={`pointer-events-auto flex h-12 items-center gap-2 px-4 ${inset ? 'pl-12' : ''}`}
+      >
         {conv.isSystem ? (
           <>
             {title}
@@ -87,6 +98,7 @@ export default function ChatPage() {
   // el ChatThread (remontarlo cortaría el stream en curso).
   const [draft, setDraft] = useState(false);
   const [threadKey, setThreadKey] = useState(0);
+  const [railOpen, setRailOpen] = useState(true);
 
   const selectConversation = (id: string | null, asDraft = false) => {
     setActiveId(id);
@@ -107,16 +119,34 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
-      <div className="hidden md:block">
-        <ConversationRail
-          conversations={conversations}
-          activeId={activeId}
-          onSelect={(id) => selectConversation(id)}
-          onNew={() => selectConversation(null, true)}
-        />
-      </div>
+      {railOpen && (
+        <div className="hidden md:block">
+          <ConversationRail
+            conversations={conversations}
+            activeId={activeId}
+            onSelect={(id) => selectConversation(id)}
+            onNew={() => selectConversation(null, true)}
+            onCollapse={() => setRailOpen(false)}
+          />
+        </div>
+      )}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-        {active && <ThreadHeader conv={active} onDeleted={() => selectConversation(null)} />}
+        {!railOpen && (
+          <button
+            title="Mostrar conversaciones"
+            onClick={() => setRailOpen(true)}
+            className="absolute left-2 top-2 z-20 hidden size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-alt hover:text-ink md:flex"
+          >
+            <PanelLeft className="size-4" />
+          </button>
+        )}
+        {active && (
+          <ThreadHeader
+            conv={active}
+            onDeleted={() => selectConversation(null)}
+            inset={!railOpen}
+          />
+        )}
         {draft ? (
           <ChatThread
             key={`draft-${threadKey}`}

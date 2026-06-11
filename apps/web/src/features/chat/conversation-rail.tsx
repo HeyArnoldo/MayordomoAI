@@ -1,4 +1,12 @@
-import { MessageCircle, MoreHorizontal, Pencil, Pin, Plus, Trash2 } from 'lucide-react';
+import {
+  MessageCircle,
+  MoreHorizontal,
+  PanelLeftClose,
+  Pencil,
+  Pin,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import type { Conversation } from '@app/contracts';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,12 +85,14 @@ export function ConversationRail({
   activeId,
   onSelect,
   onNew,
+  onCollapse,
 }: {
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
   /** Abre un borrador local — la conversación se persiste recién al primer mensaje. */
   onNew: () => void;
+  onCollapse: () => void;
 }) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-surface">
@@ -90,6 +100,15 @@ export function ConversationRail({
         <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
           Conversaciones
         </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 text-ink-3"
+          title="Ocultar conversaciones"
+          onClick={onCollapse}
+        >
+          <PanelLeftClose className="size-4" />
+        </Button>
       </div>
       <div className="px-3 pb-2">
         <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={onNew}>

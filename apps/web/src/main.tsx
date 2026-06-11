@@ -13,7 +13,7 @@ createRoot(document.getElementById('root')!).render(
       <Suspense fallback={null}>
         <RouterProvider router={router} />
       </Suspense>
-      <Toaster richColors />
+      <Toaster richColors position="top-right" />
     </QueryClientProvider>
   </StrictMode>,
 );

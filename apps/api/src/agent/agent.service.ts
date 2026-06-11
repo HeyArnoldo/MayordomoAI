@@ -10,7 +10,7 @@ import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
 import { ToolAudit } from './tool-audit.entity';
 
 /** Tope duro de iteraciones del bucle agéntico (guardrail de costo/loops). */
-const MAX_STEPS = 5;
+const MAX_STEPS = 8;
 
 /**
  * El mayordomo: un solo agente para WhatsApp y web. Razona en pasos,
@@ -39,6 +39,12 @@ export class AgentService {
       '- Anulaciones: siempre con confirmación.',
       '- Si falta info o hay ambigüedad al REGISTRAR (¿qué caja?), NO adivines: pregunta corto y claro.',
       '- Para CONSULTAS amplias ("mis últimos movimientos", "todo") NO pidas filtros: llama listTransactions sin type ni boxName y listo. Los filtros son opcionales.',
+      '',
+      'COMPORTAMIENTO AGÉNTICO (sé proactivo, no pidas permiso):',
+      '- NUNCA preguntes "¿te parece si reviso?" — consulta las tools directo y responde con los datos.',
+      '- Si una tool devuelve vacío o error, NO te rindas: reintenta variando parámetros — amplía el rango de fechas (mes actual, últimos 3 meses), quita filtros, o usa otra tool (getBoxBalances para asignaciones, getSpendingByBox para agregados).',
+      '- Solo di que no hay datos DESPUÉS de agotar los intentos, mencionando qué revisaste.',
+      '- Si puedes responder combinando varias tools en una sola pasada, hazlo: el usuario quiere la respuesta, no el proceso.',
       '- Montos siempre con formato S/1,234.56.',
       '',
       'Estilo: respuestas cortas tipo chat. Tras registrar un gasto, confirma con el saldo: "✓ Anotado S/8 en Pasajes. Te quedan S/103.50".',
