@@ -12,11 +12,15 @@ export function useAuthConfig() {
   });
 }
 
-export function useMe() {
+export function useMe(opts?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ME_KEY,
     queryFn: authApi.me,
     retry: false,
+    // Al volver a la pestaña se refresca rol/status — un admin degradado
+    // o una cuenta recién aprobada se reflejan sin recargar.
+    refetchOnWindowFocus: true,
+    refetchInterval: opts?.refetchInterval,
   });
 }
 

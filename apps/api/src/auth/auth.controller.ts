@@ -28,6 +28,7 @@ function toAuthUser(user: User): AuthUser {
     avatarUrl: user.avatarUrl,
     role: user.role,
     status: user.status,
+    onboardedAt: user.onboardedAt ? user.onboardedAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
   };
 }

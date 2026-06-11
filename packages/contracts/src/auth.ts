@@ -32,6 +32,8 @@ export const authUserSchema = z.object({
   avatarUrl: z.string().nullable(),
   role: z.enum(UserRole),
   status: z.enum(UserStatus),
+  // null hasta completar el onboarding (verificar número u omitirlo).
+  onboardedAt: z.string().nullable(),
   createdAt: z.string(),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;

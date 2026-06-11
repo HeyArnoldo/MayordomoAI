@@ -9,9 +9,11 @@ import {
   PackageOpen,
   PanelLeft,
   Plus,
+  ShieldCheck,
   Sun,
   Wrench,
 } from 'lucide-react';
+import { UserRole } from '@app/contracts';
 import { useLogout, useMe } from '@/hooks/use-auth';
 import { Mark, Wordmark } from '@/components/mayordomo/mark';
 import { RegistroDialog } from '@/features/registro/registro-dialog';
@@ -34,12 +36,15 @@ const NAV = [
   { to: '/agente', label: 'Razonamiento', icon: Wrench },
 ];
 
+const ADMIN_NAV = { to: '/admin', label: 'Administración', icon: ShieldCheck };
+
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Inicio',
   '/movimientos': 'Movimientos',
   '/chat': 'Conversaciones',
   '/cajas': 'Cajas y reparto',
   '/agente': 'Historial de razonamiento',
+  '/admin': 'Administración',
 };
 
 /** Tabs mobile del design: Inicio · Movs · [+] · Chat · Cajas. */
@@ -115,23 +120,25 @@ export function AppLayout() {
         )}
 
         <nav className="flex-1 space-y-0.5 px-2.5 pt-2">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              title={label}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2.5 rounded-xl py-2 text-sm font-semibold transition-colors',
-                  expanded ? 'px-3' : 'justify-center px-0',
-                  isActive ? 'bg-brand-soft text-brand' : 'text-ink-2 hover:bg-surface-alt',
-                )
-              }
-            >
-              <Icon className="size-[18px] shrink-0" />
-              {expanded && <span className="truncate">{label}</span>}
-            </NavLink>
-          ))}
+          {[...NAV, ...(user?.role === UserRole.ADMIN ? [ADMIN_NAV] : [])].map(
+            ({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                title={label}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2.5 rounded-xl py-2 text-sm font-semibold transition-colors',
+                    expanded ? 'px-3' : 'justify-center px-0',
+                    isActive ? 'bg-brand-soft text-brand' : 'text-ink-2 hover:bg-surface-alt',
+                  )
+                }
+              >
+                <Icon className="size-[18px] shrink-0" />
+                {expanded && <span className="truncate">{label}</span>}
+              </NavLink>
+            ),
+          )}
         </nav>
 
         <div className={cn('border-t border-line p-2.5', !expanded && 'flex justify-center')}>

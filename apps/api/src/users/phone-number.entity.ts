@@ -28,9 +28,19 @@ export class PhoneNumber {
   @Column({ type: 'varchar', length: 20, unique: true })
   e164: string;
 
-  // La verificación por código queda post-hackathon; en el sprint se marca a mano.
   @Column({ type: 'boolean', default: false })
   verified: boolean;
+
+  // Hash bcrypt del código de 6 dígitos enviado por WhatsApp. Null = sin código vigente.
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  verificationCodeHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  codeExpiresAt: Date | null;
+
+  // Última vez que se envió un código (cooldown de reenvío).
+  @Column({ type: 'timestamptz', nullable: true })
+  codeSentAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

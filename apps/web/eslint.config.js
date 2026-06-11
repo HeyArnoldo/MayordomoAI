@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   // ui/ y ai-elements/ son componentes generados (shadcn / ai-elements): no los linteamos.
-  { ignores: ['dist', 'src/components/ui', 'src/components/ai-elements'] },
+  { ignores: ['dist', '.vite', 'src/components/ui', 'src/components/ai-elements'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { queryClient } from './query-client';
 
 /**
  * Cliente HTTP centralizado. withCredentials: true → manda/recibe la cookie
@@ -29,3 +30,22 @@ api.interceptors.response.use((response) => {
   }
   return response;
 });
+
+/**
+ * Frescura de sesión: el backend autoriza con datos frescos de BD en cada
+ * request, pero la UI cachea "quién soy". Ante un rechazo, se sincroniza:
+ * 401 → sesión muerta (ProtectedRoute redirige a login); 403 → el rol o
+ * status cambió en BD (se refetchea y los guards de ruta re-evalúan).
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (status === 401) {
+      queryClient.setQueryData(['auth', 'me'], null);
+    } else if (status === 403) {
+      void queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+    }
+    return Promise.reject(error);
+  },
+);

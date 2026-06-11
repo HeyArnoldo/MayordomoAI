@@ -35,6 +35,10 @@ export class User {
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.PENDING })
   status: UserStatus;
 
+  // Se setea al verificar el número u omitir ese paso. Null = onboarding pendiente.
+  @Column({ type: 'timestamptz', nullable: true })
+  onboardedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
