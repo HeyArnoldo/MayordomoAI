@@ -16,6 +16,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^3.0.71",
     "@app/contracts": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
@@ -25,6 +26,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/typeorm": "^11.0.0",
+    "ai": "^6.0.199",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.0.0",

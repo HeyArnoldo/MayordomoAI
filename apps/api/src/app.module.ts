@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { BoxesModule } from './boxes/boxes.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { AgentModule } from './agent/agent.module';
+import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -18,6 +20,8 @@ import { HealthModule } from './health/health.module';
     AuthModule,
     BoxesModule,
     TransactionsModule,
+    AgentModule,
+    ChatModule,
     HealthModule,
   ],
 })
