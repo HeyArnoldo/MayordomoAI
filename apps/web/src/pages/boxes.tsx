@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Minus, Plus, TriangleAlert } from 'lucide-react';
+import { Check, Minus, PackagePlus, Plus, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Money } from '@/components/mayordomo/money';
+import { NewBoxDialog } from '@/features/boxes/new-box-dialog';
 import { useBoxBalances, useUpdateAllocation } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,9 @@ export default function BoxesPage() {
     }
   }, [editable, pcts]);
 
-  const total = Object.values(pcts).reduce((s, p) => s + p, 0);
+  // Total sobre las cajas REALES (no solo el estado): una caja recién creada
+  // cuenta aunque pcts aún no la tenga.
+  const total = editable.reduce((s, b) => s + (pcts[b.id] ?? b.pct), 0);
   const ok = Math.round(total * 100) === 10000;
   const dirty = editable.some((b) => pcts[b.id] !== undefined && pcts[b.id] !== b.pct);
 
@@ -119,6 +122,15 @@ export default function BoxesPage() {
           );
         })}
       </section>
+
+      <NewBoxDialog
+        trigger={
+          <Button variant="outline" className="w-full gap-2">
+            <PackagePlus className="size-4" />
+            Nueva caja
+          </Button>
+        }
+      />
 
       <p className="text-center text-xs text-ink-3">
         Los cambios aplican a ingresos futuros — el historial conserva su reparto original.
