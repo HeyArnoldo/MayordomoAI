@@ -1,43 +1,62 @@
 import { useState } from 'react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import {
+  COUNTRIES,
+  FREQUENT_ISOS,
+  findCountry,
+  normalize,
+  parseE164,
+  type Country,
+} from './countries';
 
-/** Países frecuentes del producto. El código va SIN '+' (se arma el E.164). */
-const COUNTRIES = [
-  { iso: 'PE', name: 'Perú', code: '51' },
-  { iso: 'MX', name: 'México', code: '52' },
-  { iso: 'CO', name: 'Colombia', code: '57' },
-  { iso: 'AR', name: 'Argentina', code: '54' },
-  { iso: 'CL', name: 'Chile', code: '56' },
-  { iso: 'EC', name: 'Ecuador', code: '593' },
-  { iso: 'BO', name: 'Bolivia', code: '591' },
-  { iso: 'VE', name: 'Venezuela', code: '58' },
-  { iso: 'BR', name: 'Brasil', code: '55' },
-  { iso: 'US', name: 'Estados Unidos', code: '1' },
-  { iso: 'ES', name: 'España', code: '34' },
-] as const;
+const FREQUENT = FREQUENT_ISOS.map((iso) => findCountry(iso)).filter((c): c is Country =>
+  Boolean(c),
+);
+const REST = COUNTRIES.filter((c) => !(FREQUENT_ISOS as readonly string[]).includes(c.iso));
 
-/** Descompone un E.164 en país + dígitos nacionales (código más largo gana). */
-function parseE164(e164: string | undefined): { iso: string; digits: string } {
-  if (!e164?.startsWith('+')) return { iso: 'PE', digits: '' };
-  const raw = e164.slice(1);
-  const match = [...COUNTRIES]
-    .sort((a, b) => b.code.length - a.code.length)
-    .find((c) => raw.startsWith(c.code));
-  if (!match) return { iso: 'PE', digits: '' };
-  return { iso: match.iso, digits: raw.slice(match.code.length) };
+function CountryOption({
+  country,
+  selected,
+  onSelect,
+}: {
+  country: Country;
+  selected: boolean;
+  onSelect: (iso: string) => void;
+}) {
+  return (
+    <CommandItem
+      // value único por grupo: el iso evita colisiones entre países homónimos
+      value={`${country.iso} ${country.name}`}
+      keywords={[normalize(country.name), country.code, `+${country.code}`]}
+      onSelect={() => onSelect(country.iso)}
+      className="gap-2.5"
+    >
+      <span className="w-7 shrink-0 rounded-md bg-surface-alt px-1 py-0.5 text-center font-mono text-[10.5px] font-bold text-ink-3">
+        {country.iso}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13.5px]">{country.name}</span>
+      <span className="shrink-0 font-mono text-[12px] text-ink-3">+{country.code}</span>
+      {selected && <Check className="size-4 shrink-0 text-brand" />}
+    </CommandItem>
+  );
 }
 
 /**
  * Input de teléfono estilo Discord: país a la izquierda, número con el
- * prefijo BLOQUEADO a la derecha. El input solo acepta dígitos (sin '+',
- * sin espacios) y expone autocomplete tel del navegador.
+ * prefijo BLOQUEADO a la derecha. El selector de país es un combobox con
+ * búsqueda (nombre, ISO o código, ignora tildes) sobre la lista completa
+ * E.164; los países frecuentes del producto aparecen arriba.
  */
 export function PhoneNumberInput({
   initialE164,
@@ -51,35 +70,79 @@ export function PhoneNumberInput({
   const parsed = parseE164(initialE164);
   const [iso, setIso] = useState(parsed.iso);
   const [digits, setDigits] = useState(parsed.digits);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const country = COUNTRIES.find((c) => c.iso === iso) ?? COUNTRIES[0];
+  const country = findCountry(iso) ?? COUNTRIES[0];
   const emit = (nextIso: string, nextDigits: string) => {
-    const c = COUNTRIES.find((x) => x.iso === nextIso) ?? COUNTRIES[0];
+    const c = findCountry(nextIso) ?? COUNTRIES[0];
     onChange(nextDigits ? `+${c.code}${nextDigits}` : '');
   };
 
+  const selectCountry = (nextIso: string) => {
+    setIso(nextIso);
+    emit(nextIso, digits);
+    setPickerOpen(false);
+  };
+
   return (
-    <div className="grid grid-cols-[150px_1fr] gap-3">
+    <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-[12.5px] text-ink-2">Código del país</Label>
-        <Select
-          value={iso}
-          onValueChange={(v) => {
-            setIso(v);
-            emit(v, digits);
-          }}
-        >
-          <SelectTrigger className="h-12 w-full rounded-[14px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {COUNTRIES.map((c) => (
-              <SelectItem key={c.iso} value={c.iso}>
-                <span className="font-mono text-[11px] text-ink-3">{c.iso}</span> {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label className="text-[12.5px] text-ink-2">País</Label>
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              role="combobox"
+              aria-expanded={pickerOpen}
+              className="flex h-12 w-full items-center gap-2.5 rounded-[14px] border border-line-strong bg-surface px-3.5 text-left transition hover:bg-surface-alt/60 focus:outline-none focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/20"
+            >
+              <span className="shrink-0 rounded-md bg-surface-alt px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-3">
+                {country.iso}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-ink">
+                {country.name}
+              </span>
+              <span className="shrink-0 font-mono text-[13px] font-semibold text-ink-3">
+                +{country.code}
+              </span>
+              <ChevronsUpDown className="size-4 shrink-0 text-ink-3" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+            <Command
+              filter={(value, search, keywords) => {
+                const q = normalize(search);
+                const haystack = normalize(`${value} ${(keywords ?? []).join(' ')}`);
+                return haystack.includes(q) ? 1 : 0;
+              }}
+            >
+              <CommandInput placeholder="Busca por país o código (51, perú, PE)…" />
+              <CommandList className="max-h-64">
+                <CommandEmpty>Ningún país coincide.</CommandEmpty>
+                <CommandGroup heading="Frecuentes">
+                  {FREQUENT.map((c) => (
+                    <CountryOption
+                      key={c.iso}
+                      country={c}
+                      selected={c.iso === iso}
+                      onSelect={selectCountry}
+                    />
+                  ))}
+                </CommandGroup>
+                <CommandGroup heading="Todos los países">
+                  {REST.map((c) => (
+                    <CountryOption
+                      key={c.iso}
+                      country={c}
+                      selected={c.iso === iso}
+                      onSelect={selectCountry}
+                    />
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="space-y-1.5">
