@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
-import { Check, Clock3, ShieldCheck, UserX } from 'lucide-react';
+import { Check, Clock3, CircleDollarSign, ShieldCheck, UserX } from 'lucide-react';
 import { UserRole, UserStatus, type AdminUser } from '@app/contracts';
 import { useMe } from '@/hooks/use-auth';
 import { adminApi } from '@/services/admin.api';
@@ -101,6 +102,10 @@ export default function AdminPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="todos">Todos los usuarios</TabsTrigger>
+          <TabsTrigger value="uso" className="gap-1.5">
+            <CircleDollarSign className="size-3.5" />
+            Uso
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Cola de aprobación ── */}
@@ -240,7 +245,134 @@ export default function AdminPage() {
             asigna otro admin primero.
           </p>
         </TabsContent>
+
+        {/* ── Uso y costos de IA ── */}
+        <TabsContent value="uso" className="mt-4">
+          <UsageTab />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+const KIND_LABELS: Record<string, string> = {
+  agent: 'Agente',
+  title: 'Títulos',
+  transcription: 'Voz',
+};
+
+const tokens = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+      ? `${(n / 1_000).toFixed(1)}k`
+      : `${n}`;
+
+const usd = (n: number) => `$${n.toFixed(n >= 1 ? 2 : 4)}`;
+
+function UsageTab() {
+  const [days, setDays] = useState('30');
+
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['admin', 'usage', days],
+    queryFn: () => adminApi.usage(parseInt(days, 10)),
+  });
+
+  if (isLoading || !report) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={days} onValueChange={setDays}>
+          <SelectTrigger size="sm" className="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Últimos 7 días</SelectItem>
+            <SelectItem value="30">Últimos 30 días</SelectItem>
+            <SelectItem value="90">Últimos 90 días</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex items-center gap-4 text-[13px]">
+          <span className="text-ink-2">
+            <span className="font-semibold text-ink">{report.totalRequests}</span> llamadas
+          </span>
+          <span className="text-ink-2">
+            costo estimado{' '}
+            <span className="money text-[15px] font-bold text-ink">{usd(report.totalCostUsd)}</span>
+          </span>
+        </div>
+      </div>
+
+      {report.rows.length === 0 ? (
+        <div className="flex flex-col items-center rounded-2xl border border-line bg-surface py-14 text-center">
+          <div className="flex size-11 items-center justify-center rounded-[13px] bg-brand-soft text-brand">
+            <CircleDollarSign className="size-5" />
+          </div>
+          <p className="mt-3 text-[14.5px] font-semibold text-ink">Sin uso de IA en el período</p>
+          <p className="mt-1 text-[13px] text-ink-2">
+            Cada mensaje al agente, título y nota de voz aparecerá aquí con su costo.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Usuario</TableHead>
+                <TableHead className="text-right">Llamadas</TableHead>
+                <TableHead className="text-right">Tokens in</TableHead>
+                <TableHead className="text-right">Tokens out</TableHead>
+                <TableHead>Desglose</TableHead>
+                <TableHead className="text-right">Costo est.</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.rows.map((r) => (
+                <TableRow key={r.userId}>
+                  <TableCell>
+                    <UserCell
+                      user={{ name: r.name, email: r.email, avatarUrl: r.avatarUrl } as AdminUser}
+                      compact
+                    />
+                  </TableCell>
+                  <TableCell className="money text-right text-[13px]">{r.requests}</TableCell>
+                  <TableCell className="money text-right text-[13px]">
+                    {tokens(r.inputTokens)}
+                  </TableCell>
+                  <TableCell className="money text-right text-[13px]">
+                    {tokens(r.outputTokens)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(r.kinds).map(([kind, k]) => (
+                        <Badge key={kind} className="bg-surface-alt text-[11px] text-ink-2">
+                          {KIND_LABELS[kind] ?? kind} · {usd(k.costUsd)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="money text-right text-[13.5px] font-bold text-ink">
+                    {usd(r.costUsd)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <p className="text-[12px] text-ink-3">
+        Costos ESTIMADOS con precios locales por modelo (no es la factura del provider). Modelos sin
+        precio conocido registran tokens pero costo $0.
+      </p>
     </div>
   );
 }

@@ -136,7 +136,7 @@ export class ChatController {
     }
 
     const modelMessages = await convertToModelMessages(body.messages);
-    const result = this.agent.run(user.id, conv.id, modelMessages);
+    const result = this.agent.run(user.id, conv.id, modelMessages, Channel.WEB);
 
     result.pipeUIMessageStreamToResponse(res);
 
@@ -156,7 +156,7 @@ export class ChatController {
         // Título según contexto tras el primer intercambio (no el mensaje a secas).
         if (conv.title === 'Nueva conversación' && last) {
           const userText = uiMessageText(last);
-          const suggested = await this.agent.suggestTitle(userText, text);
+          const suggested = await this.agent.suggestTitle(user.id, userText, text);
           const fallback = userText.length > 60 ? `${userText.slice(0, 57)}...` : userText;
           await this.conversations.setTitle(conv, suggested ?? fallback);
         }

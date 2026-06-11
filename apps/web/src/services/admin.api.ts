@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { AdminUser, UserRole, UserStatus } from '@app/contracts';
+import type { AdminUsageReport, AdminUser, UserRole, UserStatus } from '@app/contracts';
 
 export const adminApi = {
   users: async (status?: UserStatus): Promise<AdminUser[]> =>
@@ -8,4 +8,6 @@ export const adminApi = {
     (await api.patch<AdminUser>(`/admin/users/${id}/status`, { status })).data,
   updateRole: async (id: string, role: UserRole): Promise<AdminUser> =>
     (await api.patch<AdminUser>(`/admin/users/${id}/role`, { role })).data,
+  usage: async (days: number): Promise<AdminUsageReport> =>
+    (await api.get<AdminUsageReport>('/admin/users/usage', { params: { days } })).data,
 };

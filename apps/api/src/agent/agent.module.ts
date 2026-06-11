@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BoxesModule } from '../boxes/boxes.module';
 import { TransactionsModule } from '../transactions/transactions.module';
+import { AiUsageModule } from '../ai-usage/ai-usage.module';
 import { AgentController } from './agent.controller';
 import { AgentService } from './agent.service';
 import { ToolAudit } from './tool-audit.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ToolAudit]), BoxesModule, TransactionsModule],
+  imports: [TypeOrmModule.forFeature([ToolAudit]), BoxesModule, TransactionsModule, AiUsageModule],
   controllers: [AgentController],
   providers: [AgentService],
   exports: [AgentService],

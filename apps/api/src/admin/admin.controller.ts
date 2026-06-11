@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import {
+  AdminUsageReport,
   AdminUser,
   IdParam,
   idParamSchema,
@@ -36,6 +37,13 @@ export class AdminController {
       ? (status as UserStatus)
       : undefined;
     return this.admin.list(parsed);
+  }
+
+  /** Uso de IA por usuario en los últimos ?days= días (7-365, default 30). */
+  @Get('usage')
+  usage(@Query('days') days?: string): Promise<AdminUsageReport> {
+    const n = Math.min(365, Math.max(7, parseInt(days ?? '30', 10) || 30));
+    return this.admin.usageReport(n);
   }
 
   @Patch(':id/status')

@@ -28,18 +28,26 @@ function provider() {
   });
 }
 
-/** Modelo del agente (razonamiento + tools). En Foundry: deployment gpt-4o. */
-export function agentModel(): LanguageModel {
-  const model = usesOpenAi()
+/** Nombre del modelo/deployment del agente (también para registrar costos). */
+export function agentModelName(): string {
+  return usesOpenAi()
     ? (process.env.OPENAI_AGENT_MODEL ?? 'gpt-4o')
     : (process.env.AZURE_AGENT_DEPLOYMENT ?? 'gpt-4o');
-  return provider()(model);
+}
+
+/** Modelo del agente (razonamiento + tools). En Foundry: deployment gpt-4o. */
+export function agentModel(): LanguageModel {
+  return provider()(agentModelName());
+}
+
+/** Nombre del modelo/deployment barato (también para registrar costos). */
+export function parserModelName(): string {
+  return usesOpenAi()
+    ? (process.env.OPENAI_PARSER_MODEL ?? 'gpt-4o-mini')
+    : (process.env.AZURE_PARSER_DEPLOYMENT ?? 'gpt-4o-mini');
 }
 
 /** Modelo barato para parseo/fast-path. En Foundry: deployment gpt-4o-mini. */
 export function parserModel(): LanguageModel {
-  const model = usesOpenAi()
-    ? (process.env.OPENAI_PARSER_MODEL ?? 'gpt-4o-mini')
-    : (process.env.AZURE_PARSER_DEPLOYMENT ?? 'gpt-4o-mini');
-  return provider()(model);
+  return provider()(parserModelName());
 }

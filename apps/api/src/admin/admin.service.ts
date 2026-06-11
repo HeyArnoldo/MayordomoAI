@@ -6,11 +6,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AdminUser, BoxScope, BoxType, UserRole, UserStatus } from '@app/contracts';
+import { In, Repository } from 'typeorm';
+import {
+  AdminUsageReport,
+  AdminUser,
+  BoxScope,
+  BoxType,
+  UserRole,
+  UserStatus,
+} from '@app/contracts';
 import { User } from '../users/user.entity';
 import { PhoneNumber } from '../users/phone-number.entity';
 import { Box } from '../boxes/box.entity';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
 
 // Cajas iniciales de una cuenta aprobada (suman 100%). Nombres en español:
 // son datos del usuario, no código.
@@ -30,6 +38,7 @@ export class AdminService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(PhoneNumber) private readonly phones: Repository<PhoneNumber>,
     @InjectRepository(Box) private readonly boxes: Repository<Box>,
+    private readonly aiUsage: AiUsageService,
   ) {}
 
   async list(status?: UserStatus): Promise<AdminUser[]> {
@@ -86,6 +95,38 @@ export class AdminService {
     this.logger.log(`rol de ${user.email} → ${role} (por ${actor.email})`);
     const phone = await this.phones.findOne({ where: { userId: id } });
     return this.toAdminUser(saved, phone ?? undefined);
+  }
+
+  /** Reporte de uso/costos de IA por usuario en los últimos N días. */
+  async usageReport(days: number): Promise<AdminUsageReport> {
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const aggregates = await this.aiUsage.aggregateSince(from);
+
+    const userIds = aggregates.map((a) => a.userId);
+    const users = userIds.length ? await this.users.find({ where: { id: In(userIds) } }) : [];
+    const byId = new Map(users.map((u) => [u.id, u]));
+
+    const rows = aggregates.map((a) => {
+      const u = byId.get(a.userId);
+      return {
+        userId: a.userId,
+        name: u?.name ?? '(cuenta eliminada)',
+        email: u?.email ?? '—',
+        avatarUrl: u?.avatarUrl ?? null,
+        requests: a.requests,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
+        costUsd: a.costUsd,
+        kinds: a.kinds,
+      };
+    });
+
+    return {
+      days,
+      totalCostUsd: rows.reduce((s, r) => s + r.costUsd, 0),
+      totalRequests: rows.reduce((s, r) => s + r.requests, 0),
+      rows,
+    };
   }
 
   private async ensureDefaultBoxes(userId: string): Promise<void> {

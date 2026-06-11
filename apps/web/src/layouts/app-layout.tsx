@@ -150,9 +150,18 @@ export function AppLayout() {
                   expanded ? 'w-full px-2.5' : 'px-2',
                 )}
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-brand-soft text-sm font-bold text-brand">
-                  {initial}
-                </span>
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="size-8 shrink-0 rounded-full border border-line"
+                  />
+                ) : (
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-brand-soft text-sm font-bold text-brand">
+                    {initial}
+                  </span>
+                )}
                 {expanded && (
                   <span className="min-w-0 flex-1 truncate text-left text-[13px] font-semibold text-ink">
                     {user?.name}

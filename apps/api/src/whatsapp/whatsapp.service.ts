@@ -94,7 +94,7 @@ export class WhatsappService {
       voice = true;
       const base64 = data.message.base64 ?? (await this.evolution.getBase64(key.id));
       if (base64) {
-        text = await this.transcription.transcribe(Buffer.from(base64, 'base64'));
+        text = await this.transcription.transcribe(Buffer.from(base64, 'base64'), user.id);
       }
       if (!text) {
         await this.evolution.sendText(e164, 'No pude escuchar esa nota de voz. ¿Me lo escribes?');
@@ -188,7 +188,7 @@ export class WhatsappService {
       return 'Entiendo frases como "gasté 8 en pasajes", "me entró 500" o "resumen". Para preguntas libres, el agente aún no está configurado.';
     }
     const history = await this.historyAsModelMessages(user.id, conversationId);
-    const result = this.agent.run(user.id, conversationId, history);
+    const result = this.agent.run(user.id, conversationId, history, Channel.WHATSAPP);
     return (await result.text).trim();
   }
 

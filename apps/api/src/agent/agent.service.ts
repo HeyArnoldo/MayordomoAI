@@ -2,10 +2,12 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { generateText, ModelMessage, stepCountIs, streamText, StreamTextResult, ToolSet } from 'ai';
+import { Channel } from '@app/contracts';
 import { accountingDate } from '../common/money';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService } from '../transactions/transactions.service';
-import { agentModel, isAiEnabled, parserModel } from './ai.config';
+import { AiUsageService } from '../ai-usage/ai-usage.service';
+import { agentModel, agentModelName, isAiEnabled, parserModel, parserModelName } from './ai.config';
 import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
 import { ToolAudit } from './tool-audit.entity';
 
@@ -22,6 +24,7 @@ export class AgentService {
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
+    private readonly usage: AiUsageService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
   ) {}
 
@@ -60,6 +63,7 @@ export class AgentService {
     userId: string,
     conversationId: string | null,
     messages: ModelMessage[],
+    channel: Channel = Channel.WEB,
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
       throw new ServiceUnavailableException(
@@ -80,6 +84,17 @@ export class AgentService {
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
+      // totalUsage acumula TODOS los steps del bucle agéntico.
+      onFinish: ({ totalUsage }) => {
+        this.usage.record({
+          userId,
+          kind: 'agent',
+          model: agentModelName(),
+          inputTokens: totalUsage.inputTokens,
+          outputTokens: totalUsage.outputTokens,
+          channel,
+        });
+      },
     });
   }
 
@@ -87,14 +102,26 @@ export class AgentService {
    * Título corto según el contexto del primer intercambio (modelo barato).
    * Devuelve null si no hay IA o falla — el caller decide el fallback.
    */
-  async suggestTitle(userText: string, assistantText: string): Promise<string | null> {
+  async suggestTitle(
+    userId: string,
+    userText: string,
+    assistantText: string,
+  ): Promise<string | null> {
     if (!isAiEnabled()) return null;
     try {
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model: parserModel(),
         system:
           'Genera un título de 3 a 6 palabras en español neutro que resuma el tema de esta conversación de finanzas personales. Responde SOLO el título: sin comillas, sin punto final, sin emojis.',
         prompt: `Usuario: ${userText.slice(0, 500)}\nAsistente: ${assistantText.slice(0, 500)}`,
+      });
+      this.usage.record({
+        userId,
+        kind: 'title',
+        model: parserModelName(),
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        channel: Channel.WEB,
       });
       const title = text.trim().replace(/^["“']+|["”']+$/g, '');
       return title ? title.slice(0, 80) : null;

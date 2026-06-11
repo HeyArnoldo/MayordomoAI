@@ -4,6 +4,7 @@ import { PhoneNumber } from '../users/phone-number.entity';
 import { BoxesModule } from '../boxes/boxes.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { AgentModule } from '../agent/agent.module';
+import { AiUsageModule } from '../ai-usage/ai-usage.module';
 import { ChatModule } from '../chat/chat.module';
 import { WaInboundLog } from './wa-inbound-log.entity';
 import { WhatsappController } from './whatsapp.controller';
@@ -17,6 +18,7 @@ import { TranscriptionService } from './transcription.service';
     BoxesModule,
     TransactionsModule,
     AgentModule,
+    AiUsageModule,
     ChatModule,
   ],
   controllers: [WhatsappController],
