@@ -8,6 +8,9 @@ const LoginPage = lazy(() => import('@/pages/login'));
 const RegisterPage = lazy(() => import('@/pages/register'));
 const HomePage = lazy(() => import('@/pages/home'));
 const ChatPage = lazy(() => import('@/pages/chat'));
+const TransactionsPage = lazy(() => import('@/pages/transactions'));
+const BoxesPage = lazy(() => import('@/pages/boxes'));
+const AgentTrailPage = lazy(() => import('@/pages/agent-trail'));
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -19,7 +22,10 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: '/', element: <HomePage /> },
+          { path: '/movimientos', element: <TransactionsPage /> },
           { path: '/chat', element: <ChatPage /> },
+          { path: '/cajas', element: <BoxesPage /> },
+          { path: '/agente', element: <AgentTrailPage /> },
         ],
       },
     ],

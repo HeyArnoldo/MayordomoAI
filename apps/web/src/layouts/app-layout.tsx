@@ -1,5 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Home, LogOut, MessageCircle, Moon, Sun, User as UserIcon } from 'lucide-react';
+import {
+  Home,
+  List,
+  LogOut,
+  MessageCircle,
+  Moon,
+  PackageOpen,
+  Sun,
+  User as UserIcon,
+  Wrench,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLogout, useMe } from '@/hooks/use-auth';
 import { Wordmark } from '@/components/mayordomo/mark';
@@ -16,7 +26,10 @@ import {
 
 const NAV = [
   { to: '/', label: 'Inicio', icon: Home },
+  { to: '/movimientos', label: 'Movimientos', icon: List },
   { to: '/chat', label: 'Chat', icon: MessageCircle },
+  { to: '/cajas', label: 'Cajas', icon: PackageOpen },
+  { to: '/agente', label: 'Agente', icon: Wrench },
 ];
 
 export function AppLayout() {
