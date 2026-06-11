@@ -1,6 +1,15 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, MessageCircle, ShieldCheck, Trash2, Wrench } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Check,
+  ChevronDown,
+  MessageCircle,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { UserRole } from '@app/contracts';
 import { useMe } from '@/hooks/use-auth';
 import { usersApi } from '@/services/users.api';
@@ -9,6 +18,7 @@ import { AgentTrail } from '@/features/agent/agent-trail';
 import { PhoneLinkDialog } from '@/features/phone/phone-link-dialog';
 import { DeleteAccountDialog } from '@/features/account/delete-account-dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -33,13 +43,30 @@ function Section({
 /** Configuración: perfil, apariencia, WhatsApp, razonamiento y cuenta. */
 export default function SettingsPage() {
   const { data: user } = useMe();
+  const qc = useQueryClient();
   const [accent, setAccent] = useState<AccentKey>(() => getAccent());
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [trailOpen, setTrailOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
 
   const { data: phones = [] } = useQuery({ queryKey: ['me', 'phones'], queryFn: usersApi.phones });
   const phone = phones[0];
+
+  const renameMutation = useMutation({
+    mutationFn: usersApi.updateName,
+    onSuccess: () => {
+      setEditingName(false);
+      void qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
+
+  const submitName = () => {
+    const name = nameDraft.trim();
+    if (name.length < 2 || renameMutation.isPending) return;
+    renameMutation.mutate({ name });
+  };
 
   if (!user) {
     return (
@@ -58,7 +85,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
       {/* ── Perfil ── */}
-      <Section title="Perfil" description="Tus datos vienen de tu cuenta de Google.">
+      <Section title="Perfil" description="El mayordomo te llama por este nombre.">
         <div className="flex items-center gap-4">
           {user.avatarUrl ? (
             <img
@@ -72,15 +99,60 @@ export default function SettingsPage() {
               {user.name.charAt(0).toUpperCase()}
             </span>
           )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-[15px] font-bold text-ink">{user.name}</span>
-              {user.role === UserRole.ADMIN && (
-                <span className="rounded-full bg-brand-soft px-2 py-px text-[10.5px] font-bold text-brand">
-                  admin
-                </span>
-              )}
-            </div>
+          <div className="min-w-0 flex-1">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={nameDraft}
+                  maxLength={120}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitName();
+                    if (e.key === 'Escape') setEditingName(false);
+                  }}
+                  className="h-8 max-w-56 text-[14px]"
+                />
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-brand"
+                  disabled={nameDraft.trim().length < 2 || renameMutation.isPending}
+                  onClick={submitName}
+                  aria-label="Guardar nombre"
+                >
+                  <Check className="size-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-ink-3"
+                  onClick={() => setEditingName(false)}
+                  aria-label="Cancelar"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="truncate text-[15px] font-bold text-ink">{user.name}</span>
+                {user.role === UserRole.ADMIN && (
+                  <span className="rounded-full bg-brand-soft px-2 py-px text-[10.5px] font-bold text-brand">
+                    admin
+                  </span>
+                )}
+                <button
+                  onClick={() => {
+                    setNameDraft(user.name);
+                    setEditingName(true);
+                  }}
+                  className="text-ink-3 transition-colors hover:text-brand"
+                  aria-label="Cambiar nombre"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              </div>
+            )}
             <div className="truncate text-[13px] text-ink-2">{user.email}</div>
             <div className="text-[11.5px] text-ink-3">Miembro desde el {memberSince}</div>
           </div>

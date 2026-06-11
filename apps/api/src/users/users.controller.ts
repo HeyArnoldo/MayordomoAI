@@ -1,7 +1,14 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PhoneInput, phoneSchema, VerifyCodeInput, verifyCodeSchema } from '@app/contracts';
+import {
+  PhoneInput,
+  phoneSchema,
+  UpdateNameInput,
+  updateNameSchema,
+  VerifyCodeInput,
+  verifyCodeSchema,
+} from '@app/contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ActiveAccountGuard } from '../common/guards/active-account.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -9,6 +16,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { User } from './user.entity';
 import { PhoneNumber } from './phone-number.entity';
 import { PhoneVerificationService } from './phone-verification.service';
+import { UsersService } from './users.service';
 
 interface PhoneDto {
   id: string;
@@ -24,7 +32,18 @@ export class UsersController {
   constructor(
     @InjectRepository(PhoneNumber) private readonly phones: Repository<PhoneNumber>,
     private readonly verification: PhoneVerificationService,
+    private readonly users: UsersService,
   ) {}
+
+  /** Cambia el nombre con el que el mayordomo se dirige al usuario. */
+  @Patch('name')
+  async updateName(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(updateNameSchema)) input: UpdateNameInput,
+  ): Promise<{ name: string }> {
+    const updated = await this.users.updateName(user, input.name);
+    return { name: updated.name };
+  }
 
   @Get('phones')
   async list(@CurrentUser() user: User): Promise<PhoneDto[]> {

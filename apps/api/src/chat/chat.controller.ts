@@ -180,7 +180,7 @@ export class ChatController {
     }
 
     const modelMessages = await convertToModelMessages(body.messages);
-    const result = this.agent.run(user.id, conv.id, modelMessages, Channel.WEB);
+    const result = this.agent.run(user.id, conv.id, modelMessages, Channel.WEB, user.name);
 
     result.pipeUIMessageStreamToResponse(res);
 

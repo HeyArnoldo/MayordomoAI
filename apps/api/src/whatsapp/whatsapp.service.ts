@@ -188,7 +188,7 @@ export class WhatsappService {
       return 'Entiendo frases como "gasté 8 en pasajes", "me entró 500" o "resumen". Para preguntas libres, el agente aún no está configurado.';
     }
     const history = await this.historyAsModelMessages(user.id, conversationId);
-    const result = this.agent.run(user.id, conversationId, history, Channel.WHATSAPP);
+    const result = this.agent.run(user.id, conversationId, history, Channel.WHATSAPP, user.name);
     return (await result.text).trim();
   }
 

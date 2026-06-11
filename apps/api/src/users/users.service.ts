@@ -33,6 +33,12 @@ export class UsersService {
     return this.repo.save(user);
   }
 
+  /** Nombre con el que el mayordomo se dirige al usuario (editable en Configuración). */
+  updateName(user: User, name: string): Promise<User> {
+    user.name = name;
+    return this.repo.save(user);
+  }
+
   /**
    * Borrado definitivo de la cuenta. Toda tabla con userId tiene FK
    * ON DELETE CASCADE: un solo DELETE limpia datos y libera el número

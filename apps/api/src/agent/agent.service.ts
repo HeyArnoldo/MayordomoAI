@@ -30,10 +30,15 @@ export class AgentService {
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
   ) {}
 
-  private systemPrompt(): string {
+  private systemPrompt(userName?: string): string {
     const today = accountingDate(new Date());
     return [
       'Eres "Mayordomo", el asistente de finanzas personales del usuario. Hablas español neutro, cálido y directo.',
+      ...(userName
+        ? [
+            `El usuario se llama ${userName}. Llámalo por su nombre con naturalidad y cercanía (no en cada mensaje, se vuelve robótico). Trátalo como un mayordomo de confianza: amable, atento y con buen humor.`,
+          ]
+        : []),
       'El usuario organiza su dinero en mini-cajas (sobres) con % de reparto. Moneda: soles (S/).',
       `Hoy es ${today} (zona America/Lima).`,
       '',
@@ -68,6 +73,7 @@ export class AgentService {
     conversationId: string | null,
     messages: ModelMessage[],
     channel: Channel = Channel.WEB,
+    userName?: string,
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
       throw new ServiceUnavailableException(
@@ -85,7 +91,7 @@ export class AgentService {
 
     return streamText({
       model: agentModel(),
-      system: this.systemPrompt(),
+      system: this.systemPrompt(userName),
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),

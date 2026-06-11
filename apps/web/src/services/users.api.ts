@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { PhoneInput, VerifyCodeInput } from '@app/contracts';
+import type { PhoneInput, UpdateNameInput, VerifyCodeInput } from '@app/contracts';
 
 export interface PhoneDto {
   id: string;
@@ -9,6 +9,9 @@ export interface PhoneDto {
 
 export const usersApi = {
   phones: async (): Promise<PhoneDto[]> => (await api.get<PhoneDto[]>('/me/phones')).data,
+  /** Cambia el nombre con el que el mayordomo se dirige al usuario. */
+  updateName: async (input: UpdateNameInput): Promise<{ name: string }> =>
+    (await api.patch<{ name: string }>('/me/name', input)).data,
   /** Registra el número y dispara el código por WhatsApp. */
   linkPhone: async (input: PhoneInput): Promise<PhoneDto> =>
     (await api.post<PhoneDto>('/me/phone', input)).data,
