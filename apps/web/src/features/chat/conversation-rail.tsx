@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import {
   MessageCircle,
   MoreHorizontal,
@@ -5,10 +6,13 @@ import {
   Pencil,
   Pin,
   Plus,
-  Trash2,
+  Search,
+  X,
 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { Conversation } from '@app/contracts';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,13 +42,12 @@ function SessionRow({
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer',
-        active ? 'bg-brand-soft text-brand font-semibold' : 'text-ink-2 hover:bg-surface-alt',
+        'group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm',
+        active ? 'bg-brand-soft font-semibold text-brand' : 'text-ink-2 hover:bg-surface-alt',
       )}
       onClick={() => onSelect(conv.id)}
     >
       {conv.isSystem && <MessageCircle className="size-3.5 shrink-0 text-positive" />}
-      {!conv.isSystem && conv.pinned && <Pin className="size-3 shrink-0" />}
       <span className="flex-1 truncate">{conv.title}</span>
       {!conv.isSystem && (
         <DropdownMenu>
@@ -79,7 +82,23 @@ function SessionRow({
   );
 }
 
-/** Rail de sesiones: hilo de WhatsApp fijado arriba + sesiones web (estilo ChatGPT). */
+function SectionLabel({ children, divider = false }: { children: string; divider?: boolean }) {
+  return (
+    <p
+      className={cn(
+        'px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3',
+        divider ? 'mt-4 border-t border-line pt-3' : 'pt-2',
+      )}
+    >
+      {children}
+    </p>
+  );
+}
+
+/**
+ * Rail de sesiones estilo claude.ai: buscador, hilo de WhatsApp fijo,
+ * secciones Destacados (pinned) y Recientes con divisores.
+ */
 export function ConversationRail({
   conversations,
   activeId,
@@ -94,33 +113,110 @@ export function ConversationRail({
   onNew: () => void;
   onCollapse: () => void;
 }) {
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const { system, pinned, recent } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const visible = q
+      ? conversations.filter((c) => c.title.toLowerCase().includes(q))
+      : conversations;
+    return {
+      system: visible.filter((c) => c.isSystem),
+      pinned: visible.filter((c) => !c.isSystem && c.pinned),
+      recent: visible.filter((c) => !c.isSystem && !c.pinned),
+    };
+  }, [conversations, query]);
+
+  const closeSearch = () => {
+    setSearching(false);
+    setQuery('');
+  };
+
+  const row = (c: Conversation) => (
+    <SessionRow key={c.id} conv={c} active={c.id === activeId} onSelect={onSelect} />
+  );
+
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-surface">
-      <div className="flex items-center justify-between p-3">
+      <div className="flex items-center justify-between p-3 pb-2">
         <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
           Conversaciones
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6 text-ink-3"
-          title="Ocultar conversaciones"
-          onClick={onCollapse}
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('size-6 text-ink-3', searching && 'bg-surface-alt text-ink')}
+            title="Buscar chats"
+            onClick={() => (searching ? closeSearch() : setSearching(true))}
+          >
+            <Search className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 text-ink-3"
+            title="Ocultar conversaciones"
+            onClick={onCollapse}
+          >
+            <PanelLeftClose className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      {searching && (
+        <div className="relative px-3 pb-2">
+          <Search className="absolute left-5.5 top-1/2 size-3.5 -translate-y-[60%] text-ink-3" />
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
+            placeholder="Buscar chats…"
+            className="h-8 pl-8 pr-7 text-sm"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-5.5 top-1/2 -translate-y-[60%] text-ink-3 hover:text-ink"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="px-3 pb-1">
+        <button
+          onClick={onNew}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-ink-2 hover:bg-surface-alt"
         >
-          <PanelLeftClose className="size-4" />
-        </Button>
+          <Plus className="size-4 text-brand" /> Nueva conversación
+        </button>
       </div>
-      <div className="px-3 pb-2">
-        <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={onNew}>
-          <Plus className="size-4" /> Nueva conversación
-        </Button>
-      </div>
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-        {conversations.map((c) => (
-          <SessionRow key={c.id} conv={c} active={c.id === activeId} onSelect={onSelect} />
-        ))}
-        {conversations.length === 0 && (
-          <p className="px-3 py-6 text-center text-sm text-ink-3">Sin conversaciones todavía.</p>
+
+      <nav className="flex-1 overflow-y-auto px-2 pb-3">
+        {system.length > 0 && <div className="space-y-0.5">{system.map(row)}</div>}
+
+        {pinned.length > 0 && (
+          <>
+            <SectionLabel divider={system.length > 0}>Destacados</SectionLabel>
+            <div className="space-y-0.5">{pinned.map(row)}</div>
+          </>
+        )}
+
+        {recent.length > 0 && (
+          <>
+            <SectionLabel divider={system.length > 0 || pinned.length > 0}>Recientes</SectionLabel>
+            <div className="space-y-0.5">{recent.map(row)}</div>
+          </>
+        )}
+
+        {system.length + pinned.length + recent.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-ink-3">
+            {query ? `Nada para "${query}".` : 'Sin conversaciones todavía.'}
+          </p>
         )}
       </nav>
     </aside>

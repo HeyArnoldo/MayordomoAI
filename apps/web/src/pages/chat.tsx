@@ -45,8 +45,9 @@ function ThreadHeader({
     // Overlay con degradado: los mensajes se desvanecen bajo el header en
     // lugar de cortarse. pointer-events solo en la fila interactiva.
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-background via-background/90 to-transparent pb-7">
+      {/* max-md:pl-12 deja lugar al botón del drawer mobile */}
       <div
-        className={`pointer-events-auto flex h-12 items-center gap-2 px-4 ${inset ? 'pl-12' : ''}`}
+        className={`pointer-events-auto flex h-12 items-center gap-2 px-4 max-md:pl-12 ${inset ? 'pl-12' : ''}`}
       >
         {conv.isSystem ? (
           <>
@@ -99,6 +100,8 @@ export default function ChatPage() {
   const [draft, setDraft] = useState(false);
   const [threadKey, setThreadKey] = useState(0);
   const [railOpen, setRailOpen] = useState(true);
+  // Drawer mobile: el rail vive en un overlay deslizante (< md no hay espacio).
+  const [mobileRail, setMobileRail] = useState(false);
 
   const selectConversation = (id: string | null, asDraft = false) => {
     setActiveId(id);
@@ -118,7 +121,8 @@ export default function ChatPage() {
   const refreshConversations = () => void qc.invalidateQueries({ queryKey: ['conversations'] });
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+    // Mobile: descontar también la tabbar inferior (4rem) para que el input no quede debajo.
+    <div className="flex h-[calc(100vh-3.5rem-4rem)] overflow-hidden lg:h-[calc(100vh-3.5rem)]">
       {railOpen && (
         <div className="hidden md:block">
           <ConversationRail
@@ -130,7 +134,41 @@ export default function ChatPage() {
           />
         </div>
       )}
+
+      {/* Drawer mobile: rail en overlay deslizante con backdrop */}
+      {mobileRail && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40 animate-in fade-in"
+            onClick={() => setMobileRail(false)}
+          />
+          <div className="absolute inset-y-0 left-0 animate-in slide-in-from-left duration-200">
+            <ConversationRail
+              conversations={conversations}
+              activeId={activeId}
+              onSelect={(id) => {
+                selectConversation(id);
+                setMobileRail(false);
+              }}
+              onNew={() => {
+                selectConversation(null, true);
+                setMobileRail(false);
+              }}
+              onCollapse={() => setMobileRail(false)}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
+        {/* Mobile: botón para abrir el drawer de conversaciones */}
+        <button
+          title="Conversaciones"
+          onClick={() => setMobileRail(true)}
+          className="absolute left-2 top-2 z-20 flex size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-alt hover:text-ink md:hidden"
+        >
+          <PanelLeft className="size-4" />
+        </button>
         {!railOpen && (
           <button
             title="Mostrar conversaciones"

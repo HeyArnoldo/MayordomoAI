@@ -183,7 +183,8 @@ export function AppLayout() {
           <DarkToggle dark={dark} onToggle={() => setDark((d) => !d)} />
         </header>
 
-        <main className="flex-1 pb-20 lg:pb-0">
+        {/* pb-16 = altura exacta de la tabbar; más padding deja una franja visible */}
+        <main className="flex-1 pb-16 lg:pb-0">
           <Outlet />
         </main>
 
