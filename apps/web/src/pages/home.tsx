@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Plus, TrendingUp } from 'lucide-react';
 import { Money } from '@/components/mayordomo/money';
 import { EnvelopeCard } from '@/components/mayordomo/envelope-card';
@@ -10,8 +10,11 @@ import { useBoxBalances, useTransactions } from '@/hooks/use-finance';
 import { boxColor, monthLabel } from '@/lib/boxes';
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { data: boxes = [], isLoading } = useBoxBalances();
   const { data: recent = [] } = useTransactions({ limit: 5 });
+  // Click en una caja → su historial de movimientos filtrado.
+  const goToBox = (id: string) => navigate(`/movimientos?box=${id}`);
 
   // El dashboard personal: la caja de ámbito empresa va aparte (design).
   const personal = boxes.filter((b) => b.active && b.scope === 'personal');
@@ -67,7 +70,8 @@ export default function DashboardPage() {
       {funds.map((fund) => (
         <section
           key={fund.id}
-          className="flex items-center justify-between rounded-2xl border border-line bg-surface p-5 shadow-card"
+          onClick={() => goToBox(fund.id)}
+          className="flex cursor-pointer items-center justify-between rounded-2xl border border-line bg-surface p-5 shadow-card transition-colors hover:bg-surface-alt"
         >
           <div>
             <div className="flex items-center gap-2">
@@ -94,7 +98,7 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {expenseBoxes.map((b) => (
-            <EnvelopeCard key={b.id} box={b} />
+            <EnvelopeCard key={b.id} box={b} onClick={() => goToBox(b.id)} />
           ))}
         </div>
       </section>
@@ -107,7 +111,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {business.map((b) => (
-              <EnvelopeCard key={b.id} box={b} />
+              <EnvelopeCard key={b.id} box={b} onClick={() => goToBox(b.id)} />
             ))}
           </div>
         </section>

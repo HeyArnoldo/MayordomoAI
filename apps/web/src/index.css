@@ -214,6 +214,32 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+  /*
+   * Scrollbars con el tema: las variables cambian con .dark, así que el
+   * thumb se adapta solo. Chrome/Edge/Firefox usan scrollbar-color (y al
+   * estar definido, Chromium ignora ::-webkit-scrollbar); los ::-webkit-*
+   * quedan como fallback para Safari, que aún no soporta scrollbar-color.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-3);
+  }
   /* Montos: siempre mono con cifras tabulares (columnas alineadas) */
   .money {
     font-family: var(--font-mono);

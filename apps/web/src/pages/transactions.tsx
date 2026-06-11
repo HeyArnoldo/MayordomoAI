@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { Transaction } from '@app/contracts';
-import { TransactionStatus, TransactionType } from '@app/contracts';
+import { TransactionType } from '@app/contracts';
 import { TransactionRow } from '@/components/mayordomo/transaction-row';
+import { TransactionDetailDialog } from '@/components/mayordomo/transaction-detail';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBoxBalances, useTransactions, useVoidTransaction } from '@/hooks/use-finance';
+import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
 const FILTERS = [
@@ -43,13 +46,21 @@ function dayLabel(date: string): string {
 
 export default function TransactionsPage() {
   const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
+  const [selected, setSelected] = useState<Transaction | null>(null);
   const [toVoid, setToVoid] = useState<Transaction | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: boxes = [] } = useBoxBalances();
+
+  // Historial de UNA caja: se llega con /movimientos?box=<id> (click en el sobre).
+  const boxId = searchParams.get('box');
+  const activeBox = boxId ? boxes.find((b) => b.id === boxId) : undefined;
+
   const params: Record<string, string | number | boolean> = {
     limit: 100,
     includeVoided: true,
   };
   if (filter) params.type = filter;
+  if (boxId) params.boxId = boxId;
   const { data: txs = [], isLoading } = useTransactions(params);
   const voidTx = useVoidTransaction();
 
@@ -65,7 +76,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4">
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {FILTERS.map((f) => (
           <button
             key={f.label}
@@ -80,12 +91,32 @@ export default function TransactionsPage() {
             {f.label}
           </button>
         ))}
+
+        {/* chip de la caja activa, con su color y quitable */}
+        {activeBox && (
+          <button
+            onClick={() => setSearchParams({}, { replace: true })}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pr-2.5 pl-3 text-[13px] font-semibold text-ink transition-colors hover:bg-surface-alt"
+            title="Quitar filtro de caja"
+          >
+            <span
+              className="size-2 rounded-full"
+              style={{ backgroundColor: boxColor(activeBox.name) }}
+            />
+            {activeBox.name}
+            <X className="size-3.5 text-ink-3" />
+          </button>
+        )}
       </div>
 
       {isLoading && <Skeleton className="h-64 w-full rounded-2xl" />}
 
       {!isLoading && groups.length === 0 && (
-        <p className="py-12 text-center text-sm text-ink-3">No hay movimientos con ese filtro.</p>
+        <p className="py-12 text-center text-sm text-ink-3">
+          {activeBox
+            ? `Sin movimientos en ${activeBox.name} todavía.`
+            : 'No hay movimientos con ese filtro.'}
+        </p>
       )}
 
       {groups.map(([date, list]) => (
@@ -97,21 +128,27 @@ export default function TransactionsPage() {
             {dayLabel(date)}
           </div>
           {list.map((tx, i) => (
-            <div key={tx.id} className="group relative">
-              <TransactionRow tx={tx} boxes={boxes} last={i === list.length - 1} />
-              {tx.status !== TransactionStatus.VOIDED && (
-                <button
-                  onClick={() => setToVoid(tx)}
-                  className="absolute -right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-3 opacity-0 transition-opacity hover:text-negative group-hover:opacity-100"
-                  title="Anular"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              )}
-            </div>
+            <TransactionRow
+              key={tx.id}
+              tx={tx}
+              boxes={boxes}
+              last={i === list.length - 1}
+              onClick={() => setSelected(tx)}
+            />
           ))}
         </section>
       ))}
+
+      {/* Detalle del movimiento (design: MovDetalleScreen). Anular vive aquí. */}
+      <TransactionDetailDialog
+        tx={selected}
+        boxes={boxes}
+        onClose={() => setSelected(null)}
+        onVoid={(tx) => {
+          setSelected(null);
+          setToVoid(tx);
+        }}
+      />
 
       <AlertDialog open={Boolean(toVoid)} onOpenChange={(open) => !open && setToVoid(null)}>
         <AlertDialogContent>
