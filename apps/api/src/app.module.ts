@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from './config/typeorm.config';
 import { validateEnv } from './config/env.validation';
@@ -17,6 +18,7 @@ import { HealthModule } from './health/health.module';
   imports: [
     // El .env ya fue cargado por load-env (main.ts, primera línea).
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, validate: validateEnv }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(dataSourceOptions),
     UsersModule,
     AdminModule,

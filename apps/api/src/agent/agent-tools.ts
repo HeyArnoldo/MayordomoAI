@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CreateTransactionInput, TransactionSource, TransactionType } from '@app/contracts';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
+import { RecurringService } from '../recurring/recurring.service';
 import { ToolAudit } from './tool-audit.entity';
 
 /**
@@ -22,6 +23,7 @@ export interface AgentToolsContext {
   conversationId: string | null;
   boxes: BoxesService;
   transactions: TransactionsService;
+  recurring: RecurringService;
   audits: Repository<ToolAudit>;
 }
 
@@ -303,6 +305,84 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
           } catch {
             return { error: 'El servicio de tipo de cambio no respondió.' };
           }
+        }),
+    }),
+
+    listRecurringExpenses: tool({
+      description:
+        'Lista los gastos fijos mensuales del usuario (línea celular, suscripciones, alquiler) con ' +
+        'monto, día de vencimiento, caja y el total mensual comprometido. Úsala para "mis fijos", ' +
+        '"cuánto tengo comprometido", y SIEMPRE antes de aconsejar sobre el reparto de cajas.',
+      inputSchema: z.object({}),
+      execute: async (args) =>
+        audited(ctx, 'listRecurringExpenses', args, async () => ({
+          items: await ctx.recurring.list(ctx.userId),
+          monthlyTotal: await ctx.recurring.monthlyTotal(ctx.userId),
+        })),
+    }),
+
+    addRecurringExpense: tool({
+      description:
+        'Registra un gasto fijo mensual (NO es un gasto de hoy: es un compromiso recurrente). ' +
+        'El mayordomo recordará por WhatsApp el día del vencimiento y solo se anota cuando el ' +
+        'usuario confirma. Ej: "mi línea celular son 39.90 cada día 5, sale de Varios".',
+      inputSchema: z.object({
+        name: z.string().min(1).max(120).describe('Nombre, ej "Línea celular"'),
+        amount: z.number().positive().describe('Monto mensual en soles'),
+        dayOfMonth: z.number().int().min(1).max(31).describe('Día del mes en que vence'),
+        boxName: z.string().describe('Caja de la que sale, ej "Varios"'),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'addRecurringExpense', args, async () => {
+          const all = await ctx.boxes.findAll(ctx.userId);
+          const box = all.find(
+            (b) => b.active && b.name.toLowerCase() === args.boxName.trim().toLowerCase(),
+          );
+          if (!box) {
+            return {
+              error: `No existe la caja "${args.boxName}"`,
+              availableBoxes: all.filter((b) => b.active).map((b) => b.name),
+            };
+          }
+          const created = await ctx.recurring.create(ctx.userId, {
+            name: args.name,
+            amount: args.amount,
+            dayOfMonth: args.dayOfMonth,
+            boxId: box.id,
+          });
+          return {
+            created,
+            note: 'El recordatorio llega por WhatsApp el día del vencimiento; se registra solo cuando el usuario confirma.',
+          };
+        }),
+    }),
+
+    removeRecurringExpense: tool({
+      description:
+        'Da de baja un gasto fijo (deja de recordarse; el historial no se toca). ' +
+        'SIEMPRE pide confirmación al usuario antes.',
+      inputSchema: z.object({
+        name: z.string().describe('Nombre del gasto fijo a dar de baja'),
+        userConfirmed: z.boolean().default(false),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'removeRecurringExpense', args, async () => {
+          const items = await ctx.recurring.list(ctx.userId);
+          const match = items.find((i) => i.name.toLowerCase() === args.name.trim().toLowerCase());
+          if (!match) {
+            return {
+              error: `No hay un gasto fijo llamado "${args.name}"`,
+              available: items.map((i) => i.name),
+            };
+          }
+          if (!args.userConfirmed) {
+            return {
+              needsConfirmation: true,
+              item: match,
+              message: 'Pide confirmación antes de dar de baja este gasto fijo.',
+            };
+          }
+          return { removed: await ctx.recurring.deactivate(ctx.userId, match.id) };
         }),
     }),
 

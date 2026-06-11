@@ -6,6 +6,7 @@ import { Channel } from '@app/contracts';
 import { accountingDate } from '../common/money';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService } from '../transactions/transactions.service';
+import { RecurringService } from '../recurring/recurring.service';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { agentModel, agentModelName, isAiEnabled, parserModel, parserModelName } from './ai.config';
 import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
@@ -24,6 +25,7 @@ export class AgentService {
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
+    private readonly recurring: RecurringService,
     private readonly usage: AiUsageService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
   ) {}
@@ -41,6 +43,7 @@ export class AgentService {
       `- Gastos >= S/${CONFIRMATION_THRESHOLD}: pregunta "¿Confirmas?" antes de registrar (registerTransaction con userConfirmed=true solo tras un sí explícito).`,
       '- Anulaciones: siempre con confirmación.',
       '- Cambios de presupuesto (updateAllocation): muestra el reparto nuevo completo caja por caja y pide confirmación antes de aplicar.',
+      '- Gastos fijos (listRecurringExpenses/addRecurringExpense): si el usuario menciona un pago mensual recurrente ("mi línea celular", "la suscripción"), ofrécele guardarlo como fijo. Si confirma un recordatorio de vencimiento ("sí, regístralo"), usa registerTransaction con el monto y caja del recordatorio.',
       '- Si falta info o hay ambigüedad al REGISTRAR (¿qué caja?), NO adivines: pregunta corto y claro.',
       '- Para CONSULTAS amplias ("mis últimos movimientos", "todo") NO pidas filtros: llama listTransactions sin type ni boxName y listo. Los filtros son opcionales.',
       '',
@@ -76,6 +79,7 @@ export class AgentService {
       conversationId,
       boxes: this.boxes,
       transactions: this.transactions,
+      recurring: this.recurring,
       audits: this.audits,
     });
 
