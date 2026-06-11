@@ -7,7 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { PendienteEstado } from '@app/contracts';
+import { ClarificationStatus } from '@app/contracts';
 import { User } from '../users/user.entity';
 
 /**
@@ -15,9 +15,9 @@ import { User } from '../users/user.entity';
  * no se descarta — se acumula y se pregunta en una sola tanda. Expira para
  * no vivir colgado para siempre.
  */
-@Entity('pendientes')
-@Index(['userId', 'estado'])
-export class Pendiente {
+@Entity('clarifications')
+@Index(['userId', 'status'])
+export class Clarification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -29,20 +29,20 @@ export class Pendiente {
   user: User;
 
   @Column({ type: 'uuid', nullable: true })
-  conversacionId: string | null;
+  conversationId: string | null;
 
   @Column({ type: 'varchar', length: 300 })
-  descripcion: string;
+  description: string;
 
-  // Datos parciales del movimiento propuesto (monto, nota, candidatas, etc.)
+  // Datos parciales de la transacción propuesta (monto, nota, candidatas, etc.)
   @Column({ type: 'jsonb', nullable: true })
   payload: unknown | null;
 
-  @Column({ type: 'enum', enum: PendienteEstado, default: PendienteEstado.ABIERTO })
-  estado: PendienteEstado;
+  @Column({ type: 'enum', enum: ClarificationStatus, default: ClarificationStatus.OPEN })
+  status: ClarificationStatus;
 
   @Column({ type: 'timestamptz', nullable: true })
-  expiraAt: Date | null;
+  expiresAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

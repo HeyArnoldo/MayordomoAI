@@ -1,63 +1,63 @@
 import { z } from 'zod';
 
-export enum Canal {
+export enum Channel {
   WHATSAPP = 'whatsapp',
   WEB = 'web',
 }
 
-export enum MensajeRol {
+export enum MessageRole {
   USER = 'user',
   ASSISTANT = 'assistant',
   TOOL = 'tool',
 }
 
-export enum PendienteEstado {
-  ABIERTO = 'abierto',
-  RESUELTO = 'resuelto',
-  EXPIRADO = 'expirado',
+export enum ClarificationStatus {
+  OPEN = 'open',
+  RESOLVED = 'resolved',
+  EXPIRED = 'expired',
 }
 
-export const conversacionSchema = z.object({
+export const conversationSchema = z.object({
   id: z.uuid(),
-  canal: z.enum(Canal),
-  titulo: z.string(),
+  channel: z.enum(Channel),
+  title: z.string(),
   /** El hilo de WhatsApp es de sistema: fijado, no se borra ni renombra. */
-  sistema: z.boolean(),
-  fijada: z.boolean(),
-  abierta: z.boolean(),
+  isSystem: z.boolean(),
+  pinned: z.boolean(),
+  open: z.boolean(),
   lastAt: z.string(),
   createdAt: z.string(),
 });
-export type Conversacion = z.infer<typeof conversacionSchema>;
+export type Conversation = z.infer<typeof conversationSchema>;
 
-export const mensajeSchema = z.object({
+export const messageSchema = z.object({
   id: z.uuid(),
-  conversacionId: z.uuid(),
-  rol: z.enum(MensajeRol),
-  contenido: z.string(),
-  canal: z.enum(Canal),
+  conversationId: z.uuid(),
+  role: z.enum(MessageRole),
+  content: z.string(),
+  channel: z.enum(Channel),
   toolCalls: z.unknown().nullable(),
   createdAt: z.string(),
 });
-export type Mensaje = z.infer<typeof mensajeSchema>;
+export type Message = z.infer<typeof messageSchema>;
 
-export const createConversacionSchema = z.object({
-  titulo: z.string().min(1).max(120).optional(),
+export const createConversationSchema = z.object({
+  title: z.string().min(1).max(120).optional(),
 });
-export type CreateConversacionInput = z.infer<typeof createConversacionSchema>;
+export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 
-export const renameConversacionSchema = z.object({
-  titulo: z.string().min(1).max(120),
+export const renameConversationSchema = z.object({
+  title: z.string().min(1).max(120),
 });
-export type RenameConversacionInput = z.infer<typeof renameConversacionSchema>;
+export type RenameConversationInput = z.infer<typeof renameConversationSchema>;
 
 /** Una llamada a herramienta del agente — el "reasoning trail" visible. */
-export const auditToolSchema = z.object({
+export const toolAuditSchema = z.object({
   id: z.uuid(),
   tool: z.string(),
   args: z.unknown(),
-  resultado: z.unknown().nullable(),
-  conversacionId: z.uuid().nullable(),
+  result: z.unknown().nullable(),
+  conversationId: z.uuid().nullable(),
   createdAt: z.string(),
 });
-export type AuditTool = z.infer<typeof auditToolSchema>;
+export type ToolAudit = z.infer<typeof toolAuditSchema>;

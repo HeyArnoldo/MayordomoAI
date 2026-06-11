@@ -12,8 +12,8 @@ import { User } from './user.entity';
  * Número de WhatsApp vinculado a una cuenta. Es la llave que resuelve
  * "remitente del webhook → user_id". Un número pertenece a UNA sola cuenta.
  */
-@Entity('numeros')
-export class Numero {
+@Entity('phone_numbers')
+export class PhoneNumber {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -30,7 +30,7 @@ export class Numero {
 
   // La verificación por código queda post-hackathon; en el sprint se marca a mano.
   @Column({ type: 'boolean', default: false })
-  verificado: boolean;
+  verified: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

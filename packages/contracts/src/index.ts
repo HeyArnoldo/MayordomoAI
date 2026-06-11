@@ -1,5 +1,5 @@
 export * from './common';
 export * from './auth';
-export * from './cajas';
-export * from './movimientos';
+export * from './boxes';
+export * from './transactions';
 export * from './chat';

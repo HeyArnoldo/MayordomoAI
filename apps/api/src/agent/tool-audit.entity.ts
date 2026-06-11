@@ -14,9 +14,9 @@ import { User } from '../users/user.entity';
  * y qué devolvió. Es el "reasoning trail" visible en el dashboard y la
  * evidencia de Reliability & Safety.
  */
-@Entity('audit_tools')
+@Entity('tool_audits')
 @Index(['userId', 'createdAt'])
-export class AuditTool {
+export class ToolAudit {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -28,7 +28,7 @@ export class AuditTool {
   user: User;
 
   @Column({ type: 'uuid', nullable: true })
-  conversacionId: string | null;
+  conversationId: string | null;
 
   @Column({ type: 'varchar', length: 80 })
   tool: string;
@@ -37,7 +37,7 @@ export class AuditTool {
   args: unknown;
 
   @Column({ type: 'jsonb', nullable: true })
-  resultado: unknown | null;
+  result: unknown | null;
 
   @CreateDateColumn()
   createdAt: Date;

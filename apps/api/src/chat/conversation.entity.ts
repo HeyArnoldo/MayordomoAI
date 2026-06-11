@@ -7,7 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Canal } from '@app/contracts';
+import { Channel } from '@app/contracts';
 import { User } from '../users/user.entity';
 
 /**
@@ -15,9 +15,9 @@ import { User } from '../users/user.entity';
  * usuario, de sistema y fijado; las sesiones web se crean libremente
  * (estilo ChatGPT) y comparten el mismo agente.
  */
-@Entity('conversaciones')
+@Entity('conversations')
 @Index(['userId', 'lastAt'])
-export class Conversacion {
+export class Conversation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -28,20 +28,20 @@ export class Conversacion {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @Column({ type: 'enum', enum: Canal })
-  canal: Canal;
+  @Column({ type: 'enum', enum: Channel })
+  channel: Channel;
 
   @Column({ type: 'varchar', length: 120, default: 'Nueva conversación' })
-  titulo: string;
+  title: string;
 
   @Column({ type: 'boolean', default: false })
-  sistema: boolean;
+  isSystem: boolean;
 
   @Column({ type: 'boolean', default: false })
-  fijada: boolean;
+  pinned: boolean;
 
   @Column({ type: 'boolean', default: true })
-  abierta: boolean;
+  open: boolean;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   lastAt: Date;

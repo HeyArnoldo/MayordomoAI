@@ -5,8 +5,8 @@ import { dataSourceOptions } from './config/typeorm.config';
 import { validateEnv } from './config/env.validation';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
-import { CajasModule } from './cajas/cajas.module';
-import { MovimientosModule } from './movimientos/movimientos.module';
+import { BoxesModule } from './boxes/boxes.module';
+import { TransactionsModule } from './transactions/transactions.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -16,8 +16,8 @@ import { HealthModule } from './health/health.module';
     TypeOrmModule.forRoot(dataSourceOptions),
     UsersModule,
     AuthModule,
-    CajasModule,
-    MovimientosModule,
+    BoxesModule,
+    TransactionsModule,
     HealthModule,
   ],
 })

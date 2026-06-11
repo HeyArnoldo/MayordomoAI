@@ -7,15 +7,15 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { CajaAmbito, CajaTipo } from '@app/contracts';
+import { BoxScope, BoxType } from '@app/contracts';
 import { User } from '../users/user.entity';
 
 /**
- * Mini-caja (sobre). Las de tipo 'gasto' reinician cada mes; las 'fondo'
+ * Mini-caja (sobre). Las de tipo 'expense' reinician cada mes; las 'fund'
  * acumulan (ahorro). El % es en puntos porcentuales y el set activo suma 100.
  */
-@Entity('cajas')
-export class Caja {
+@Entity('boxes')
+export class Box {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -27,23 +27,23 @@ export class Caja {
   user: User;
 
   @Column({ type: 'varchar', length: 60 })
-  nombre: string;
+  name: string;
 
   // Puntos porcentuales con 2 decimales: 25.00 = 25%
   @Column({ type: 'numeric', precision: 5, scale: 2 })
   pct: string;
 
-  @Column({ type: 'enum', enum: CajaTipo, default: CajaTipo.GASTO })
-  tipo: CajaTipo;
+  @Column({ type: 'enum', enum: BoxType, default: BoxType.EXPENSE })
+  type: BoxType;
 
-  @Column({ type: 'enum', enum: CajaAmbito, default: CajaAmbito.PERSONAL })
-  ambito: CajaAmbito;
+  @Column({ type: 'enum', enum: BoxScope, default: BoxScope.PERSONAL })
+  scope: BoxScope;
 
   @Column({ type: 'int', default: 0 })
-  orden: number;
+  sortOrder: number;
 
   @Column({ type: 'boolean', default: true })
-  activa: boolean;
+  active: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
