@@ -283,7 +283,8 @@ export function ChatThread({
     id: chatId,
     messages: initialMessages,
     transport: new DefaultChatTransport({
-      api: '/api/chat',
+      // Misma base que axios: en dev '' (proxy de Vite), en prod la URL absoluta.
+      api: `${import.meta.env.VITE_API_URL ?? ''}/api/chat`,
       credentials: 'include',
     }),
     // El backend genera el título por contexto tras el primer intercambio;
