@@ -306,6 +306,80 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
         }),
     }),
 
+    updateAllocation: tool({
+      description:
+        'Cambia el presupuesto: los % de reparto de las cajas personales activas. El set resultante ' +
+        'debe sumar EXACTAMENTE 100 — incluye en items solo las cajas que cambian; el resto conserva su %. ' +
+        'Aplica SOLO a ingresos futuros (el historial conserva su reparto). ' +
+        'REGLA: primero muestra al usuario el reparto nuevo completo (caja por caja) y llama con ' +
+        'userConfirmed=true solo después de su "sí" explícito.',
+      inputSchema: z.object({
+        items: z
+          .array(
+            z.object({
+              boxName: z.string().describe('Nombre exacto de la caja, ej "Ahorro"'),
+              pct: z.number().min(0).max(100).describe('Nuevo % para esa caja'),
+            }),
+          )
+          .min(1),
+        userConfirmed: z
+          .boolean()
+          .default(false)
+          .describe('true SOLO si el usuario ya confirmó el nuevo reparto'),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'updateAllocation', args, async () => {
+          const personal = await ctx.boxes.activePersonal(ctx.userId);
+          const byName = new Map(personal.map((b) => [b.name.toLowerCase(), b]));
+
+          const items: { id: string; pct: number }[] = [];
+          for (const item of args.items) {
+            const box = byName.get(item.boxName.trim().toLowerCase());
+            if (!box) {
+              return {
+                error: `No existe la caja "${item.boxName}" (o no participa del reparto personal)`,
+                availableBoxes: personal.map((b) => b.name),
+              };
+            }
+            items.push({ id: box.id, pct: item.pct });
+          }
+
+          // Reparto resultante: lo que cambia + lo que se conserva.
+          const changed = new Map(items.map((i) => [i.id, i.pct]));
+          const proposed = personal.map((b) => ({
+            boxName: b.name,
+            pct: changed.get(b.id) ?? parseFloat(b.pct),
+          }));
+          const total = Math.round(proposed.reduce((s, p) => s + p.pct, 0) * 100) / 100;
+
+          // Guardrail server-side: cambiar el presupuesto SIEMPRE pide confirmación.
+          if (!args.userConfirmed) {
+            return {
+              needsConfirmation: true,
+              proposedAllocation: proposed,
+              total,
+              message:
+                total === 100
+                  ? 'Muestra este reparto al usuario y pide confirmación antes de aplicar.'
+                  : `El reparto propuesto suma ${total}%, no 100%. Ajusta con el usuario antes de confirmar.`,
+            };
+          }
+
+          try {
+            const saved = await ctx.boxes.updateAllocation(ctx.userId, { items });
+            return {
+              updated: saved.map((b) => ({ boxName: b.name, pct: parseFloat(b.pct) })),
+              note: 'Aplica a ingresos futuros; los ingresos pasados conservan su reparto.',
+            };
+          } catch (err) {
+            return {
+              error: err instanceof Error ? err.message : 'No se pudo actualizar el reparto',
+              currentAllocation: proposed,
+            };
+          }
+        }),
+    }),
+
     voidTransaction: tool({
       description:
         'Anula un movimiento (soft delete, recalcula saldos). SIEMPRE pide confirmación al usuario antes de anular.',
