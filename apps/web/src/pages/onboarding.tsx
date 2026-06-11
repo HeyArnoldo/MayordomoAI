@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -8,6 +8,7 @@ import { UserStatus } from '@app/contracts';
 import { useMe } from '@/hooks/use-auth';
 import { usersApi } from '@/services/users.api';
 import { AuthShell, MobileBrandHeader } from '@/components/mayordomo/auth-shell';
+import { CodeInput, useCodeInput } from '@/features/phone/code-input';
 import { Input } from '@/components/ui/input';
 
 const E164 = /^\+[1-9]\d{7,14}$/;
@@ -211,29 +212,7 @@ function CodeStep(props: {
   onResend: () => void;
   onSkip: () => void;
 }) {
-  const [code, setCode] = useState<string[]>(['', '', '', '', '', '']);
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const full = code.every((d) => d !== '');
-
-  const setDigit = (i: number, v: string) => {
-    if (!/^\d?$/.test(v)) return;
-    const next = [...code];
-    next[i] = v;
-    setCode(next);
-    if (v && i < 5) refs.current[i + 1]?.focus();
-  };
-
-  const onKey = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !code[i] && i > 0) refs.current[i - 1]?.focus();
-  };
-
-  const onPaste = (e: React.ClipboardEvent) => {
-    const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (digits.length < 2) return;
-    e.preventDefault();
-    setCode(digits.padEnd(6, '').split('').slice(0, 6));
-    refs.current[Math.min(digits.length, 5)]?.focus();
-  };
+  const { code, setCode, full, value } = useCodeInput();
 
   return (
     <div className="flex flex-col">
@@ -257,22 +236,8 @@ function CodeStep(props: {
         </button>
       </div>
 
-      <div className="mt-8 flex justify-center gap-2.5" onPaste={onPaste}>
-        {code.map((d, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            value={d}
-            inputMode="numeric"
-            maxLength={1}
-            autoFocus={i === 0}
-            onChange={(e) => setDigit(i, e.target.value)}
-            onKeyDown={(e) => onKey(i, e)}
-            className="box-border h-14 w-[46px] rounded-[14px] border-[1.5px] border-line bg-surface text-center font-mono text-[22px] font-semibold text-ink transition outline-none focus:border-brand focus:ring-4 focus:ring-brand/20"
-          />
-        ))}
+      <div className="mt-8">
+        <CodeInput code={code} onChange={setCode} />
       </div>
 
       <div className="mt-[18px] text-center text-[13px] text-ink-2">
@@ -294,7 +259,7 @@ function CodeStep(props: {
       </div>
 
       <button
-        onClick={() => props.onVerify(code.join(''))}
+        onClick={() => props.onVerify(value)}
         disabled={!full || props.pending}
         className="mt-8 inline-flex h-[50px] w-full items-center justify-center rounded-[14px] bg-brand text-[16px] font-semibold text-on-brand transition disabled:pointer-events-none disabled:opacity-50"
       >

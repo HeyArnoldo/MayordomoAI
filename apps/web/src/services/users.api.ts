@@ -19,4 +19,8 @@ export const usersApi = {
   completeOnboarding: async (): Promise<void> => {
     await api.post('/me/onboarding/complete');
   },
+  /** Borrado definitivo de la cuenta (libera el número vinculado). */
+  deleteAccount: async (): Promise<void> => {
+    await api.delete('/me');
+  },
 };

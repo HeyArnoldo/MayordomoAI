@@ -6,12 +6,13 @@ import { EvolutionClient } from '../whatsapp/evolution.client';
 import { User } from './user.entity';
 import { PhoneNumber } from './phone-number.entity';
 import { UsersController } from './users.controller';
+import { AccountController } from './account.controller';
 import { UsersService } from './users.service';
 import { PhoneVerificationService } from './phone-verification.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, PhoneNumber])],
-  controllers: [UsersController],
+  controllers: [UsersController, AccountController],
   providers: [UsersService, PhoneVerificationService, EvolutionClient],
   exports: [UsersService],
 })

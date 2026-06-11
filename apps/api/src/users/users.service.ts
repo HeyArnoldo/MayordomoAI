@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from '@app/contracts';
@@ -13,6 +13,8 @@ export interface GoogleProfileData {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(@InjectRepository(User) private readonly repo: Repository<User>) {}
 
   findById(id: string): Promise<User | null> {
@@ -29,6 +31,24 @@ export class UsersService {
 
   save(user: User): Promise<User> {
     return this.repo.save(user);
+  }
+
+  /**
+   * Borrado definitivo de la cuenta. Toda tabla con userId tiene FK
+   * ON DELETE CASCADE: un solo DELETE limpia datos y libera el número
+   * (el unique de e164 muere con la fila de phone_numbers).
+   */
+  async deleteAccount(user: User): Promise<void> {
+    if (user.role === UserRole.ADMIN) {
+      const admins = await this.repo.count({ where: { role: UserRole.ADMIN } });
+      if (admins <= 1) {
+        throw new ConflictException(
+          'Eres el último admin — asigna otro antes de eliminar tu cuenta',
+        );
+      }
+    }
+    await this.repo.delete(user.id);
+    this.logger.warn(`cuenta eliminada: ${user.email} (${user.id})`);
   }
 
   /**

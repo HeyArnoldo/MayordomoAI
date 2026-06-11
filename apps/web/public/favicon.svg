@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Marca MayordomoAI: sobre mayordomo (mismo Mark de la app) -->
+  <rect width="32" height="32" rx="9.6" fill="#0e7a4d"/>
+  <path d="M5 10 L16 19 L27 10" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M5 24 L16 15 L27 24" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+</svg>

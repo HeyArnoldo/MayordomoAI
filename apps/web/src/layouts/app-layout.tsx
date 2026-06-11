@@ -11,12 +11,15 @@ import {
   Plus,
   ShieldCheck,
   Sun,
+  Trash2,
   Wrench,
 } from 'lucide-react';
 import { UserRole } from '@app/contracts';
 import { useLogout, useMe } from '@/hooks/use-auth';
 import { Mark, Wordmark } from '@/components/mayordomo/mark';
 import { RegistroDialog } from '@/features/registro/registro-dialog';
+import { PhoneLinkDialog } from '@/features/phone/phone-link-dialog';
+import { DeleteAccountDialog } from '@/features/account/delete-account-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -75,6 +78,9 @@ export function AppLayout() {
   const { pathname } = useLocation();
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [expanded, setExpanded] = useState(() => localStorage.getItem('sidebar') !== 'collapsed');
+  // Dialogs del menú de perfil: viven fuera del dropdown (Radix los desmonta).
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -174,6 +180,9 @@ export function AppLayout() {
                 {user?.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setPhoneOpen(true)}>
+                <MessageCircle className="size-4" /> WhatsApp
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDark((d) => !d)}>
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 {dark ? 'Modo claro' : 'Modo oscuro'}
@@ -181,8 +190,15 @@ export function AppLayout() {
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="size-4" /> Cerrar sesión
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="size-4" /> Eliminar cuenta
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <PhoneLinkDialog open={phoneOpen} onOpenChange={setPhoneOpen} />
+          <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} />
         </div>
       </aside>
 
