@@ -10,13 +10,15 @@ export function Money({
   value,
   sign,
   className,
+  style,
 }: {
   value: number;
   sign?: '+' | '−' | '↔';
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
-    <span className={cn('money font-semibold', className)}>
+    <span className={cn('money font-semibold', className)} style={style}>
       {sign ? `${sign} ` : ''}
       <span className="mr-0.5 text-[0.68em] opacity-60">S/</span>
       {formatter.format(value)}

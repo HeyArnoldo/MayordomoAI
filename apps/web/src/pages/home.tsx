@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Plus, TrendingUp } from 'lucide-react';
 import { Money } from '@/components/mayordomo/money';
-import { BoxRow } from '@/components/mayordomo/box-row';
+import { EnvelopeCard } from '@/components/mayordomo/envelope-card';
 import { TransactionRow } from '@/components/mayordomo/transaction-row';
 import { RegistroDialog } from '@/features/registro/registro-dialog';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,11 @@ export default function DashboardPage() {
   const { data: boxes = [], isLoading } = useBoxBalances();
   const { data: recent = [] } = useTransactions({ limit: 5 });
 
-  const expenseBoxes = boxes.filter((b) => b.active && b.accumulated === null);
-  const funds = boxes.filter((b) => b.active && b.accumulated !== null);
+  // El dashboard personal: la caja de ámbito empresa va aparte (design).
+  const personal = boxes.filter((b) => b.active && b.scope === 'personal');
+  const business = boxes.filter((b) => b.active && b.scope === 'business');
+  const expenseBoxes = personal.filter((b) => b.accumulated === null);
+  const funds = personal.filter((b) => b.accumulated !== null);
   const available = expenseBoxes.reduce((s, b) => s + b.balance, 0);
   const allocated = expenseBoxes.reduce((s, b) => s + b.allocated, 0);
   const usedPct = allocated > 0 ? ((allocated - available) / allocated) * 100 : 0;
@@ -79,9 +82,9 @@ export default function DashboardPage() {
         </section>
       ))}
 
-      {/* Cajas de gasto */}
-      <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
-        <div className="flex items-center justify-between pt-3">
+      {/* Las cajas como sobres — la metáfora central del design */}
+      <section>
+        <div className="mb-2 flex items-center justify-between">
           <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
             Tus cajas
           </span>
@@ -89,10 +92,26 @@ export default function DashboardPage() {
             Editar % <ArrowRight className="size-3" />
           </Link>
         </div>
-        {expenseBoxes.map((b, i) => (
-          <BoxRow key={b.id} box={b} last={i === expenseBoxes.length - 1} />
-        ))}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {expenseBoxes.map((b) => (
+            <EnvelopeCard key={b.id} box={b} />
+          ))}
+        </div>
       </section>
+
+      {/* Ámbito empresa, separado del reparto personal */}
+      {business.length > 0 && (
+        <section>
+          <div className="mb-2 font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
+            Ámbito empresa
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {business.map((b) => (
+              <EnvelopeCard key={b.id} box={b} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Recientes */}
       <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
