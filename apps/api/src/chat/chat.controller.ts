@@ -66,6 +66,8 @@ export class ChatController {
 
   @Get('conversations')
   async list(@CurrentUser() user: User): Promise<ConversationDto[]> {
+    // El hilo de WhatsApp existe siempre (se crea on-demand, idempotente).
+    await this.conversations.ensureWhatsAppThread(user.id);
     return (await this.conversations.list(user.id)).map(toConversationDto);
   }
 

@@ -7,6 +7,7 @@ import { AppLayout } from '@/layouts/app-layout';
 const LoginPage = lazy(() => import('@/pages/login'));
 const RegisterPage = lazy(() => import('@/pages/register'));
 const HomePage = lazy(() => import('@/pages/home'));
+const ChatPage = lazy(() => import('@/pages/chat'));
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -16,7 +17,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppLayout />,
-        children: [{ path: '/', element: <HomePage /> }],
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/chat', element: <ChatPage /> },
+        ],
       },
     ],
   },
