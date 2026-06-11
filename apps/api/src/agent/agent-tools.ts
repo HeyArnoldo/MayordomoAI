@@ -120,7 +120,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
       description:
         `Registra un movimiento (gasto en una caja, ingreso que se reparte por %, o tránsito). ` +
         `REGLA: si es un gasto >= S/${CONFIRMATION_THRESHOLD} o viene de una transcripción de voz dudosa, ` +
-        `PRIMERO preguntá al usuario y llamá esta tool con userConfirmed=true solo después de su "sí".`,
+        `PRIMERO pregunta al usuario y llama esta tool con userConfirmed=true solo después de su "sí".`,
       inputSchema: z.object({
         type: z.enum(TransactionType),
         boxName: z.string().optional().describe('Nombre de la caja (solo gastos)'),
@@ -141,7 +141,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
           ) {
             return {
               needsConfirmation: true,
-              message: `Monto alto (S/${args.amount.toFixed(2)}). Pedí confirmación al usuario antes de registrar.`,
+              message: `Monto alto (S/${args.amount.toFixed(2)}). Pide confirmación al usuario antes de registrar.`,
             };
           }
           let boxId: string | null | undefined;
@@ -172,7 +172,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
 
     voidTransaction: tool({
       description:
-        'Anula un movimiento (soft delete, recalcula saldos). SIEMPRE pedí confirmación al usuario antes de anular.',
+        'Anula un movimiento (soft delete, recalcula saldos). SIEMPRE pide confirmación al usuario antes de anular.',
       inputSchema: z.object({
         transactionId: z.string().uuid(),
         userConfirmed: z.boolean().default(false),
@@ -180,7 +180,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
       execute: async (args) =>
         audited(ctx, 'voidTransaction', args, async () => {
           if (!args.userConfirmed) {
-            return { needsConfirmation: true, message: 'Pedí confirmación antes de anular.' };
+            return { needsConfirmation: true, message: 'Pide confirmación antes de anular.' };
           }
           const tx = await ctx.transactions.void(ctx.userId, args.transactionId);
           return { voided: toTransactionDto(tx) };

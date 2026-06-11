@@ -3,7 +3,7 @@ import { z } from 'zod';
 export enum TransactionType {
   INCOME = 'income',
   EXPENSE = 'expense',
-  /** Dinero de paso (reembolsos que reenviás): no toca cajas ni %. */
+  /** Dinero de paso (reembolsos que reenvías): no toca cajas ni %. */
   TRANSIT = 'transit',
 }
 

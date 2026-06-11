@@ -46,7 +46,7 @@ export default function ChatPage() {
           <ChatThread key={activeId} conversationId={activeId} history={history} />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-ink-3">
-            Creá una conversación para empezar.
+            Crea una conversación para empezar.
           </div>
         )}
       </div>

@@ -147,7 +147,7 @@ export function ChatThread({
               }
             }}
             rows={1}
-            placeholder="Escribí un mensaje…"
+            placeholder="Escribe un mensaje…"
             className="max-h-32 min-h-10 flex-1 resize-none rounded-xl border border-line bg-inset px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-ink-3 focus:border-brand"
           />
           <Button type="submit" size="icon" disabled={!input.trim() || busy} className="size-10">
