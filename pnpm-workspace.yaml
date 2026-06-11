@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# pnpm 11 exige declarar qué dependencias pueden correr scripts de build nativos.
+# Sin esto, `pnpm install` aborta con ERR_PNPM_IGNORED_BUILDS y esbuild /
+# @tailwindcss/oxide no compilan sus bindings -> Vite no arranca.
+allowBuilds:
+  "@nestjs/core": true
+  esbuild: true
+  "@tailwindcss/oxide": true
+  unrs-resolver: true
+
+# react-jsx-parser (dep de ai-elements/jsx-preview) pinea @types/react 18;
+# el monorepo es React 19 — sin override, tsc ve dos copias de tipos y rompe.
+overrides:
+  "@types/react": ^19.2.0
+  "@types/react-dom": ^19.2.0

@@ -1,0 +1,224 @@
+@import '@fontsource-variable/hanken-grotesk';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Paleta MayordomoAI — "limpia y bancaria" (docs/design/ui/tokens.jsx).
+ * Acento conmutable via data-accent en <html>: verde (default) | teal | indigo.
+ * Las variables shadcn (--background, --primary, …) mapean a esta paleta para
+ * que los componentes shadcn hereden el tema sin tocarlos.
+ */
+:root {
+  --radius: 1rem;
+
+  /* acento — verde dinero (default) */
+  --brand: #0e7a4d;
+  --brand-soft: #e2f1e9;
+  --on-brand: #ffffff;
+
+  /* neutrales light */
+  --surface: #ffffff;
+  --surface-alt: #ebefeb;
+  --inset: #f6f8f6;
+  --ink: #16211a;
+  --ink-2: #5d6a62;
+  --ink-3: #94a09a;
+  --line: #e3e8e3;
+  --line-strong: #cfd8cf;
+  --positive: #0e7a4d;
+  --negative: #bb4540;
+  --negative-soft: #f7e9e8;
+  --warn: #b07c1e;
+
+  /* colores por caja */
+  --caja-ahorro: #0e7a4d;
+  --caja-varios: #5c6e77;
+  --caja-pasajes: #0f7e96;
+  --caja-ocio: #b07c1e;
+  --caja-diezmo: #7a5cc4;
+  --caja-snacks: #b5536e;
+  --caja-ofrenda: #3f6fc4;
+  --caja-empresa: #41599e;
+
+  /* sombras */
+  --shadow-card: 0 1px 2px rgba(20, 40, 28, 0.06);
+  --shadow-float: 0 16px 40px rgba(20, 40, 28, 0.12);
+
+  /* mapeo shadcn */
+  --background: #f2f5f2;
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--surface-alt);
+  --secondary-foreground: var(--ink);
+  --muted: var(--inset);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand);
+  --destructive: var(--negative);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--brand);
+  --chart-1: var(--caja-ahorro);
+  --chart-2: var(--caja-pasajes);
+  --chart-3: var(--caja-ocio);
+  --chart-4: var(--caja-diezmo);
+  --chart-5: var(--caja-snacks);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--brand);
+}
+
+:root[data-accent='teal'] {
+  --brand: #0f7e96;
+  --brand-soft: #e1f0f3;
+}
+
+:root[data-accent='indigo'] {
+  --brand: #41599e;
+  --brand-soft: #e7eaf5;
+}
+
+.dark {
+  --brand: #34d399;
+  --brand-soft: #16332455;
+  --on-brand: #0b1410;
+
+  --surface: #141c17;
+  --surface-alt: #1a241e;
+  --inset: #101813;
+  --ink: #edf3ee;
+  --ink-2: #94a39a;
+  --ink-3: #5f6e65;
+  --line: #232f28;
+  --line-strong: #314037;
+  --positive: #34d399;
+  --negative: #f07b72;
+  --negative-soft: #3a211f;
+  --warn: #e0b34e;
+
+  --caja-ahorro: #34d399;
+  --caja-varios: #9db0ba;
+  --caja-pasajes: #53c8de;
+  --caja-ocio: #e0b34e;
+  --caja-diezmo: #ac93f2;
+  --caja-snacks: #ef8fae;
+  --caja-ofrenda: #85a8ee;
+  --caja-empresa: #93a8e8;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  --background: #0c120f;
+}
+
+:root.dark[data-accent='teal'] {
+  --brand: #53c8de;
+  --brand-soft: #13313955;
+}
+
+:root.dark[data-accent='indigo'] {
+  --brand: #93a8e8;
+  --brand-soft: #1d274555;
+}
+
+@theme inline {
+  --font-sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+
+  /* semánticos del design */
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-inset: var(--inset);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-warn: var(--warn);
+
+  --color-caja-ahorro: var(--caja-ahorro);
+  --color-caja-varios: var(--caja-varios);
+  --color-caja-pasajes: var(--caja-pasajes);
+  --color-caja-ocio: var(--caja-ocio);
+  --color-caja-diezmo: var(--caja-diezmo);
+  --color-caja-snacks: var(--caja-snacks);
+  --color-caja-ofrenda: var(--caja-ofrenda);
+  --color-caja-empresa: var(--caja-empresa);
+
+  /* mapeo shadcn */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  /* Montos: siempre mono con cifras tabulares (columnas alineadas) */
+  .money {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+}
