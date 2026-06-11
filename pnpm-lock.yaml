@@ -35,6 +35,9 @@ importers:
       '@ai-sdk/azure':
         specifier: ^3.0.71
         version: 3.0.71(zod@4.4.3)
+      '@ai-sdk/openai':
+        specifier: ^3.0.69
+        version: 3.0.69(zod@4.4.3)
       '@app/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

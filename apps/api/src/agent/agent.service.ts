@@ -56,7 +56,7 @@ export class AgentService {
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
       throw new ServiceUnavailableException(
-        'El agente necesita credenciales de Azure OpenAI (AZURE_RESOURCE_NAME y AZURE_API_KEY en .env).',
+        'El agente necesita credenciales de IA (OPENAI_API_KEY, o AZURE_RESOURCE_NAME y AZURE_API_KEY en .env).',
       );
     }
     const tools = buildAgentTools({
