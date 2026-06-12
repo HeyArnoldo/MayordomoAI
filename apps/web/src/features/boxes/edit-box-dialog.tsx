@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { isAxiosError } from 'axios';
 import { Archive, Check } from 'lucide-react';
 import { BOX_COLOR_KEYS, type BoxBalance, type BoxColorKey } from '@app/contracts';
+import { translateApiError } from '@/lib/api-error';
 import { useUpdateBox } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { Button } from '@/components/ui/button';
@@ -27,14 +27,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-
-function apiError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const msg = (err.response?.data as { message?: string } | undefined)?.message;
-    if (msg) return msg;
-  }
-  return fallback;
-}
 
 /** Edición de caja: nombre, color (tokens del design) y archivado. */
 export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClose: () => void }) {
@@ -65,7 +57,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
           toast.success(t('edit.updated'));
           onClose();
         },
-        onError: (err) => toast.error(apiError(err, t('edit.updateError'))),
+        onError: (err) => toast.error(translateApiError(err)),
       },
     );
   };
@@ -80,7 +72,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
           setConfirmArchive(false);
           onClose();
         },
-        onError: (err) => toast.error(apiError(err, t('edit.archiveError'))),
+        onError: (err) => toast.error(translateApiError(err)),
       },
     );
   };

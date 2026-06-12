@@ -2,27 +2,18 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { ChevronLeft, Phone } from 'lucide-react';
 import { UserStatus } from '@app/contracts';
 import { useMe } from '@/hooks/use-auth';
 import { usersApi } from '@/services/users.api';
+import { translateApiError } from '@/lib/api-error';
 import { AuthShell, MobileBrandHeader } from '@/components/mayordomo/auth-shell';
 import { CodeInput, useCodeInput } from '@/features/phone/code-input';
 import { PhoneNumberInput } from '@/features/phone/phone-number-input';
 
 const E164 = /^\+[1-9]\d{7,14}$/;
 const RESEND_SECONDS = 60;
-
-function apiError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const msg = (err.response?.data as { message?: string | string[] } | undefined)?.message;
-    if (Array.isArray(msg)) return msg[0] ?? fallback;
-    if (msg) return msg;
-  }
-  return fallback;
-}
 
 /**
  * Onboarding post-aprobación: Paso 1 ingresa el número, Paso 2 verifica el
@@ -61,7 +52,7 @@ export default function OnboardingPage() {
       setStep('code');
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, t('onboarding.toasts.linkError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const verify = useMutation({
@@ -70,7 +61,7 @@ export default function OnboardingPage() {
       toast.success(t('onboarding.toasts.verified'));
       void finish();
     },
-    onError: (err) => toast.error(apiError(err, t('onboarding.toasts.wrongCode'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const resend = useMutation({
@@ -79,13 +70,13 @@ export default function OnboardingPage() {
       toast.success(t('onboarding.toasts.resent'));
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, t('onboarding.toasts.resendError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const skip = useMutation({
     mutationFn: usersApi.completeOnboarding,
     onSuccess: () => void finish(),
-    onError: (err) => toast.error(apiError(err, t('onboarding.toasts.skipError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   if (!user) return <Navigate to="/login" replace />;

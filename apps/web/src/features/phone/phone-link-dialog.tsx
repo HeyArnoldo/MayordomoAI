@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { MessageCircle, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { usersApi } from '@/services/users.api';
+import { translateApiError } from '@/lib/api-error';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,15 +19,6 @@ import { PhoneNumberInput } from './phone-number-input';
 const E164 = /^\+[1-9]\d{7,14}$/;
 const RESEND_SECONDS = 60;
 const PHONES_KEY = ['me', 'phones'] as const;
-
-function apiError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const msg = (err.response?.data as { message?: string | string[] } | undefined)?.message;
-    if (Array.isArray(msg)) return msg[0] ?? fallback;
-    if (msg) return msg;
-  }
-  return fallback;
-}
 
 /**
  * Vincular o cambiar el número de WhatsApp desde la app (menú de perfil).
@@ -85,7 +76,7 @@ export function PhoneLinkDialog({
       setStep('code');
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, t('link.linkError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const verify = useMutation({
@@ -95,7 +86,7 @@ export function PhoneLinkDialog({
       toast.success(t('link.verifiedLinked'));
       close();
     },
-    onError: (err) => toast.error(apiError(err, t('link.codeError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const resend = useMutation({
@@ -104,7 +95,7 @@ export function PhoneLinkDialog({
       toast.success(t('link.resent'));
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, t('link.resendError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const valid = E164.test(e164);
