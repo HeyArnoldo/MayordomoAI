@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Channel, MessageRole } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
 
@@ -22,7 +23,12 @@ export class ConversationsService {
 
   async findOne(userId: string, id: string): Promise<Conversation> {
     const conv = await this.conversations.findOne({ where: { id, userId } });
-    if (!conv) throw new NotFoundException('Conversación no encontrada');
+    if (!conv)
+      throw new AppException(
+        'conversation.not_found',
+        HttpStatus.NOT_FOUND,
+        'Conversation not found',
+      );
     return conv;
   }
 
@@ -55,7 +61,12 @@ export class ConversationsService {
 
   async rename(userId: string, id: string, title: string): Promise<Conversation> {
     const conv = await this.findOne(userId, id);
-    if (conv.isSystem) throw new BadRequestException('El hilo de WhatsApp no se renombra');
+    if (conv.isSystem)
+      throw new AppException(
+        'conversation.whatsapp_thread_rename_forbidden',
+        HttpStatus.BAD_REQUEST,
+        'WhatsApp thread cannot be renamed',
+      );
     conv.title = title;
     return this.conversations.save(conv);
   }
@@ -69,7 +80,12 @@ export class ConversationsService {
 
   async remove(userId: string, id: string): Promise<void> {
     const conv = await this.findOne(userId, id);
-    if (conv.isSystem) throw new BadRequestException('El hilo de WhatsApp no se borra');
+    if (conv.isSystem)
+      throw new AppException(
+        'conversation.whatsapp_thread_delete_forbidden',
+        HttpStatus.BAD_REQUEST,
+        'WhatsApp thread cannot be deleted',
+      );
     await this.conversations.remove(conv);
   }
 
