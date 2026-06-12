@@ -53,6 +53,11 @@ export const errors = {
   preferences: {
     nothing_to_update: 'Nothing to update',
   },
+  box: {
+    not_found: 'Box not found',
+    not_in_allocation: 'Box {{id}} does not exist or is not part of the split',
+    allocation_must_sum_100: 'Percentages must add up to 100 (they add up to {{total}})',
+  },
   server: {
     internal_error: 'An unexpected error occurred',
   },

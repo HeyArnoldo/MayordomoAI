@@ -35,6 +35,9 @@ export const ERROR_CODES = [
   'common.invalid_e164_format',
   'common.invalid_verification_code',
   'preferences.nothing_to_update',
+  'box.not_found',
+  'box.not_in_allocation',
+  'box.allocation_must_sum_100',
   'server.internal_error',
 ] as const;
 

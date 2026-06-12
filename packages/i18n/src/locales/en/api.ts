@@ -22,11 +22,6 @@ export const api = {
     dueToday:
       '📌 Reminder: *{{name}}* is due today — {{amount}} (box {{box}}). Should I log it? Reply "yes" and I\'ll note it down.',
   },
-  errors: {
-    boxNotFound: 'Box not found',
-    boxNotInAllocation: 'Box {{id}} does not exist or is not part of the split',
-    allocationMustSum100: 'Percentages must add up to 100 (they add up to {{total}})',
-  },
   defaultBoxes: {
     savings: 'Savings',
     misc: 'Misc',

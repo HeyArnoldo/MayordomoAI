@@ -55,6 +55,11 @@ export const errors = {
   preferences: {
     nothing_to_update: 'Nada que actualizar',
   },
+  box: {
+    not_found: 'Caja no encontrada',
+    not_in_allocation: 'La caja {{id}} no existe o no participa del reparto',
+    allocation_must_sum_100: 'Los porcentajes deben sumar 100 (suman {{total}})',
+  },
   server: {
     internal_error: 'Ocurrió un error inesperado',
   },
