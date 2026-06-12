@@ -27,6 +27,7 @@ import {
   MessageRole,
   RenameConversationInput,
   renameConversationSchema,
+  resolveCurrency,
 } from '@app/contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ActiveAccountGuard } from '../common/guards/active-account.guard';
@@ -187,7 +188,15 @@ export class ChatController {
     }
 
     const modelMessages = await convertToModelMessages(body.messages);
-    const result = this.agent.run(user.id, conv.id, modelMessages, Channel.WEB, user.name);
+    const result = this.agent.run(
+      user.id,
+      conv.id,
+      modelMessages,
+      Channel.WEB,
+      user.name,
+      user.language,
+      resolveCurrency(user.currency),
+    );
 
     result.pipeUIMessageStreamToResponse(res);
 
@@ -207,7 +216,7 @@ export class ChatController {
         // Título según contexto tras el primer intercambio (no el mensaje a secas).
         if (conv.title === 'Nueva conversación' && last) {
           const userText = uiMessageText(last);
-          const suggested = await this.agent.suggestTitle(user.id, userText, text);
+          const suggested = await this.agent.suggestTitle(user.id, userText, text, user.language);
           const fallback = userText.length > 60 ? `${userText.slice(0, 57)}...` : userText;
           await this.conversations.setTitle(conv, suggested ?? fallback);
         }

@@ -1,4 +1,5 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, HttpStatus } from '@nestjs/common';
+import { AppException } from '../common/errors/app.exception';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { generateText, ModelMessage, stepCountIs, streamText, StreamTextResult, ToolSet } from 'ai';
@@ -126,8 +127,10 @@ export class AgentService {
     currency = 'PEN',
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
-      throw new ServiceUnavailableException(
-        'El agente necesita credenciales de IA (OPENAI_API_KEY, o AZURE_RESOURCE_NAME y AZURE_API_KEY en .env).',
+      throw new AppException(
+        'agent.ai_credentials_missing',
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Agent requires AI credentials (OPENAI_API_KEY, or AZURE_RESOURCE_NAME and AZURE_API_KEY in .env).',
       );
     }
     const tools = buildAgentTools({
@@ -165,18 +168,26 @@ export class AgentService {
   /**
    * Título corto según el contexto del primer intercambio (modelo barato).
    * Devuelve null si no hay IA o falla — el caller decide el fallback.
+   * El system prompt se genera en el idioma del usuario para que el título
+   * quede en su lengua natural.
    */
   async suggestTitle(
     userId: string,
     userText: string,
     assistantText: string,
+    locale: Locale = 'es',
   ): Promise<string | null> {
     if (!isAiEnabled()) return null;
+
+    const system =
+      locale === 'en'
+        ? 'Generate a title of 3 to 6 words in English that summarises the topic of this personal finance conversation. Reply ONLY with the title: no quotes, no period, no emojis.'
+        : 'Genera un título de 3 a 6 palabras en español neutro que resuma el tema de esta conversación de finanzas personales. Responde SOLO el título: sin comillas, sin punto final, sin emojis.';
+
     try {
       const { text, usage } = await generateText({
         model: parserModel(),
-        system:
-          'Genera un título de 3 a 6 palabras en español neutro que resuma el tema de esta conversación de finanzas personales. Responde SOLO el título: sin comillas, sin punto final, sin emojis.',
+        system,
         prompt: `Usuario: ${userText.slice(0, 500)}\nAsistente: ${assistantText.slice(0, 500)}`,
       });
       this.usage.record({

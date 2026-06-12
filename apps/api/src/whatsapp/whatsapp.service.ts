@@ -206,7 +206,15 @@ export class WhatsappService {
       return this.i18n.t(user.language, 'whatsapp.aiDisabled');
     }
     const history = await this.historyAsModelMessages(user.id, conversationId);
-    const result = this.agent.run(user.id, conversationId, history, Channel.WHATSAPP, user.name);
+    const result = this.agent.run(
+      user.id,
+      conversationId,
+      history,
+      Channel.WHATSAPP,
+      user.name,
+      user.language,
+      resolveCurrency(user.currency),
+    );
     return (await result.text).trim();
   }
 
