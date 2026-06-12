@@ -1,5 +1,6 @@
-import { HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, HttpStatus } from '@nestjs/common';
 import { AppException } from './app.exception';
+import { HttpExceptionFilter } from '../filters/http-exception.filter';
 
 describe('AppException', () => {
   describe('body shape', () => {
@@ -62,9 +63,23 @@ describe('AppException', () => {
   });
 
   describe('HttpExceptionFilter regression', () => {
-    it('getResponse() returns an object (not a string), so the filter passes it through verbatim', () => {
+    it('passes the { statusCode, code, message } body through verbatim', () => {
       const ex = new AppException('auth.forbidden', HttpStatus.FORBIDDEN, 'Forbidden');
-      expect(typeof ex.getResponse()).toBe('object');
+
+      const json = jest.fn();
+      const status = jest.fn().mockReturnValue({ json });
+      const host = {
+        switchToHttp: () => ({ getResponse: () => ({ status }) }),
+      } as unknown as ArgumentsHost;
+
+      new HttpExceptionFilter().catch(ex, host);
+
+      expect(status).toHaveBeenCalledWith(403);
+      expect(json).toHaveBeenCalledWith({
+        statusCode: 403,
+        code: 'auth.forbidden',
+        message: 'Forbidden',
+      });
     });
   });
 });

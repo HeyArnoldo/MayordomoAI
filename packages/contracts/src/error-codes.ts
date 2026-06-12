@@ -33,6 +33,7 @@ export const ERROR_CODES = [
   'chat.transcription_failed',
   'agent.ai_credentials_missing',
   'common.invalid_e164_format',
+  'common.invalid_verification_code',
   'preferences.nothing_to_update',
   'server.internal_error',
 ] as const;
@@ -40,7 +41,11 @@ export const ERROR_CODES = [
 /** Stable union of all valid error codes. Never rename a member. */
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
-/** Shape of every user-facing error response body produced by the API. */
+/** Shape of error responses originating from an `AppException`.
+ *
+ * Note: this does NOT cover all API error shapes. 400 validation errors raised
+ * by ZodValidationPipe have a different shape — `{ statusCode, message: string[], error }`
+ * with no `code`. Unifying both shapes is deferred to a later slice. */
 export interface ApiError {
   statusCode: number;
   code: ErrorCode;

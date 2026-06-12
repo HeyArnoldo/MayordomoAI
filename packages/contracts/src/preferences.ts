@@ -97,7 +97,7 @@ export const updatePreferencesSchema = z
     currency: currencySchema.optional(),
   })
   .refine((v) => v.language !== undefined || v.currency !== undefined, {
-    message: 'Nothing to update',
+    message: 'Nada que actualizar',
     params: { code: 'preferences.nothing_to_update' },
   });
 export type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;

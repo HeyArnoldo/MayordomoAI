@@ -48,6 +48,7 @@ export const errors = {
   },
   common: {
     invalid_e164_format: 'Invalid phone number format (E.164: +51987654321)',
+    invalid_verification_code: 'Enter the 6-digit code',
   },
   preferences: {
     nothing_to_update: 'Nothing to update',

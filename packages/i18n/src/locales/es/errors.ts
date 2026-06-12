@@ -50,6 +50,7 @@ export const errors = {
   },
   common: {
     invalid_e164_format: 'Formato de número inválido (E.164: +51987654321)',
+    invalid_verification_code: 'Código de 6 dígitos',
   },
   preferences: {
     nothing_to_update: 'Nada que actualizar',
@@ -72,5 +73,6 @@ type DotKeys<T, Prefix extends string = ''> = T extends object
   : never;
 
 // ErrorCode must be a subset of the dot-key union derived from `errors`.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _AssertAllCodesPresent = ErrorCode extends DotKeys<typeof errors> ? true : never;
+// `satisfies` forces evaluation: if any ErrorCode is missing a key here, the
+// conditional resolves to `never` and `true satisfies never` fails to compile.
+true satisfies ErrorCode extends DotKeys<typeof errors> ? true : never;
