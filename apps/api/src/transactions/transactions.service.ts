@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -9,6 +9,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { accountingDate, computeSplit } from '../common/money';
 import { BoxesService } from '../boxes/boxes.service';
 import { Transaction } from './transaction.entity';
@@ -59,14 +60,28 @@ export class TransactionsService {
     let split: Transaction['split'] = null;
 
     if (input.type === TransactionType.EXPENSE) {
-      if (!input.boxId) throw new BadRequestException('Un gasto necesita caja');
+      if (!input.boxId)
+        throw new AppException(
+          'transaction.expense_requires_box',
+          HttpStatus.BAD_REQUEST,
+          'An expense requires a box',
+        );
       const box = await this.boxes.findOne(userId, input.boxId);
-      if (!box.active) throw new BadRequestException('La caja está inactiva');
+      if (!box.active)
+        throw new AppException(
+          'transaction.box_inactive',
+          HttpStatus.BAD_REQUEST,
+          'Box is inactive',
+        );
       boxId = box.id;
     } else if (input.type === TransactionType.INCOME) {
       const active = await this.boxes.activePersonal(userId);
       if (active.length === 0)
-        throw new BadRequestException('No hay cajas para repartir el ingreso');
+        throw new AppException(
+          'transaction.no_boxes_for_income',
+          HttpStatus.BAD_REQUEST,
+          'No active boxes to split income across',
+        );
       split = computeSplit(
         input.amount,
         active.map((b) => ({ id: b.id, name: b.name, pct: parseFloat(b.pct) })),
@@ -109,7 +124,12 @@ export class TransactionsService {
 
   async findOne(userId: string, id: string): Promise<Transaction> {
     const tx = await this.repo.findOne({ where: { id, userId }, withDeleted: true });
-    if (!tx) throw new NotFoundException('Movimiento no encontrado');
+    if (!tx)
+      throw new AppException(
+        'transaction.not_found',
+        HttpStatus.NOT_FOUND,
+        'Transaction not found',
+      );
     return tx;
   }
 
