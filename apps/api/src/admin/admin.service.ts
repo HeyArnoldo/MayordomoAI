@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -16,6 +10,7 @@ import {
   UserRole,
   UserStatus,
 } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { User } from '../users/user.entity';
 import { PhoneNumber } from '../users/phone-number.entity';
 import { Box } from '../boxes/box.entity';
@@ -63,10 +58,15 @@ export class AdminService {
    */
   async updateStatus(actor: User, id: string, status: UserStatus): Promise<AdminUser> {
     if (actor.id === id) {
-      throw new BadRequestException('No puedes cambiar tu propio status');
+      throw new AppException(
+        'admin.cannot_change_own_status',
+        HttpStatus.BAD_REQUEST,
+        'Cannot change your own status',
+      );
     }
     const user = await this.users.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (!user)
+      throw new AppException('admin.user_not_found', HttpStatus.NOT_FOUND, 'User not found');
 
     user.status = status;
     const saved = await this.users.save(user);
@@ -83,15 +83,24 @@ export class AdminService {
   /** Cambia el rol. Guardas: no a uno mismo, y nunca dejar 0 admins. */
   async updateRole(actor: User, id: string, role: UserRole): Promise<AdminUser> {
     if (actor.id === id) {
-      throw new BadRequestException('No puedes cambiar tu propio rol');
+      throw new AppException(
+        'admin.cannot_change_own_role',
+        HttpStatus.BAD_REQUEST,
+        'Cannot change your own role',
+      );
     }
     const user = await this.users.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (!user)
+      throw new AppException('admin.user_not_found', HttpStatus.NOT_FOUND, 'User not found');
 
     if (user.role === UserRole.ADMIN && role !== UserRole.ADMIN) {
       const admins = await this.users.count({ where: { role: UserRole.ADMIN } });
       if (admins <= 1) {
-        throw new ConflictException('Es el último admin — asigna otro antes de degradarlo');
+        throw new AppException(
+          'admin.last_admin',
+          HttpStatus.CONFLICT,
+          'Last admin — assign another before downgrading',
+        );
       }
     }
 

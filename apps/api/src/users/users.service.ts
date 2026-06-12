@@ -1,7 +1,8 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UpdatePreferencesInput, UserRole } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { User } from './user.entity';
 
 export interface GoogleProfileData {
@@ -55,8 +56,10 @@ export class UsersService {
     if (user.role === UserRole.ADMIN) {
       const admins = await this.repo.count({ where: { role: UserRole.ADMIN } });
       if (admins <= 1) {
-        throw new ConflictException(
-          'Eres el último admin — asigna otro antes de eliminar tu cuenta',
+        throw new AppException(
+          'user.last_admin_cannot_delete',
+          HttpStatus.CONFLICT,
+          'Last admin — assign another before deleting your account',
         );
       }
     }
