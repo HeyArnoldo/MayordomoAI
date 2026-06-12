@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { isAxiosError } from 'axios';
 import { BoxScope, BoxType } from '@app/contracts';
 import { useCreateBox } from '@/hooks/use-finance';
+import { translateApiError } from '@/lib/api-error';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -54,12 +54,7 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
           setType(BoxType.EXPENSE);
           setBusiness(false);
         },
-        onError: (err) => {
-          const msg = isAxiosError(err)
-            ? ((err.response?.data as { message?: string } | undefined)?.message ?? err.message)
-            : t('new.createError');
-          toast.error(msg);
-        },
+        onError: (err) => toast.error(translateApiError(err)),
       },
     );
   };

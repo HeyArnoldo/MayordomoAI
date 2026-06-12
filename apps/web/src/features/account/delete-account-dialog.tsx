@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { usersApi } from '@/services/users.api';
+import { translateApiError } from '@/lib/api-error';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -39,13 +39,7 @@ export function DeleteAccountDialog({
       toast.success(t('account.deleteDialog.success'));
       navigate('/login', { replace: true });
     },
-    onError: (err) => {
-      const msg = isAxiosError(err)
-        ? ((err.response?.data as { message?: string } | undefined)?.message ??
-          t('account.deleteDialog.error'))
-        : t('account.deleteDialog.error');
-      toast.error(msg);
-    },
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const armed = confirm.trim().toUpperCase() === confirmWord;
