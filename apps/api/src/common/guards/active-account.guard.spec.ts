@@ -24,12 +24,13 @@ describe('ActiveAccountGuard', () => {
   });
 
   it('thrown exception has FORBIDDEN status', () => {
+    let caught: { getStatus: () => number } | undefined;
     try {
       guard.canActivate(makeCtx(UserStatus.PENDING));
     } catch (e: unknown) {
-      const ex = e as { getStatus: () => number };
-      expect(ex.getStatus()).toBe(HttpStatus.FORBIDDEN);
+      caught = e as { getStatus: () => number };
     }
+    expect(caught?.getStatus()).toBe(HttpStatus.FORBIDDEN);
   });
 
   it('throws when user is undefined', () => {

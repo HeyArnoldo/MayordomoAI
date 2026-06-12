@@ -5,6 +5,7 @@ import type { ErrorCode } from '@app/contracts';
 export const errors = {
   auth: {
     invalid_credentials: 'Credenciales inválidas',
+    invalid_session: 'Sesión inválida',
     email_already_registered: 'Este correo ya está registrado',
     forbidden: 'No tienes permisos para esta acción',
   },
@@ -59,6 +60,9 @@ export const errors = {
     not_found: 'Caja no encontrada',
     not_in_allocation: 'La caja {{id}} no existe o no participa del reparto',
     allocation_must_sum_100: 'Los porcentajes deben sumar 100 (suman {{total}})',
+  },
+  recurring: {
+    not_found: 'Gasto fijo no encontrado',
   },
   server: {
     internal_error: 'Ocurrió un error inesperado',

@@ -73,11 +73,12 @@ describe('RolesGuard', () => {
       getHandler: jest.fn(),
       getClass: jest.fn(),
     } as unknown as ExecutionContext;
+    let caught: { getStatus: () => number } | undefined;
     try {
       guard.canActivate(ctx);
     } catch (e: unknown) {
-      const ex = e as { getStatus: () => number };
-      expect(ex.getStatus()).toBe(HttpStatus.FORBIDDEN);
+      caught = e as { getStatus: () => number };
     }
+    expect(caught?.getStatus()).toBe(HttpStatus.FORBIDDEN);
   });
 });

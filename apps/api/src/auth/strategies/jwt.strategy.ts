@@ -31,11 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload): Promise<User> {
     const user = await this.users.findById(payload.sub);
     if (!user)
-      throw new AppException(
-        'auth.invalid_credentials',
-        HttpStatus.UNAUTHORIZED,
-        'Invalid session',
-      );
+      throw new AppException('auth.invalid_session', HttpStatus.UNAUTHORIZED, 'Invalid session');
     return user;
   }
 }

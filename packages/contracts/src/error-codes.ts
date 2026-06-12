@@ -7,6 +7,7 @@
  */
 export const ERROR_CODES = [
   'auth.invalid_credentials',
+  'auth.invalid_session',
   'auth.email_already_registered',
   'auth.forbidden',
   'account.pending_activation',
@@ -38,6 +39,7 @@ export const ERROR_CODES = [
   'box.not_found',
   'box.not_in_allocation',
   'box.allocation_must_sum_100',
+  'recurring.not_found',
   'server.internal_error',
 ] as const;
 
