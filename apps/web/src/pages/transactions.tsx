@@ -40,9 +40,10 @@ function dayLabel(
   t: TFunction<readonly ['transactions', 'common']>,
   locale: Locale,
 ): string {
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz });
   const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', {
-    timeZone: 'America/Lima',
+    timeZone: tz,
   });
   if (date === today) return t('dates.today');
   if (date === yesterday) return t('dates.yesterday');
