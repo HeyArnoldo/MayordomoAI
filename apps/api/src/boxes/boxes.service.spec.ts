@@ -1,0 +1,121 @@
+import { HttpStatus } from '@nestjs/common';
+import { BoxesService } from './boxes.service';
+import { Box } from './box.entity';
+import { BoxScope, BoxType, DEFAULT_LOCALE } from '@app/contracts';
+
+const makeBox = (overrides: Partial<Box> = {}): Box =>
+  ({
+    id: 'b1',
+    userId: 'u1',
+    name: 'Savings',
+    pct: '25.00',
+    type: BoxType.FUND,
+    scope: BoxScope.PERSONAL,
+    active: true,
+    sortOrder: 0,
+    createdAt: new Date(),
+    ...overrides,
+  }) as Box;
+
+const makeRepo = () => ({
+  findOne: jest.fn(),
+  find: jest.fn(),
+  save: jest.fn(),
+  create: jest.fn(),
+  count: jest.fn(),
+  maximum: jest.fn(),
+  manager: { query: jest.fn() },
+});
+
+describe('BoxesService', () => {
+  let service: BoxesService;
+  let repo: ReturnType<typeof makeRepo>;
+  const i18n = { t: jest.fn().mockReturnValue('Box name') };
+
+  beforeEach(() => {
+    repo = makeRepo();
+    service = new BoxesService(repo as never, i18n as never);
+  });
+
+  describe('findOne', () => {
+    it('throws box.not_found when box does not exist', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.findOne('u1', 'b1')).rejects.toMatchObject({
+        code: 'box.not_found',
+      });
+    });
+
+    it('thrown exception has NOT_FOUND status', async () => {
+      repo.findOne.mockResolvedValue(null);
+      let caught: { getStatus: () => number } | undefined;
+      try {
+        await service.findOne('u1', 'b1');
+      } catch (e) {
+        caught = e as typeof caught;
+      }
+      expect(caught?.getStatus()).toBe(HttpStatus.NOT_FOUND);
+    });
+
+    it('returns the box when found', async () => {
+      const box = makeBox();
+      repo.findOne.mockResolvedValue(box);
+      const result = await service.findOne('u1', 'b1');
+      expect(result).toBe(box);
+    });
+  });
+
+  describe('updateAllocation', () => {
+    it('throws box.not_in_allocation when an item references a non-existent box', async () => {
+      repo.find.mockResolvedValue([makeBox({ id: 'b1' })]);
+      await expect(
+        service.updateAllocation('u1', {
+          items: [
+            { id: 'unknown', pct: 50 },
+            { id: 'b1', pct: 50 },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'box.not_in_allocation' });
+    });
+
+    it('thrown box.not_in_allocation carries id param', async () => {
+      repo.find.mockResolvedValue([makeBox({ id: 'b1' })]);
+      let caught: { code: string; params?: Record<string, string | number> } | undefined;
+      try {
+        await service.updateAllocation('u1', { items: [{ id: 'unknown', pct: 100 }] });
+      } catch (e) {
+        caught = e as typeof caught;
+      }
+      expect(caught?.code).toBe('box.not_in_allocation');
+      expect(caught?.params?.id).toBeDefined();
+    });
+
+    it('throws box.allocation_must_sum_100 when percentages do not sum to 100', async () => {
+      repo.find.mockResolvedValue([makeBox({ id: 'b1', pct: '25.00' })]);
+      await expect(
+        service.updateAllocation('u1', { items: [{ id: 'b1', pct: 50 }] }),
+      ).rejects.toMatchObject({ code: 'box.allocation_must_sum_100' });
+    });
+
+    it('thrown box.allocation_must_sum_100 carries total param', async () => {
+      repo.find.mockResolvedValue([makeBox({ id: 'b1', pct: '25.00' })]);
+      let caught: { code: string; params?: Record<string, string | number> } | undefined;
+      try {
+        await service.updateAllocation('u1', { items: [{ id: 'b1', pct: 50 }] });
+      } catch (e) {
+        caught = e as typeof caught;
+      }
+      expect(caught?.code).toBe('box.allocation_must_sum_100');
+      expect(caught?.params?.total).toBeDefined();
+    });
+  });
+
+  describe('seedDefaults', () => {
+    it('calls i18n.t for box names (i18n still used in seedDefaults)', async () => {
+      repo.find.mockResolvedValue([]);
+      repo.create.mockImplementation((data: Partial<Box>) => ({ ...data }) as Box);
+      repo.save.mockImplementation((boxes: Box[]) => Promise.resolve(boxes));
+      await service.seedDefaults('u1', DEFAULT_LOCALE);
+      expect(i18n.t).toHaveBeenCalled();
+    });
+  });
+});

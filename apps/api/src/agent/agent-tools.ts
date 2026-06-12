@@ -17,7 +17,9 @@ import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
+import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
+import { toolErrorMessage } from './tool-error.helper';
 
 /**
  * Herramientas del agente. GUARDRAILS CLAVE:
@@ -42,16 +44,46 @@ export interface AgentToolsContext {
   locale: Locale;
   /** Moneda resuelta del usuario (resolveCurrency aplicado, nunca null). */
   currency: string;
+  /**
+   * I18nService instance for translating AppException codes into localized
+   * tool error messages. When present, toolErrorMessage is used for all
+   * catch paths so the LLM sees errors in the user's language.
+   */
+  i18n?: Pick<I18nService, 't'>;
 }
 
-/** Audita y ejecuta: cada tool pasa por acá. */
+/** Audita y ejecuta: cada tool pasa por acá.
+ *
+ * Punto central de manejo de errores: si la tool (o un servicio que invoca)
+ * lanza una excepción, se traduce vía toolErrorMessage al idioma del usuario y
+ * se devuelve como `{ error }` para que el LLM la vea localizada — cerrando la
+ * fuga de mensajes en inglés cuando un AppException de servicio escapa del
+ * execute sin catch propio. Sin ctx.i18n se conserva el comportamiento previo
+ * (re-throw), evitando regresiones en entornos sin i18n.
+ */
 async function audited<T>(
   ctx: AgentToolsContext,
   toolName: string,
   args: unknown,
   run: () => Promise<T>,
-): Promise<T> {
-  const result = await run();
+): Promise<T | { error: string }> {
+  let result: T;
+  try {
+    result = await run();
+  } catch (err) {
+    if (!ctx.i18n) throw err;
+    const errorResult = { error: toolErrorMessage(err, ctx.locale, ctx.i18n) };
+    await ctx.audits.save(
+      ctx.audits.create({
+        userId: ctx.userId,
+        conversationId: ctx.conversationId,
+        tool: toolName,
+        args,
+        result: errorResult,
+      }),
+    );
+    return errorResult;
+  }
   await ctx.audits.save(
     ctx.audits.create({
       userId: ctx.userId,
@@ -407,11 +439,13 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
               };
             }
             return { from: args.from.toUpperCase(), to: args.to.toUpperCase(), rate };
-          } catch {
+          } catch (err) {
             return {
-              error: isEn
-                ? 'The exchange rate service did not respond.'
-                : 'El servicio de tipo de cambio no respondió.',
+              error: ctx.i18n
+                ? toolErrorMessage(err, ctx.locale, ctx.i18n)
+                : isEn
+                  ? 'The exchange rate service did not respond.'
+                  : 'El servicio de tipo de cambio no respondió.',
             };
           }
         }),
@@ -623,8 +657,9 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
             };
           } catch (err) {
             return {
-              error:
-                err instanceof Error
+              error: ctx.i18n
+                ? toolErrorMessage(err, ctx.locale, ctx.i18n)
+                : err instanceof Error
                   ? err.message
                   : isEn
                     ? 'Could not update allocation'

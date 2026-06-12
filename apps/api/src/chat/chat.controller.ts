@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -12,6 +12,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AppException } from '../common/errors/app.exception';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { convertToModelMessages, UIMessage } from 'ai';
@@ -26,6 +27,7 @@ import {
   MessageRole,
   RenameConversationInput,
   renameConversationSchema,
+  resolveCurrency,
 } from '@app/contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ActiveAccountGuard } from '../common/guards/active-account.guard';
@@ -97,14 +99,20 @@ export class ChatController {
     @CurrentUser() user: User,
     @UploadedFile() file: UploadedAudio | undefined,
   ): Promise<{ text: string }> {
-    if (!file?.buffer?.length) throw new BadRequestException('Falta el audio');
+    if (!file?.buffer?.length)
+      throw new AppException('chat.audio_missing', HttpStatus.BAD_REQUEST, 'Audio file is missing');
     const text = await this.transcription.transcribe(
       file.buffer,
       user.id,
       file.mimetype || 'audio/webm',
       Channel.WEB,
     );
-    if (!text) throw new BadRequestException('No se pudo transcribir el audio');
+    if (!text)
+      throw new AppException(
+        'chat.transcription_failed',
+        HttpStatus.BAD_REQUEST,
+        'Could not transcribe the audio',
+      );
     return { text };
   }
 
@@ -180,7 +188,15 @@ export class ChatController {
     }
 
     const modelMessages = await convertToModelMessages(body.messages);
-    const result = this.agent.run(user.id, conv.id, modelMessages, Channel.WEB, user.name);
+    const result = this.agent.run(
+      user.id,
+      conv.id,
+      modelMessages,
+      Channel.WEB,
+      user.name,
+      user.language,
+      resolveCurrency(user.currency),
+    );
 
     result.pipeUIMessageStreamToResponse(res);
 
@@ -200,7 +216,7 @@ export class ChatController {
         // Título según contexto tras el primer intercambio (no el mensaje a secas).
         if (conv.title === 'Nueva conversación' && last) {
           const userText = uiMessageText(last);
-          const suggested = await this.agent.suggestTitle(user.id, userText, text);
+          const suggested = await this.agent.suggestTitle(user.id, userText, text, user.language);
           const fallback = userText.length > 60 ? `${userText.slice(0, 57)}...` : userText;
           await this.conversations.setTitle(conv, suggested ?? fallback);
         }

@@ -1,5 +1,6 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { UserStatus } from '@app/contracts';
+import { AppException } from '../errors/app.exception';
 import { User } from '../../users/user.entity';
 
 /**
@@ -11,7 +12,11 @@ export class ActiveAccountGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<{ user?: User }>();
     if (req.user?.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Tu cuenta está pendiente de activación.');
+      throw new AppException(
+        'account.pending_activation',
+        HttpStatus.FORBIDDEN,
+        'Account pending activation',
+      );
     }
     return true;
   }

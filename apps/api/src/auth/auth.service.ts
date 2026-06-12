@@ -1,7 +1,9 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { DEFAULT_LOCALE, LoginInput, RegisterInput, UserRole } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { GoogleProfileData, UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
 
@@ -30,7 +32,12 @@ export class AuthService {
 
   async register(input: RegisterInput): Promise<AuthResult> {
     const existing = await this.users.findByEmail(input.email);
-    if (existing) throw new ConflictException('El email ya está registrado');
+    if (existing)
+      throw new AppException(
+        'auth.email_already_registered',
+        HttpStatus.CONFLICT,
+        'Email already registered',
+      );
 
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
     const user = await this.users.create({
@@ -45,11 +52,21 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const user = await this.users.findByEmail(input.email);
-    // Mismo mensaje para "no existe" y "password mal": no filtrar qué emails existen.
-    if (!user?.passwordHash) throw new UnauthorizedException('Credenciales inválidas');
+    // Same message for "not found" and "wrong password": do not reveal which emails exist.
+    if (!user?.passwordHash)
+      throw new AppException(
+        'auth.invalid_credentials',
+        HttpStatus.UNAUTHORIZED,
+        'Invalid credentials',
+      );
 
     const ok = await bcrypt.compare(input.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Credenciales inválidas');
+    if (!ok)
+      throw new AppException(
+        'auth.invalid_credentials',
+        HttpStatus.UNAUTHORIZED,
+        'Invalid credentials',
+      );
     return { user, token: this.sign(user) };
   }
 

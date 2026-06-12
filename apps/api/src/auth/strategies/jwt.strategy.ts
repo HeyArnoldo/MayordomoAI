@@ -1,7 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
+import { AppException } from '../../common/errors/app.exception';
 import { UsersService } from '../../users/users.service';
 import { User } from '../../users/user.entity';
 import { SESSION_COOKIE } from '../../config/app.config';
@@ -28,7 +30,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(payload: JwtPayload): Promise<User> {
     const user = await this.users.findById(payload.sub);
-    if (!user) throw new UnauthorizedException('Sesión inválida');
+    if (!user)
+      throw new AppException('auth.invalid_session', HttpStatus.UNAUTHORIZED, 'Invalid session');
     return user;
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -12,6 +12,7 @@ import {
   Locale,
   UpdateBoxInput,
 } from '@app/contracts';
+import { AppException } from '../common/errors/app.exception';
 import { accountingMonth, fromCents, isValidPctSum, toCents } from '../common/money';
 import { I18nService } from '../i18n/i18n.service';
 import { Box } from './box.entity';
@@ -57,8 +58,9 @@ export class BoxesService {
   }
 
   async findOne(userId: string, id: string, locale: Locale = DEFAULT_LOCALE): Promise<Box> {
+    void locale; // locale param kept for call-site compatibility; error is now code-based
     const box = await this.repo.findOne({ where: { id, userId } });
-    if (!box) throw new NotFoundException(this.i18n.t(locale, 'errors.boxNotFound'));
+    if (!box) throw new AppException('box.not_found', HttpStatus.NOT_FOUND, 'Box not found');
     return box;
   }
 
@@ -112,21 +114,28 @@ export class BoxesService {
     input: AllocationInput,
     locale: Locale = DEFAULT_LOCALE,
   ): Promise<Box[]> {
+    void locale; // locale param kept for call-site compatibility; errors are now code-based
     const boxes = await this.activePersonal(userId);
     const byId = new Map(boxes.map((b) => [b.id, b]));
     for (const item of input.items) {
       const box = byId.get(item.id);
       if (!box)
-        throw new BadRequestException(
-          this.i18n.t(locale, 'errors.boxNotInAllocation', { id: item.id }),
+        throw new AppException(
+          'box.not_in_allocation',
+          HttpStatus.BAD_REQUEST,
+          `Box ${item.id} is not part of the active allocation`,
+          { id: item.id },
         );
       box.pct = item.pct.toFixed(2);
     }
     const pcts = boxes.map((b) => parseFloat(b.pct));
     if (!isValidPctSum(pcts)) {
       const total = pcts.reduce((s, p) => s + p, 0);
-      throw new BadRequestException(
-        this.i18n.t(locale, 'errors.allocationMustSum100', { total: total.toFixed(2) }),
+      throw new AppException(
+        'box.allocation_must_sum_100',
+        HttpStatus.BAD_REQUEST,
+        `Allocation must sum to 100 (currently ${total.toFixed(2)})`,
+        { total: total.toFixed(2) },
       );
     }
     return this.repo.save(boxes);

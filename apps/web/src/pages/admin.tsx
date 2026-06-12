@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { Check, Clock3, CircleDollarSign, ShieldCheck, UserX } from 'lucide-react';
 import { UserRole, UserStatus, type AdminUser } from '@app/contracts';
@@ -10,6 +9,7 @@ import { getIntlLocale } from '@app/i18n';
 import { useMe } from '@/hooks/use-auth';
 import { useLocale } from '@/hooks/use-locale';
 import { adminApi } from '@/services/admin.api';
+import { translateApiError } from '@/lib/api-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,14 +40,6 @@ const STATUS_META: Record<UserStatus, { labelKey: ParseKeys<'admin'>; className:
     className: 'bg-negative-soft text-negative',
   },
 };
-
-function apiError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const msg = (err.response?.data as { message?: string } | undefined)?.message;
-    if (msg) return msg;
-  }
-  return fallback;
-}
 
 function fecha(iso: string, intlLocale: string): string {
   return new Date(iso).toLocaleDateString(intlLocale, { day: '2-digit', month: 'short' });
@@ -80,7 +72,7 @@ export default function AdminPage() {
         }),
       );
     },
-    onError: (err) => toast.error(apiError(err, t('toasts.statusError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const setRole = useMutation({
@@ -93,7 +85,7 @@ export default function AdminPage() {
           : t('toasts.roleChangedUser', { name: u.name }),
       );
     },
-    onError: (err) => toast.error(apiError(err, t('toasts.roleError'))),
+    onError: (err) => toast.error(translateApiError(err)),
   });
 
   const pending = (users ?? []).filter((u) => u.status === UserStatus.PENDING);

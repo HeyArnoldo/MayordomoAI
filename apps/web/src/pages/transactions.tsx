@@ -40,10 +40,13 @@ function dayLabel(
   t: TFunction<readonly ['transactions', 'common']>,
   locale: Locale,
 ): string {
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-  const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', {
-    timeZone: 'America/Lima',
-  });
+  // Calendar-day math (not 86_400_000ms): a 25-hour fall-back DST day would make
+  // "now − 1 day" land on today, breaking the Hoy/Ayer labels. Local-default
+  // formatting already resolves to the browser timezone.
+  const today = new Date().toLocaleDateString('en-CA');
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = yesterdayDate.toLocaleDateString('en-CA');
   if (date === today) return t('dates.today');
   if (date === yesterday) return t('dates.yesterday');
   const label = new Date(`${date}T12:00:00`).toLocaleDateString(getIntlLocale(locale), {

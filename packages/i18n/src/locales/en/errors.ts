@@ -3,6 +3,7 @@ import type { errors as es } from '../es/errors';
 export const errors = {
   auth: {
     invalid_credentials: 'Invalid credentials',
+    invalid_session: 'Invalid session',
     email_already_registered: 'This email is already registered',
     forbidden: 'You do not have permission to perform this action',
   },
@@ -49,9 +50,18 @@ export const errors = {
   common: {
     invalid_e164_format: 'Invalid phone number format (E.164: +51987654321)',
     invalid_verification_code: 'Enter the 6-digit code',
+    unexpected: 'An unexpected error occurred',
   },
   preferences: {
     nothing_to_update: 'Nothing to update',
+  },
+  box: {
+    not_found: 'Box not found',
+    not_in_allocation: 'Box {{id}} does not exist or is not part of the split',
+    allocation_must_sum_100: 'Percentages must add up to 100 (they add up to {{total}})',
+  },
+  recurring: {
+    not_found: 'Recurring expense not found',
   },
   server: {
     internal_error: 'An unexpected error occurred',

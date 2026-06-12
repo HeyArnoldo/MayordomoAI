@@ -23,11 +23,6 @@ export const api = {
     dueToday:
       '📌 Recordatorio: hoy vence *{{name}}* — {{amount}} (caja {{box}}). ¿Lo registro? Responde "sí" y lo anoto.',
   },
-  errors: {
-    boxNotFound: 'Caja no encontrada',
-    boxNotInAllocation: 'Caja {{id}} no existe o no participa del reparto',
-    allocationMustSum100: 'Los porcentajes deben sumar 100 (suman {{total}})',
-  },
   // Nombres de las cajas que se crean al activar una cuenta. Solo aplican al
   // crearlas: después son data del usuario y jamás se tocan.
   defaultBoxes: {

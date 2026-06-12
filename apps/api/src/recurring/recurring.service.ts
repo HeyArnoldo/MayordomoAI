@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AppException } from '../common/errors/app.exception';
 import { accountingDate } from '../common/money';
 import { Box } from '../boxes/box.entity';
 import { RecurringExpense } from './recurring-expense.entity';
@@ -50,7 +51,12 @@ export class RecurringService {
 
   async deactivate(userId: string, id: string): Promise<RecurringDto> {
     const row = await this.repo.findOne({ where: { id, userId }, relations: { box: true } });
-    if (!row) throw new NotFoundException('Gasto fijo no encontrado');
+    if (!row)
+      throw new AppException(
+        'recurring.not_found',
+        HttpStatus.NOT_FOUND,
+        'Recurring expense not found',
+      );
     row.active = false;
     await this.repo.save(row);
     return this.toDto(row);
