@@ -12,13 +12,15 @@ FROM base AS build
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/tsconfig/package.json packages/tsconfig/
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/i18n/package.json packages/i18n/
 COPY apps/api/package.json apps/api/
 RUN pnpm install --frozen-lockfile --filter @app/api...
 
 COPY packages/tsconfig packages/tsconfig
 COPY packages/contracts packages/contracts
+COPY packages/i18n packages/i18n
 COPY apps/api apps/api
-RUN pnpm --filter @app/contracts build && pnpm --filter @app/api build
+RUN pnpm --filter @app/contracts build && pnpm --filter @app/i18n build && pnpm --filter @app/api build
 
 # ── Stage 2: runtime ──────────────────────────────────────────────
 FROM base AS runtime
@@ -29,10 +31,12 @@ ENV NODE_ENV=production
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/tsconfig/package.json packages/tsconfig/
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/i18n/package.json packages/i18n/
 COPY apps/api/package.json apps/api/
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts --filter @app/api...
 
 COPY --from=build /repo/packages/contracts/dist packages/contracts/dist
+COPY --from=build /repo/packages/i18n/dist packages/i18n/dist
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
