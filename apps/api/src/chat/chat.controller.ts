@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -12,6 +12,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AppException } from '../common/errors/app.exception';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { convertToModelMessages, UIMessage } from 'ai';
@@ -97,14 +98,20 @@ export class ChatController {
     @CurrentUser() user: User,
     @UploadedFile() file: UploadedAudio | undefined,
   ): Promise<{ text: string }> {
-    if (!file?.buffer?.length) throw new BadRequestException('Falta el audio');
+    if (!file?.buffer?.length)
+      throw new AppException('chat.audio_missing', HttpStatus.BAD_REQUEST, 'Audio file is missing');
     const text = await this.transcription.transcribe(
       file.buffer,
       user.id,
       file.mimetype || 'audio/webm',
       Channel.WEB,
     );
-    if (!text) throw new BadRequestException('No se pudo transcribir el audio');
+    if (!text)
+      throw new AppException(
+        'chat.transcription_failed',
+        HttpStatus.BAD_REQUEST,
+        'Could not transcribe the audio',
+      );
     return { text };
   }
 
