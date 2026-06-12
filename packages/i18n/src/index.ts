@@ -4,6 +4,7 @@ import { auth as authEs } from './locales/es/auth';
 import { boxes as boxesEs } from './locales/es/boxes';
 import { chat as chatEs } from './locales/es/chat';
 import { common as commonEs } from './locales/es/common';
+import { errors as errorsEs } from './locales/es/errors';
 import { phone as phoneEs } from './locales/es/phone';
 import { settings as settingsEs } from './locales/es/settings';
 import { transactions as transactionsEs } from './locales/es/transactions';
@@ -13,6 +14,7 @@ import { auth as authEn } from './locales/en/auth';
 import { boxes as boxesEn } from './locales/en/boxes';
 import { chat as chatEn } from './locales/en/chat';
 import { common as commonEn } from './locales/en/common';
+import { errors as errorsEn } from './locales/en/errors';
 import { phone as phoneEn } from './locales/en/phone';
 import { settings as settingsEn } from './locales/en/settings';
 import { transactions as transactionsEn } from './locales/en/transactions';
@@ -28,6 +30,7 @@ export const resources = {
     boxes: boxesEs,
     chat: chatEs,
     common: commonEs,
+    errors: errorsEs,
     phone: phoneEs,
     settings: settingsEs,
     transactions: transactionsEs,
@@ -39,6 +42,7 @@ export const resources = {
     boxes: boxesEn,
     chat: chatEn,
     common: commonEn,
+    errors: errorsEn,
     phone: phoneEn,
     settings: settingsEn,
     transactions: transactionsEn,

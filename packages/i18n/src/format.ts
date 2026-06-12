@@ -1,7 +1,17 @@
 import type { Locale } from '@app/contracts';
 
-/** Locale BCP 47 para Intl según el idioma del usuario. */
+/**
+ * Canonical BCP-47 locale for Intl formatting, keyed by app locale.
+ *
+ * es-PE chosen for number/currency formatting conventions (sol as default currency);
+ * adjust if a different Spanish region becomes primary.
+ *
+ * All BCP-47 locale tags used for Intl formatting MUST be defined here and only here.
+ * No other file in the codebase may hardcode a BCP-47 tag for formatting purposes.
+ */
 export function getIntlLocale(language: Locale): string {
+  // es-PE chosen for number/currency formatting conventions (sol as default currency);
+  // adjust if a different Spanish region becomes primary.
   return language === 'es' ? 'es-PE' : 'en-US';
 }
 
