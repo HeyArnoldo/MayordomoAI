@@ -17,7 +17,9 @@ import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
+import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
+import { toolErrorMessage } from './tool-error.helper';
 
 /**
  * Herramientas del agente. GUARDRAILS CLAVE:
@@ -42,6 +44,12 @@ export interface AgentToolsContext {
   locale: Locale;
   /** Moneda resuelta del usuario (resolveCurrency aplicado, nunca null). */
   currency: string;
+  /**
+   * I18nService instance for translating AppException codes into localized
+   * tool error messages. When present, toolErrorMessage is used for all
+   * catch paths so the LLM sees errors in the user's language.
+   */
+  i18n?: Pick<I18nService, 't'>;
 }
 
 /** Audita y ejecuta: cada tool pasa por acá. */
@@ -407,11 +415,13 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
               };
             }
             return { from: args.from.toUpperCase(), to: args.to.toUpperCase(), rate };
-          } catch {
+          } catch (err) {
             return {
-              error: isEn
-                ? 'The exchange rate service did not respond.'
-                : 'El servicio de tipo de cambio no respondió.',
+              error: ctx.i18n
+                ? toolErrorMessage(err, ctx.locale, ctx.i18n)
+                : isEn
+                  ? 'The exchange rate service did not respond.'
+                  : 'El servicio de tipo de cambio no respondió.',
             };
           }
         }),
@@ -623,8 +633,9 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
             };
           } catch (err) {
             return {
-              error:
-                err instanceof Error
+              error: ctx.i18n
+                ? toolErrorMessage(err, ctx.locale, ctx.i18n)
+                : err instanceof Error
                   ? err.message
                   : isEn
                     ? 'Could not update allocation'

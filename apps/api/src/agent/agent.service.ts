@@ -11,6 +11,7 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { UsersService } from '../users/users.service';
+import { I18nService } from '../i18n/i18n.service';
 import { agentModel, agentModelName, isAiEnabled, parserModel, parserModelName } from './ai.config';
 import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
 import { ToolAudit } from './tool-audit.entity';
@@ -32,6 +33,7 @@ export class AgentService {
     private readonly usage: AiUsageService,
     private readonly users: UsersService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -143,6 +145,7 @@ export class AgentService {
       audits: this.audits,
       locale,
       currency,
+      i18n: this.i18n,
     });
 
     return streamText({

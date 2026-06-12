@@ -24,6 +24,10 @@ const aiMock = require('ai') as {
 
 const makeAiUsageService = () => ({ record: jest.fn() });
 
+const makeI18n = () => ({
+  t: jest.fn().mockReturnValue('translated'),
+});
+
 function makeService(): AgentService {
   return new AgentService(
     {} as never,
@@ -32,6 +36,7 @@ function makeService(): AgentService {
     makeAiUsageService() as never,
     {} as never,
     { save: jest.fn(), create: jest.fn() } as never,
+    makeI18n() as never,
   );
 }
 
