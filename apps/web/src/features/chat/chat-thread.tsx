@@ -28,6 +28,7 @@ import type { Message as PersistedMessage } from '@app/contracts';
 import { MessageRole } from '@app/contracts';
 import { toast } from 'sonner';
 import { Mark } from '@/components/mayordomo/mark';
+import { translateApiError } from '@/lib/api-error';
 import { useMe } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { chatApi } from '@/services/chat.api';
@@ -439,9 +440,7 @@ export function ChatThread({
 
   const errorBox = error && (
     <p className="mx-auto w-full max-w-3xl rounded-lg bg-negative-soft px-3 py-2 text-sm text-negative">
-      {error.message.includes('503') || error.message.includes('credenciales')
-        ? t('errors.noCredentials')
-        : t('errors.failed', { message: error.message })}
+      {translateApiError(error)}
     </p>
   );
 
