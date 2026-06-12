@@ -219,6 +219,8 @@ export type PromptInputProviderProps = PropsWithChildren<{
  * Optional global provider that lifts PromptInput state outside of PromptInput.
  * If you don't use it, PromptInput stays fully self-managed.
  */
+const CHAT_DRAFT_STORAGE_KEY = 'mayordomo:chat-draft';
+
 export const PromptInputProvider = ({
   initialInput: initialTextInput = '',
   children,
@@ -226,6 +228,30 @@ export const PromptInputProvider = ({
   // ----- textInput state
   const [textInput, setTextInput] = useState(initialTextInput);
   const clearInput = useCallback(() => setTextInput(''), []);
+
+  // Restore draft from localStorage after mount (hydration-safe)
+  useEffect(() => {
+    if (initialTextInput) return; // explicit prop takes precedence
+    try {
+      const stored = localStorage.getItem(CHAT_DRAFT_STORAGE_KEY);
+      if (stored) setTextInput(stored);
+    } catch {
+      // quota exceeded or privacy mode — ignore
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist draft to localStorage whenever text changes
+  useEffect(() => {
+    try {
+      if (textInput) {
+        localStorage.setItem(CHAT_DRAFT_STORAGE_KEY, textInput);
+      } else {
+        localStorage.removeItem(CHAT_DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      // quota exceeded or privacy mode — ignore
+    }
+  }, [textInput]);
 
   // ----- attachments state (global when wrapped)
   const [attachmentFiles, setAttachmentFiles] = useState<(FileUIPart & { id: string })[]>([]);
