@@ -58,10 +58,6 @@ export const chat = {
     feedbackThanks: 'Thanks for the feedback!',
     feedbackNoted: 'Thanks, we will keep it in mind.',
   },
-  errors: {
-    noCredentials: 'The agent does not have AI credentials configured yet.',
-    failed: 'Something failed: {{message}}',
-  },
   rail: {
     searchChats: 'Search chats',
     hideConversations: 'Hide conversations',

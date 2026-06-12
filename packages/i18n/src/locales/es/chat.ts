@@ -57,10 +57,6 @@ export const chat = {
     feedbackThanks: '¡Gracias por el feedback!',
     feedbackNoted: 'Gracias, lo tendremos en cuenta.',
   },
-  errors: {
-    noCredentials: 'El agente todavía no tiene credenciales de IA configuradas.',
-    failed: 'Algo falló: {{message}}',
-  },
   rail: {
     searchChats: 'Buscar chats',
     hideConversations: 'Ocultar conversaciones',
