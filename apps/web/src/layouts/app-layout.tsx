@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   List,
@@ -113,7 +113,9 @@ export function AppLayout() {
             expanded ? 'justify-between px-4' : 'justify-center',
           )}
         >
-          {expanded ? <Wordmark /> : <Mark size={28} />}
+          <Link to="/" aria-label={t('nav.home')}>
+            {expanded ? <Wordmark /> : <Mark size={28} />}
+          </Link>
           {expanded && (
             <button onClick={() => setExpanded(false)} className="text-ink-3 hover:text-ink">
               <PanelLeft className="size-4" />
@@ -200,9 +202,9 @@ export function AppLayout() {
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         {/* Top bar fina (desktop) / header mobile con marca */}
         <header className="flex h-14 items-center justify-between border-b border-line bg-surface px-4">
-          <div className="lg:hidden">
+          <Link to="/" aria-label={t('nav.home')} className="lg:hidden">
             <Wordmark />
-          </div>
+          </Link>
           <h1 className="hidden text-[15px] font-bold text-ink lg:block">
             {PAGE_TITLE_KEYS[pathname] ? t(PAGE_TITLE_KEYS[pathname]) : 'MayordomoAI'}
           </h1>
@@ -220,6 +222,34 @@ export function AppLayout() {
               <Settings className="size-4" />
             </NavLink>
             <DarkToggle dark={dark} onToggle={() => setDark((d) => !d)} />
+            {/* Menú de usuario en mobile: la sidebar (con logout) no existe ahí */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="lg:hidden" aria-label={t('nav.account')}>
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="size-8 rounded-full border border-line"
+                    />
+                  ) : (
+                    <span className="flex size-8 items-center justify-center rounded-full border border-line bg-brand-soft text-sm font-bold text-brand">
+                      {initial}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="font-normal text-muted-foreground">
+                  {user?.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="size-4" /> {t('nav.logout')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

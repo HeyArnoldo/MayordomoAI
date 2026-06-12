@@ -77,6 +77,15 @@ export default function BoxesPage() {
         </Button>
       </section>
 
+      <NewBoxDialog
+        trigger={
+          <Button variant="outline" className="w-full gap-2">
+            <PackagePlus className="size-4" />
+            {t('editor.newBox')}
+          </Button>
+        }
+      />
+
       <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
         {editable.map((b, i) => {
           const color = boxColor(b.name, b.colorKey);
@@ -148,15 +157,6 @@ export default function BoxesPage() {
           );
         })}
       </section>
-
-      <NewBoxDialog
-        trigger={
-          <Button variant="outline" className="w-full gap-2">
-            <PackagePlus className="size-4" />
-            {t('editor.newBox')}
-          </Button>
-        }
-      />
 
       <p className="text-center text-xs text-ink-3">{t('editor.futureNote')}</p>
 

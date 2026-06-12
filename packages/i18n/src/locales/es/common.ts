@@ -24,5 +24,6 @@ export const common = {
     lightMode: 'Modo claro',
     darkMode: 'Modo oscuro',
     logout: 'Cerrar sesión',
+    account: 'Cuenta',
   },
 };

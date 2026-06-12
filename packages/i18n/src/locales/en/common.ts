@@ -22,5 +22,6 @@ export const common = {
     lightMode: 'Light mode',
     darkMode: 'Dark mode',
     logout: 'Sign out',
+    account: 'Account',
   },
 } satisfies typeof es;
