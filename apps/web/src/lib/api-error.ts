@@ -36,9 +36,8 @@ export function translateApiError(err: unknown): string {
         return String(data.message[0]);
       }
 
-      if (typeof data.message === 'string' && data.message) {
-        return data.message;
-      }
+      // Codeless body with a plain string message (e.g. a legacy 500 fallback):
+      // do not leak the raw English string — route to the generic translated fallback.
     }
   }
 

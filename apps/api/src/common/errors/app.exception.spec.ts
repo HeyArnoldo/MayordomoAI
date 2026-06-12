@@ -81,5 +81,22 @@ describe('AppException', () => {
         message: 'Forbidden',
       });
     });
+
+    it('emits a coded 500 fallback for uncaught non-HttpException errors', () => {
+      const json = jest.fn();
+      const status = jest.fn().mockReturnValue({ json });
+      const host = {
+        switchToHttp: () => ({ getResponse: () => ({ status }) }),
+      } as unknown as ArgumentsHost;
+
+      new HttpExceptionFilter().catch(new Error('boom'), host);
+
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({
+        statusCode: 500,
+        code: 'server.internal_error',
+        message: 'Internal server error',
+      });
+    });
   });
 });
