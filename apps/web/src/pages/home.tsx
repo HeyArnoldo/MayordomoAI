@@ -8,10 +8,12 @@ import { RegistroDialog } from '@/features/registro/registro-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBoxBalances, useTransactions } from '@/hooks/use-finance';
+import { useLocale } from '@/hooks/use-locale';
 import { boxColor, monthLabel } from '@/lib/boxes';
 
 export default function DashboardPage() {
   const { t } = useTranslation('boxes');
+  const locale = useLocale();
   const navigate = useNavigate();
   const { data: boxes = [], isLoading } = useBoxBalances();
   const { data: recent = [] } = useTransactions({ limit: 5 });
@@ -43,7 +45,7 @@ export default function DashboardPage() {
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            {t('home.availableMonth', { month: monthLabel() })}
+            {t('home.availableMonth', { month: monthLabel(undefined, locale) })}
           </span>
           <RegistroDialog
             trigger={
@@ -67,7 +69,7 @@ export default function DashboardPage() {
             t={t}
             i18nKey="home.usedOfAllocated"
             values={{ pct: Math.round(usedPct) }}
-            components={{ amount: <span className="money">S/{allocated.toFixed(2)}</span> }}
+            components={{ amount: <Money value={allocated} /> }}
           />
         </p>
       </section>
@@ -92,7 +94,7 @@ export default function DashboardPage() {
                 t={t}
                 i18nKey="home.fundAccumulates"
                 components={{
-                  amount: <span className="money">+S/{fund.allocated.toFixed(2)}</span>,
+                  amount: <Money value={fund.allocated} sign="+" />,
                 }}
               />
             </p>

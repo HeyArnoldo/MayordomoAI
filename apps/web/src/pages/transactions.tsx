@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import type { Transaction } from '@app/contracts';
 import { TransactionType } from '@app/contracts';
+import type { Locale } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
+import { Money } from '@/components/mayordomo/money';
 import { TransactionRow } from '@/components/mayordomo/transaction-row';
 import { TransactionDetailDialog } from '@/components/mayordomo/transaction-detail';
 import {
@@ -20,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBoxBalances, useTransactions, useVoidTransaction } from '@/hooks/use-finance';
+import { useLocale } from '@/hooks/use-locale';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
@@ -31,14 +35,18 @@ const FILTERS = [
 ] as const;
 
 /** Agrupa por fecha contable con etiquetas humanas (Hoy / Ayer / fecha). */
-function dayLabel(date: string, t: TFunction<readonly ['transactions', 'common']>): string {
+function dayLabel(
+  date: string,
+  t: TFunction<readonly ['transactions', 'common']>,
+  locale: Locale,
+): string {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
   const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', {
     timeZone: 'America/Lima',
   });
   if (date === today) return t('dates.today');
   if (date === yesterday) return t('dates.yesterday');
-  const label = new Date(`${date}T12:00:00`).toLocaleDateString('es-PE', {
+  const label = new Date(`${date}T12:00:00`).toLocaleDateString(getIntlLocale(locale), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -48,6 +56,7 @@ function dayLabel(date: string, t: TFunction<readonly ['transactions', 'common']
 
 export default function TransactionsPage() {
   const { t } = useTranslation(['transactions', 'common']);
+  const locale = useLocale();
   const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [toVoid, setToVoid] = useState<Transaction | null>(null);
@@ -126,7 +135,7 @@ export default function TransactionsPage() {
           className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card"
         >
           <div className="pt-3 font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            {dayLabel(date, t)}
+            {dayLabel(date, t, locale)}
           </div>
           {list.map((tx, i) => (
             <TransactionRow
@@ -156,8 +165,8 @@ export default function TransactionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('void.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {toVoid?.note ?? t('void.fallbackNote')} · S/{toVoid?.amount.toFixed(2)}.{' '}
-              {t('void.description')}
+              {toVoid?.note ?? t('void.fallbackNote')} · {toVoid && <Money value={toVoid.amount} />}
+              . {t('void.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

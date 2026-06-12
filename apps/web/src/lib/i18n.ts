@@ -12,6 +12,13 @@ void i18n.use(initReactI18next).init({
   lng: mapBrowserLanguage(typeof navigator !== 'undefined' ? navigator.language : null),
   fallbackLng: DEFAULT_LOCALE,
   interpolation: { escapeValue: false }, // React ya escapa
+  // Detección de keys faltantes: solo en desarrollo para no contaminar producción.
+  saveMissing: import.meta.env.DEV,
+  missingKeyHandler: import.meta.env.DEV
+    ? (_lngs, ns, key) => {
+        console.warn(`[i18n] key faltante: "${ns}:${key}"`);
+      }
+    : undefined,
 });
 
 // Zod global sigue al idioma activo: los mensajes default de validación

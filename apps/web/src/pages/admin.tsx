@@ -6,7 +6,9 @@ import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { Check, Clock3, CircleDollarSign, ShieldCheck, UserX } from 'lucide-react';
 import { UserRole, UserStatus, type AdminUser } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
 import { useMe } from '@/hooks/use-auth';
+import { useLocale } from '@/hooks/use-locale';
 import { adminApi } from '@/services/admin.api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,14 +49,16 @@ function apiError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function fecha(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+function fecha(iso: string, intlLocale: string): string {
+  return new Date(iso).toLocaleDateString(intlLocale, { day: '2-digit', month: 'short' });
 }
 
 /** Panel de administración: cola de aprobación + gestión de status y roles. */
 export default function AdminPage() {
   const { t } = useTranslation('admin');
   const { data: me } = useMe();
+  const locale = useLocale();
+  const intlLocale = getIntlLocale(locale);
   const qc = useQueryClient();
 
   const { data: users, isLoading } = useQuery({
@@ -143,7 +147,7 @@ export default function AdminPage() {
                   <UserCell user={u} />
                   <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
                     <span className="text-[12px] text-ink-3">
-                      {t('pending.since', { date: fecha(u.createdAt) })}
+                      {t('pending.since', { date: fecha(u.createdAt, intlLocale) })}
                     </span>
                     <Button
                       size="sm"
@@ -245,7 +249,7 @@ export default function AdminPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-[12.5px] text-ink-3">
-                        {fecha(u.createdAt)}
+                        {fecha(u.createdAt, intlLocale)}
                       </TableCell>
                     </TableRow>
                   );

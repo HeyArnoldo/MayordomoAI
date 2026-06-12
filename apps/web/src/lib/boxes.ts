@@ -1,5 +1,6 @@
-import type { BoxBalance, BoxColorKey } from '@app/contracts';
+import type { BoxBalance, BoxColorKey, Locale } from '@app/contracts';
 import { BOX_COLOR_KEYS } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
 
 /**
  * Color de caja: el colorKey elegido por el usuario manda; sin él, las 8 del
@@ -30,7 +31,10 @@ export function boxAlert(b: BoxBalance): {
   return null;
 }
 
-export function monthLabel(date = new Date()): string {
-  const label = date.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+export function monthLabel(date = new Date(), language: Locale = 'es'): string {
+  const label = date.toLocaleDateString(getIntlLocale(language), {
+    month: 'long',
+    year: 'numeric',
+  });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }

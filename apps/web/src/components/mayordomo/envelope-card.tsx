@@ -75,7 +75,7 @@ export function EnvelopeCard({
                   t={t}
                   i18nKey="card.fundAccumulates"
                   components={{
-                    amount: <span className="money">+S/{box.allocated.toFixed(2)}</span>,
+                    amount: <Money value={box.allocated} sign="+" />,
                   }}
                 />
               </span>
@@ -102,7 +102,7 @@ export function EnvelopeCard({
                     t={t}
                     i18nKey="card.ofAllocated"
                     components={{
-                      amount: <span>S/{box.allocated.toFixed(2)}</span>,
+                      amount: <Money value={box.allocated} />,
                     }}
                   />
                 </span>

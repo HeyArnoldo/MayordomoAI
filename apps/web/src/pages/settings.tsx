@@ -104,7 +104,7 @@ export default function SettingsPage() {
     );
   }
 
-  const memberSince = new Date(user.createdAt).toLocaleDateString('es-PE', {
+  const memberSince = new Date(user.createdAt).toLocaleDateString(getIntlLocale(user.language), {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

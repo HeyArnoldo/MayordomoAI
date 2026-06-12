@@ -278,7 +278,7 @@ function AssistantActions({
   /** Mensajes pasados: acciones visibles solo al pasar el mouse. */
   hoverOnly?: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t, i18n } = useTranslation('chat');
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
@@ -296,7 +296,8 @@ function AssistantActions({
       return;
     }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-PE';
+    // Usar el idioma activo del usuario para la síntesis de voz.
+    utterance.lang = i18n.language;
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);

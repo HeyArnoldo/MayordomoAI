@@ -2,12 +2,18 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ArrowUpDown, Mic } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionStatus, TransactionType } from '@app/contracts';
+import type { Locale } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
 import { Money } from '@/components/mayordomo/money';
+import { useLocale } from '@/hooks/use-locale';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' });
+function timeLabel(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleTimeString(getIntlLocale(locale), {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 /** Fila de movimiento del design: ícono por tipo, nota, caja coloreada, monto. */
@@ -23,6 +29,7 @@ export function TransactionRow({
   onClick?: () => void;
 }) {
   const { t } = useTranslation('transactions');
+  const locale = useLocale();
   const box = boxes.find((b) => b.id === tx.boxId);
   const isIncome = tx.type === TransactionType.INCOME;
   const isTransit = tx.type === TransactionType.TRANSIT;
@@ -68,7 +75,7 @@ export function TransactionRow({
             {label}
           </span>
           <span className="text-ink-3">·</span>
-          <span className="text-ink-3">{timeLabel(tx.occurredAt)}</span>
+          <span className="text-ink-3">{timeLabel(tx.occurredAt, locale)}</span>
           {voided && (
             <span className="rounded-full bg-surface-alt px-2 py-px font-semibold text-ink-3">
               {t('row.voided')}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { TransactionType } from '@app/contracts';
+import { resolveCurrency, TransactionType } from '@app/contracts';
+import { formatMoney } from '@app/i18n';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useMe } from '@/hooks/use-auth';
+import { useLocale } from '@/hooks/use-locale';
 import { useBoxBalances, useCreateTransaction } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
@@ -24,6 +27,9 @@ const TYPES = [
 /** Registro manual del design: tabs de tipo, monto, selector de caja, nota. */
 export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
   const { t } = useTranslation('transactions');
+  const locale = useLocale();
+  const { data: me } = useMe();
+  const currency = resolveCurrency(me?.currency);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [amount, setAmount] = useState('');
@@ -47,8 +53,7 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
       },
       {
         onSuccess: () => {
-          // El símbolo S/ queda hardcodeado: la fase de moneda/locale lo resuelve.
-          toast.success(t('registro.success', { amount: `S/${parsed.toFixed(2)}` }));
+          toast.success(t('registro.success', { amount: formatMoney(parsed, currency, locale) }));
           setOpen(false);
           setAmount('');
           setNote('');
@@ -83,7 +88,7 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
         </div>
 
         <div className="flex items-baseline gap-2">
-          <span className="money text-xl text-ink-3">S/</span>
+          <span className="money text-xl text-ink-3">{currency}</span>
           <Input
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ''))}

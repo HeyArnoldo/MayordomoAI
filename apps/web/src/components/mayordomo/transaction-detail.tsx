@@ -2,6 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ArrowUpDown, Mic, Trash2, X } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionSource, TransactionStatus, TransactionType } from '@app/contracts';
+import type { Locale } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
+import { useLocale } from '@/hooks/use-locale';
 import { Money } from '@/components/mayordomo/money';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -15,13 +18,14 @@ const SOURCE_LABEL_KEYS = {
   [TransactionSource.IMPORT]: 'detail.source.import',
 } as const satisfies Record<TransactionSource, string>;
 
-function fechaLabel(tx: Transaction): string {
-  const fecha = new Date(`${tx.date}T12:00:00`).toLocaleDateString('es-PE', {
+function fechaLabel(tx: Transaction, locale: Locale): string {
+  const intlLocale = getIntlLocale(locale);
+  const fecha = new Date(`${tx.date}T12:00:00`).toLocaleDateString(intlLocale, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
-  const hora = new Date(tx.occurredAt).toLocaleTimeString('es-PE', {
+  const hora = new Date(tx.occurredAt).toLocaleTimeString(intlLocale, {
     hour: 'numeric',
     minute: '2-digit',
   });
@@ -44,6 +48,7 @@ export function TransactionDetailDialog({
   onVoid: (tx: Transaction) => void;
 }) {
   const { t } = useTranslation(['transactions', 'common']);
+  const locale = useLocale();
   if (!tx) return null;
 
   const box = boxes.find((b) => b.id === tx.boxId);
@@ -63,7 +68,7 @@ export function TransactionDetailDialog({
       isIncome ? t('types.income') : isTransit ? t('types.transit') : t('types.expense'),
     ],
     [t('detail.rows.box'), box?.name ?? '—'],
-    [t('detail.rows.date'), fechaLabel(tx)],
+    [t('detail.rows.date'), fechaLabel(tx, locale)],
     [t('detail.rows.source'), t(SOURCE_LABEL_KEYS[tx.source])],
     [t('detail.rows.status'), voided ? t('detail.status.voided') : t('detail.status.confirmed')],
   ];

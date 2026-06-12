@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Wrench } from 'lucide-react';
+import type { Locale } from '@app/contracts';
+import { getIntlLocale } from '@app/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLocale } from '@/hooks/use-locale';
 import { useToolAudits } from '@/hooks/use-finance';
 
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleString('es-PE', {
+function timeLabel(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleString(getIntlLocale(locale), {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
@@ -24,6 +27,7 @@ function compact(value: unknown): string {
  */
 export function AgentTrail() {
   const { t } = useTranslation('chat');
+  const locale = useLocale();
   const { data: audits = [], isLoading } = useToolAudits();
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-2xl" />;
@@ -40,7 +44,9 @@ export function AgentTrail() {
             <span className="flex items-center gap-2 font-mono text-[12.5px] font-semibold text-brand">
               <Wrench className="size-3.5" /> {a.tool}
             </span>
-            <span className="font-mono text-[10.5px] text-ink-3">{timeLabel(a.createdAt)}</span>
+            <span className="font-mono text-[10.5px] text-ink-3">
+              {timeLabel(a.createdAt, locale)}
+            </span>
           </div>
           <dl className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed">
             <div className="flex gap-2">
