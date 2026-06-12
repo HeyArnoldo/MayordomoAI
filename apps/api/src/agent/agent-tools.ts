@@ -52,14 +52,38 @@ export interface AgentToolsContext {
   i18n?: Pick<I18nService, 't'>;
 }
 
-/** Audita y ejecuta: cada tool pasa por acá. */
+/** Audita y ejecuta: cada tool pasa por acá.
+ *
+ * Punto central de manejo de errores: si la tool (o un servicio que invoca)
+ * lanza una excepción, se traduce vía toolErrorMessage al idioma del usuario y
+ * se devuelve como `{ error }` para que el LLM la vea localizada — cerrando la
+ * fuga de mensajes en inglés cuando un AppException de servicio escapa del
+ * execute sin catch propio. Sin ctx.i18n se conserva el comportamiento previo
+ * (re-throw), evitando regresiones en entornos sin i18n.
+ */
 async function audited<T>(
   ctx: AgentToolsContext,
   toolName: string,
   args: unknown,
   run: () => Promise<T>,
-): Promise<T> {
-  const result = await run();
+): Promise<T | { error: string }> {
+  let result: T;
+  try {
+    result = await run();
+  } catch (err) {
+    if (!ctx.i18n) throw err;
+    const errorResult = { error: toolErrorMessage(err, ctx.locale, ctx.i18n) };
+    await ctx.audits.save(
+      ctx.audits.create({
+        userId: ctx.userId,
+        conversationId: ctx.conversationId,
+        tool: toolName,
+        args,
+        result: errorResult,
+      }),
+    );
+    return errorResult;
+  }
   await ctx.audits.save(
     ctx.audits.create({
       userId: ctx.userId,

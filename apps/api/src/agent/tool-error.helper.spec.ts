@@ -64,5 +64,18 @@ describe('toolErrorMessage', () => {
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
     });
+
+    it('resolves the fallback via i18n errors:common.unexpected for the locale', () => {
+      i18n.t.mockReturnValue('Ocurrió un error inesperado');
+      const result = toolErrorMessage('string error', 'es', i18n as never);
+      expect(i18n.t).toHaveBeenCalledWith('es', 'errors:common.unexpected', undefined);
+      expect(result).toBe('Ocurrió un error inesperado');
+    });
+
+    it('falls back to a static string when i18n is absent', () => {
+      const result = toolErrorMessage('string error', 'en', undefined);
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
   });
 });

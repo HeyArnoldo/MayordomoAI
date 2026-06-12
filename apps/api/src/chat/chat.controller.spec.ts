@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { Channel } from '@app/contracts';
 import { AppException } from '../common/errors/app.exception';
 import { ChatController } from './chat.controller';
 
@@ -133,6 +134,56 @@ describe('ChatController', () => {
         const result = await controller.transcribe(user as never, file as never);
         expect(result).toEqual({ text: 'hello world' });
       });
+    });
+  });
+
+  describe('chat (locale + currency passthrough)', () => {
+    // Guards the headline bug fix: agent.run must receive the USER's language
+    // and resolved currency so the agent replies in the right language/currency.
+    // A revert (e.g. hardcoding 'es'/default) must fail this suite.
+    const makeRunResult = () => ({
+      pipeUIMessageStreamToResponse: jest.fn(),
+      text: Promise.resolve('assistant reply'),
+      steps: Promise.resolve([]),
+    });
+
+    beforeEach(() => {
+      conversations.findOne.mockResolvedValue({ id: 'c1', title: 'Existing' });
+      conversations.lastMessage.mockResolvedValue(null);
+      conversations.appendMessage.mockResolvedValue(undefined);
+      conversations.setTitle.mockResolvedValue(undefined);
+    });
+
+    it('calls agent.run with the user language and resolved currency (en/USD)', async () => {
+      const user = { id: 'u1', name: 'En User', language: 'en' as const, currency: 'USD' };
+      agent.run.mockReturnValue(makeRunResult());
+      const body = { conversationId: 'c1', messages: [] };
+      const res = { foo: 'bar' };
+
+      await controller.chat(user as never, body as never, res as never);
+
+      expect(agent.run).toHaveBeenCalledWith(
+        'u1',
+        'c1',
+        expect.anything(),
+        Channel.WEB,
+        'En User',
+        'en',
+        'USD',
+      );
+    });
+
+    it('passes the es user language and resolved currency (es/PEN)', async () => {
+      const user = { id: 'u1', name: 'Es User', language: 'es' as const, currency: 'PEN' };
+      agent.run.mockReturnValue(makeRunResult());
+      const body = { conversationId: 'c1', messages: [] };
+      const res = {};
+
+      await controller.chat(user as never, body as never, res as never);
+
+      const call = agent.run.mock.calls[0];
+      expect(call[5]).toBe('es');
+      expect(call[6]).toBe('PEN');
     });
   });
 });

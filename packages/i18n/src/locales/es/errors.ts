@@ -52,6 +52,7 @@ export const errors = {
   common: {
     invalid_e164_format: 'Formato de número inválido (E.164: +51987654321)',
     invalid_verification_code: 'Código de 6 dígitos',
+    unexpected: 'Ocurrió un error inesperado',
   },
   preferences: {
     nothing_to_update: 'Nada que actualizar',

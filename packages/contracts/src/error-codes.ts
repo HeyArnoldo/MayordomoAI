@@ -35,6 +35,7 @@ export const ERROR_CODES = [
   'agent.ai_credentials_missing',
   'common.invalid_e164_format',
   'common.invalid_verification_code',
+  'common.unexpected',
   'preferences.nothing_to_update',
   'box.not_found',
   'box.not_in_allocation',
