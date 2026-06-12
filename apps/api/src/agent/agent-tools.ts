@@ -2,6 +2,8 @@ import { tool, ToolSet } from 'ai';
 import { z } from 'zod';
 import { Repository } from 'typeorm';
 import {
+  BoxScope,
+  BoxType,
   CreateTransactionInput,
   Locale,
   localeSchema,
@@ -11,7 +13,7 @@ import {
   TransactionType,
 } from '@app/contracts';
 import { formatMoney } from '@app/i18n';
-import { BoxesService } from '../boxes/boxes.service';
+import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
@@ -65,44 +67,14 @@ async function audited<T>(
 /** "all"/"todas"/"*" del modelo = sin filtro de caja. */
 const ALL_BOXES = new Set(['all', 'todas', 'todos', '*']);
 
-/**
- * Resuelve nombre de caja → id. Devuelve undefined si el nombre significa
- * "todas". Si no existe, error con las cajas disponibles para que el modelo
- * se recupere solo en el siguiente paso.
- */
-async function resolveBox(
-  ctx: AgentToolsContext,
-  boxName: string | undefined,
-): Promise<{ boxId?: string; error?: { error: string; availableBoxes: string[]; hint: string } }> {
-  if (!boxName || ALL_BOXES.has(boxName.trim().toLowerCase())) return {};
-  const all = await ctx.boxes.findAll(ctx.userId);
-  const box = all.find((b) => b.name.toLowerCase() === boxName.trim().toLowerCase());
-  if (box) return { boxId: box.id };
-  const hint =
-    ctx.locale === 'en'
-      ? 'Omit boxName to search across ALL boxes.'
-      : 'Omite boxName para buscar en TODAS las cajas.';
-  const errorMsg =
-    ctx.locale === 'en'
-      ? `No box named "${boxName}" exists`
-      : `No existe una caja llamada "${boxName}"`;
-  return {
-    error: {
-      error: errorMsg,
-      availableBoxes: all.filter((b) => b.active).map((b) => b.name),
-      hint,
-    },
-  };
-}
-
-/** Agrega boxName legible a cada movimiento (el modelo no debe ver solo UUIDs). */
-async function withBoxNames<T extends { boxId: string | null }>(
-  ctx: AgentToolsContext,
-  txs: T[],
-): Promise<(T & { boxName: string | null })[]> {
-  const all = await ctx.boxes.findAll(ctx.userId);
-  const names = new Map(all.map((b) => [b.id, b.name]));
-  return txs.map((t) => ({ ...t, boxName: t.boxId ? (names.get(t.boxId) ?? null) : null }));
+/** Semana ISO de una fecha YYYY-MM-DD → "2026-W23" (para groupBy=week). */
+function isoWeek(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const day = d.getUTCDay() || 7; // lunes=1 ... domingo=7
+  d.setUTCDate(d.getUTCDate() + 4 - day); // jueves de la semana ISO
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
@@ -121,16 +93,20 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
         audited(ctx, 'getBoxBalances', args, () => ctx.boxes.withBalances(ctx.userId)),
     }),
 
-    listTransactions: tool({
+    queryTransactions: tool({
       description: isEn
-        ? "Lists the user's most recent transactions. ALL filters are optional: " +
-          'without type it returns income+expenses+transits together; without boxName it searches ALL boxes; ' +
-          'without dates it returns the most recent. For "my last N transactions" call ONLY with limit=N. ' +
-          'Dates in YYYY-MM-DD (America/Lima timezone).'
-        : 'Lista los movimientos más recientes del usuario. TODOS los filtros son opcionales: ' +
-          'sin type trae ingresos+gastos+tránsitos juntos; sin boxName busca en TODAS las cajas; ' +
-          'sin fechas trae lo más reciente. Para "mis últimos N movimientos" llama SOLO con limit=N. ' +
-          'Fechas en YYYY-MM-DD (zona America/Lima).',
+        ? "Flexible query over the user's transactions: filtering, text search and aggregation in ONE tool. " +
+          'ALL filters are optional: without type it returns income+expenses+transits; without boxNames it searches ALL boxes; ' +
+          'without dates it returns the most recent. textQuery searches the note ("taxi", "supermarket"). ' +
+          'groupBy=box/day/week/month aggregates with total, count and average per group — use it for ' +
+          '"where am I overspending", "which box do I spend the most in", monthly comparisons. ' +
+          'orderBy=amount for the biggest expenses. Dates in YYYY-MM-DD (America/Lima timezone).'
+        : 'Consulta flexible sobre los movimientos del usuario: filtros, búsqueda por texto y agregación en UNA tool. ' +
+          'TODOS los filtros son opcionales: sin type trae ingresos+gastos+tránsitos; sin boxNames busca en TODAS las cajas; ' +
+          'sin fechas trae lo más reciente. textQuery busca en la nota ("taxi", "supermercado"). ' +
+          'groupBy=box/day/week/month agrega con total, cantidad y promedio por grupo — úsala para ' +
+          '"en qué me excedo", "en qué caja gasto más", comparativas mensuales. ' +
+          'orderBy=amount para los gastos más grandes. Fechas en YYYY-MM-DD (zona America/Lima).',
       inputSchema: z.object({
         type: z
           .enum(TransactionType)
@@ -140,14 +116,18 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
               ? 'income | expense | transit. OMIT for all types.'
               : 'income | expense | transit. OMITIR para todos los tipos.',
           ),
-        boxName: z
-          .string()
+        boxNames: z
+          .array(z.string())
           .optional()
           .describe(
             isEn
-              ? 'Exact name of ONE box, e.g. "Entertainment". OMIT for all boxes.'
-              : 'Nombre exacto de UNA caja, ej "Ocio". OMITIR para todas las cajas.',
+              ? 'Exact box names to filter by. OMIT for all boxes.'
+              : 'Nombres exactos de cajas a filtrar. OMITIR para todas las cajas.',
           ),
+        textQuery: z
+          .string()
+          .optional()
+          .describe(isEn ? 'Text to search in the note' : 'Texto a buscar en la nota'),
         from: z
           .string()
           .optional()
@@ -156,139 +136,154 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
           .string()
           .optional()
           .describe(isEn ? 'Date to, YYYY-MM-DD' : 'Fecha hasta, YYYY-MM-DD'),
+        groupBy: z
+          .enum(['none', 'box', 'day', 'week', 'month'])
+          .default('none')
+          .describe(
+            isEn ? 'Aggregate by group instead of listing' : 'Agregar por grupo en vez de listar',
+          ),
+        orderBy: z.enum(['date', 'amount']).default('date'),
         limit: z.number().int().min(1).max(100).default(30),
       }),
       execute: async (args) =>
-        audited(ctx, 'listTransactions', args, async () => {
-          const { boxId, error } = await resolveBox(ctx, args.boxName);
-          if (error) return error;
+        audited(ctx, 'queryTransactions', args, async () => {
+          const allBoxes = await ctx.boxes.findAll(ctx.userId);
+
+          // Resuelve nombres → ids (filtro en memoria: list() solo filtra por una caja).
+          let boxIds: Set<string> | null = null;
+          const wanted = (args.boxNames ?? []).filter(
+            (n) => !ALL_BOXES.has(n.trim().toLowerCase()),
+          );
+          if (wanted.length > 0) {
+            const ids = new Set<string>();
+            const missing: string[] = [];
+            for (const name of wanted) {
+              const box = allBoxes.find((b) => b.name.toLowerCase() === name.trim().toLowerCase());
+              if (box) ids.add(box.id);
+              else missing.push(name);
+            }
+            if (missing.length > 0) {
+              return {
+                error: isEn
+                  ? `These boxes do not exist: ${missing.join(', ')}`
+                  : `Estas cajas no existen: ${missing.join(', ')}`,
+                availableBoxes: allBoxes.filter((b) => b.active).map((b) => b.name),
+                hint: isEn
+                  ? 'Omit boxNames to search across ALL boxes.'
+                  : 'Omite boxNames para buscar en TODAS las cajas.',
+              };
+            }
+            boxIds = ids;
+          }
+
+          // Texto/cajas/agregación se filtran post-query: hay que escanear más filas.
+          const scanAll =
+            args.groupBy !== 'none' ||
+            !!args.textQuery ||
+            boxIds !== null ||
+            args.orderBy === 'amount';
           const txs = await ctx.transactions.list(ctx.userId, {
             type: args.type,
-            boxId,
             from: args.from,
             to: args.to,
             includeVoided: false,
-            limit: args.limit,
+            limit: scanAll ? 500 : args.limit,
             offset: 0,
           });
-          return withBoxNames(ctx, txs.map(toTransactionDto));
-        }),
-    }),
 
-    searchTransactions: tool({
-      description: isEn
-        ? 'Searches transactions by text in the note/description (e.g. "taxi", "Claude", "supermarket"). ' +
-          'Use for "how much did I spend on X", "when did I pay Y". Returns matches with summed total.'
-        : 'Busca movimientos por texto en la nota/descripción (ej "taxi", "Claude", "supermercado"). ' +
-          'Úsala para "cuánto gasté en X", "cuándo pagué Y". Devuelve coincidencias con total sumado.',
-      inputSchema: z.object({
-        query: z
-          .string()
-          .min(1)
-          .describe(isEn ? 'Text to search in notes' : 'Texto a buscar en las notas'),
-        from: z
-          .string()
-          .optional()
-          .describe(isEn ? 'Date from, YYYY-MM-DD' : 'Fecha desde, YYYY-MM-DD'),
-        to: z
-          .string()
-          .optional()
-          .describe(isEn ? 'Date to, YYYY-MM-DD' : 'Fecha hasta, YYYY-MM-DD'),
-        limit: z.number().int().min(1).max(50).default(20),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'searchTransactions', args, async () => {
-          const txs = await ctx.transactions.list(ctx.userId, {
-            from: args.from,
-            to: args.to,
-            includeVoided: false,
-            limit: 300,
-            offset: 0,
-          });
-          const q = args.query.toLowerCase();
+          // Si llegan exactamente 500 filas, el escaneo pudo quedar truncado.
+          const truncated = txs.length === 500;
+
+          const names = new Map(allBoxes.map((b) => [b.id, b.name]));
+          const q = args.textQuery?.trim().toLowerCase();
           const matches = txs
             .map(toTransactionDto)
-            .filter((t) => t.note?.toLowerCase().includes(q))
-            .slice(0, args.limit);
-          const total = matches.reduce((s, t) => s + t.amount, 0);
-          return { matches: await withBoxNames(ctx, matches), count: matches.length, total };
-        }),
-    }),
+            .filter((t) => !boxIds || (t.boxId !== null && boxIds.has(t.boxId)))
+            .filter((t) => !q || (t.note?.toLowerCase().includes(q) ?? false))
+            .map((t) => ({ ...t, boxName: t.boxId ? (names.get(t.boxId) ?? null) : null }));
 
-    getSpendingByBox: tool({
-      description: isEn
-        ? 'Aggregated spending BY BOX in a date range: total, number of transactions and % of allocated. ' +
-          'Use for "where am I overspending", "which box do I spend the most in", monthly comparisons.'
-        : 'Gasto agregado POR CAJA en un rango de fechas: total, cantidad de movimientos y % del ' +
-          'asignado. Úsala para "en qué me excedo", "en qué caja gasto más", comparativas del mes.',
-      inputSchema: z.object({
-        from: z.string().describe(isEn ? 'Date from, YYYY-MM-DD' : 'Fecha desde, YYYY-MM-DD'),
-        to: z.string().describe(isEn ? 'Date to, YYYY-MM-DD' : 'Fecha hasta, YYYY-MM-DD'),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'getSpendingByBox', args, async () => {
-          const txs = await ctx.transactions.list(ctx.userId, {
-            type: TransactionType.EXPENSE,
-            from: args.from,
-            to: args.to,
-            includeVoided: false,
-            limit: 500,
-            offset: 0,
-          });
-          const balances = await ctx.boxes.withBalances(ctx.userId);
-          const byBox = new Map<string, { total: number; count: number }>();
-          for (const t of txs) {
-            if (!t.boxId) continue;
-            const acc = byBox.get(t.boxId) ?? { total: 0, count: 0 };
-            acc.total += Number(t.amount);
-            acc.count += 1;
-            byBox.set(t.boxId, acc);
+          const round2 = (n: number) => Math.round(n * 100) / 100;
+          const total = round2(matches.reduce((s, t) => s + t.amount, 0));
+
+          if (args.groupBy === 'none') {
+            const sorted =
+              args.orderBy === 'amount'
+                ? [...matches].sort((a, b) => b.amount - a.amount)
+                : matches;
+            return {
+              matches: sorted.slice(0, args.limit),
+              count: matches.length,
+              total,
+              ...(truncated
+                ? {
+                    warning: isEn
+                      ? 'Only the most recent 500 transactions were scanned; results may be incomplete. Narrow the date range for exact figures.'
+                      : 'Solo se escanearon los 500 movimientos más recientes; los resultados pueden estar incompletos. Acota el rango de fechas para cifras exactas.',
+                  }
+                : {}),
+            };
           }
-          return balances
-            .filter((b) => b.active)
-            .map((b) => {
-              const agg = byBox.get(b.id) ?? { total: 0, count: 0 };
-              return {
-                boxName: b.name,
-                spent: Math.round(agg.total * 100) / 100,
-                movements: agg.count,
-                allocated: b.allocated,
-                pctOfAllocated:
-                  b.allocated > 0 ? Math.round((agg.total / b.allocated) * 100) : null,
-              };
-            })
-            .sort((a, b) => b.spent - a.spent);
-        }),
-    }),
 
-    getTopExpenses: tool({
-      description: isEn
-        ? 'The N largest expenses in a date range. Use for "my biggest expense", "where did my money go".'
-        : 'Los N gastos más grandes de un rango de fechas. Úsala para "mi gasto más fuerte", "en qué se me fue la plata".',
-      inputSchema: z.object({
-        from: z.string().describe(isEn ? 'Date from, YYYY-MM-DD' : 'Fecha desde, YYYY-MM-DD'),
-        to: z.string().describe(isEn ? 'Date to, YYYY-MM-DD' : 'Fecha hasta, YYYY-MM-DD'),
-        n: z.number().int().min(1).max(20).default(5),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'getTopExpenses', args, async () => {
-          const txs = await ctx.transactions.list(ctx.userId, {
-            type: TransactionType.EXPENSE,
-            from: args.from,
-            to: args.to,
-            includeVoided: false,
-            limit: 200,
-            offset: 0,
-          });
-          const all = await ctx.boxes.findAll(ctx.userId);
-          return txs
-            .map(toTransactionDto)
-            .sort((a, b) => b.amount - a.amount)
-            .slice(0, args.n)
-            .map((t) => ({
-              ...t,
-              boxName: all.find((b) => b.id === t.boxId)?.name ?? null,
-            }));
+          const keyOf = (t: (typeof matches)[number]): string => {
+            switch (args.groupBy) {
+              case 'box':
+                return t.boxName ?? (isEn ? '(no box)' : '(sin caja)');
+              case 'day':
+                return t.date;
+              case 'month':
+                return t.date.slice(0, 7);
+              default:
+                return isoWeek(t.date);
+            }
+          };
+          const groups = new Map<string, { total: number; count: number; max: number }>();
+          for (const t of matches) {
+            const k = keyOf(t);
+            const g = groups.get(k) ?? { total: 0, count: 0, max: 0 };
+            g.total += t.amount;
+            g.count += 1;
+            g.max = Math.max(g.max, t.amount);
+            groups.set(k, g);
+          }
+
+          // Por caja: el asignado del mes permite detectar excesos (% del asignado).
+          const allocated =
+            args.groupBy === 'box'
+              ? new Map(
+                  (await ctx.boxes.withBalances(ctx.userId)).map((b) => [b.name, b.allocated]),
+                )
+              : null;
+
+          const rows = [...groups.entries()]
+            .map(([key, g]) => ({
+              group: key,
+              total: round2(g.total),
+              count: g.count,
+              avg: round2(g.total / g.count),
+              max: round2(g.max),
+              ...(allocated
+                ? {
+                    allocated: allocated.get(key) ?? null,
+                    pctOfAllocated:
+                      (allocated.get(key) ?? 0) > 0
+                        ? Math.round((g.total / allocated.get(key)!) * 100)
+                        : null,
+                  }
+                : {}),
+            }))
+            .sort((a, b) => b.total - a.total);
+          return {
+            groups: rows,
+            count: matches.length,
+            total,
+            ...(truncated
+              ? {
+                  warning: isEn
+                    ? 'Only the most recent 500 transactions were scanned; results may be incomplete. Narrow the date range for exact figures.'
+                    : 'Solo se escanearon los 500 movimientos más recientes; los resultados pueden estar incompletos. Acota el rango de fechas para cifras exactas.',
+                }
+              : {}),
+          };
         }),
     }),
 
@@ -637,6 +632,143 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
               currentAllocation: proposed,
             };
           }
+        }),
+    }),
+
+    createBox: tool({
+      description: isEn
+        ? 'Creates a new box (envelope). It is created with 0% allocation: right after creating it, ' +
+          'propose the new allocation with updateAllocation so the set sums 100 again. ' +
+          'type "expense" resets monthly; "fund" accumulates (savings).'
+        : 'Crea una caja (sobre) nueva. Se crea con 0% de reparto: justo después de crearla, ' +
+          'propón el nuevo reparto con updateAllocation para que el set vuelva a sumar 100. ' +
+          'type "expense" reinicia cada mes; "fund" acumula (ahorro).',
+      inputSchema: z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(60)
+          .describe(isEn ? 'Box name, e.g. "Gym"' : 'Nombre de la caja, ej "Gimnasio"'),
+        type: z
+          .enum(BoxType)
+          .default(BoxType.EXPENSE)
+          .describe(
+            isEn ? 'expense (monthly) | fund (accumulates)' : 'expense (mensual) | fund (acumula)',
+          ),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'createBox', args, async () => {
+          const all = await ctx.boxes.findAll(ctx.userId);
+          const duplicate = all.find(
+            (b) => b.name.toLowerCase() === args.name.trim().toLowerCase(),
+          );
+          if (duplicate) {
+            return {
+              error: isEn
+                ? `A box named "${duplicate.name}" already exists`
+                : `Ya existe una caja llamada "${duplicate.name}"`,
+              ...(duplicate.active
+                ? {}
+                : {
+                    hint: isEn
+                      ? 'That box is inactive: you can reactivate it with updateBox (active=true) instead of creating a new one.'
+                      : 'Esa caja está inactiva: puedes reactivarla con updateBox (active=true) en vez de crear una nueva.',
+                  }),
+            };
+          }
+          const box = await ctx.boxes.create(ctx.userId, {
+            name: args.name.trim(),
+            pct: 0,
+            type: args.type,
+            scope: BoxScope.PERSONAL,
+          });
+          return {
+            created: toBoxDto(box),
+            note: isEn
+              ? 'The box was created with 0% allocation: propose the new allocation with updateAllocation so the set sums 100 again.'
+              : 'La caja quedó con 0% de reparto: propón el nuevo reparto con updateAllocation para que el set vuelva a sumar 100.',
+          };
+        }),
+    }),
+
+    updateBox: tool({
+      description: isEn
+        ? 'Renames, activates or deactivates an existing box. Structural change: ALWAYS ask the user ' +
+          'for confirmation first (userConfirmed=true only after an explicit yes). To change %, use ' +
+          'updateAllocation. Deactivating a box with % > 0 leaves the allocation below 100: propose ' +
+          'a rebalance with updateAllocation right after.'
+        : 'Renombra, activa o desactiva una caja existente. Cambio estructural: SIEMPRE pide confirmación ' +
+          'al usuario antes (userConfirmed=true solo tras su sí explícito). Para cambiar %, usa ' +
+          'updateAllocation. Desactivar una caja con % > 0 deja el reparto debajo de 100: propón ' +
+          'un rebalanceo con updateAllocation justo después.',
+      inputSchema: z.object({
+        boxName: z.string().describe(isEn ? 'Current exact box name' : 'Nombre exacto actual'),
+        newName: z.string().min(1).max(60).optional(),
+        active: z.boolean().optional(),
+        userConfirmed: z.boolean().default(false),
+      }),
+      execute: async (args) =>
+        audited(ctx, 'updateBox', args, async () => {
+          if (args.newName === undefined && args.active === undefined) {
+            return {
+              error: isEn ? 'Provide newName and/or active.' : 'Indica newName y/o active.',
+            };
+          }
+          const all = await ctx.boxes.findAll(ctx.userId);
+          const box = all.find((b) => b.name.toLowerCase() === args.boxName.trim().toLowerCase());
+          if (!box) {
+            return {
+              error: isEn
+                ? `No box named "${args.boxName}" exists`
+                : `No existe una caja llamada "${args.boxName}"`,
+              availableBoxes: all.filter((b) => b.active).map((b) => b.name),
+            };
+          }
+          if (args.newName !== undefined) {
+            const duplicate = all.find(
+              (b) => b.id !== box.id && b.name.toLowerCase() === args.newName!.trim().toLowerCase(),
+            );
+            if (duplicate) {
+              return {
+                error: isEn
+                  ? `A box named "${duplicate.name}" already exists`
+                  : `Ya existe una caja llamada "${duplicate.name}"`,
+              };
+            }
+          }
+          // Guardrail server-side: cambio estructural SIEMPRE pide confirmación.
+          if (!args.userConfirmed) {
+            return {
+              needsConfirmation: true,
+              box: toBoxDto(box),
+              changes: {
+                ...(args.newName !== undefined ? { newName: args.newName } : {}),
+                ...(args.active !== undefined ? { active: args.active } : {}),
+              },
+              message: isEn
+                ? 'Show the change to the user and ask for confirmation before applying.'
+                : 'Muestra el cambio al usuario y pide confirmación antes de aplicar.',
+            };
+          }
+          const updated = await ctx.boxes.update(
+            ctx.userId,
+            box.id,
+            {
+              ...(args.newName !== undefined ? { name: args.newName.trim() } : {}),
+              ...(args.active !== undefined ? { active: args.active } : {}),
+            },
+            ctx.locale,
+          );
+          const pct = parseFloat(updated.pct);
+          if (args.active === false && pct > 0) {
+            return {
+              updated: toBoxDto(updated),
+              warning: isEn
+                ? `The deactivated box had ${pct}%: the active allocation no longer sums 100. Propose a rebalance with updateAllocation.`
+                : `La caja desactivada tenía ${pct}%: el reparto activo ya no suma 100. Propón un rebalanceo con updateAllocation.`,
+            };
+          }
+          return { updated: toBoxDto(updated) };
         }),
     }),
 
