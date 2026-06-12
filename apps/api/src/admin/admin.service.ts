@@ -12,6 +12,7 @@ import {
   AdminUser,
   BoxScope,
   BoxType,
+  Locale,
   UserRole,
   UserStatus,
 } from '@app/contracts';
@@ -19,15 +20,17 @@ import { User } from '../users/user.entity';
 import { PhoneNumber } from '../users/phone-number.entity';
 import { Box } from '../boxes/box.entity';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
+import { I18nService } from '../i18n/i18n.service';
 
-// Cajas iniciales de una cuenta aprobada (suman 100%). Nombres en español:
-// son datos del usuario, no código.
+// Cajas iniciales de una cuenta aprobada (suman 100%). Los nombres se
+// resuelven en el idioma del usuario aprobado al crearlas (keys
+// `defaultBoxes.*`): después son datos del usuario, no código.
 const DEFAULT_BOXES = [
-  { name: 'Ahorro', pct: 25, type: BoxType.FUND, scope: BoxScope.PERSONAL },
-  { name: 'Varios', pct: 30, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
-  { name: 'Pasajes', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
-  { name: 'Ocio', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
-  { name: 'Snacks', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
+  { nameKey: 'defaultBoxes.savings', pct: 25, type: BoxType.FUND, scope: BoxScope.PERSONAL },
+  { nameKey: 'defaultBoxes.misc', pct: 30, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
+  { nameKey: 'defaultBoxes.transport', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
+  { nameKey: 'defaultBoxes.leisure', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
+  { nameKey: 'defaultBoxes.snacks', pct: 15, type: BoxType.EXPENSE, scope: BoxScope.PERSONAL },
 ];
 
 @Injectable()
@@ -39,6 +42,7 @@ export class AdminService {
     @InjectRepository(PhoneNumber) private readonly phones: Repository<PhoneNumber>,
     @InjectRepository(Box) private readonly boxes: Repository<Box>,
     private readonly aiUsage: AiUsageService,
+    private readonly i18n: I18nService,
   ) {}
 
   async list(status?: UserStatus): Promise<AdminUser[]> {
@@ -68,7 +72,8 @@ export class AdminService {
     const saved = await this.users.save(user);
 
     if (status === UserStatus.ACTIVE) {
-      await this.ensureDefaultBoxes(saved.id);
+      // Idioma del usuario aprobado (no del admin que aprueba).
+      await this.ensureDefaultBoxes(saved.id, saved.language);
     }
     this.logger.log(`status de ${user.email} → ${status} (por ${actor.email})`);
     const phone = await this.phones.findOne({ where: { userId: id } });
@@ -129,14 +134,14 @@ export class AdminService {
     };
   }
 
-  private async ensureDefaultBoxes(userId: string): Promise<void> {
+  private async ensureDefaultBoxes(userId: string, locale: Locale): Promise<void> {
     const existing = await this.boxes.count({ where: { userId } });
     if (existing > 0) return;
     await this.boxes.save(
       DEFAULT_BOXES.map((b, i) =>
         this.boxes.create({
           userId,
-          name: b.name,
+          name: this.i18n.t(locale, b.nameKey),
           pct: b.pct.toFixed(2),
           type: b.type,
           scope: b.scope,

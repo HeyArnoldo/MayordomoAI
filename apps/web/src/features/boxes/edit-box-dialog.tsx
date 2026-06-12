@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { isAxiosError } from 'axios';
 import { Archive, Check } from 'lucide-react';
@@ -37,6 +38,7 @@ function apiError(err: unknown, fallback: string): string {
 
 /** Edición de caja: nombre, color (tokens del design) y archivado. */
 export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClose: () => void }) {
+  const { t } = useTranslation(['boxes', 'common']);
   const update = useUpdateBox();
   const [name, setName] = useState('');
   const [colorKey, setColorKey] = useState<BoxColorKey | null>(null);
@@ -60,10 +62,10 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
       { id: box.id, input: { name: name.trim(), colorKey } },
       {
         onSuccess: () => {
-          toast.success('Caja actualizada');
+          toast.success(t('edit.updated'));
           onClose();
         },
-        onError: (err) => toast.error(apiError(err, 'No se pudo actualizar la caja')),
+        onError: (err) => toast.error(apiError(err, t('edit.updateError'))),
       },
     );
   };
@@ -74,11 +76,11 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
       { id: box.id, input: { active: false, pct: 0 } },
       {
         onSuccess: () => {
-          toast.success(`"${box.name}" archivada — redistribuye su ${box.pct}% y guarda`);
+          toast.success(t('edit.archived', { name: box.name, pct: box.pct }));
           setConfirmArchive(false);
           onClose();
         },
-        onError: (err) => toast.error(apiError(err, 'No se pudo archivar')),
+        onError: (err) => toast.error(apiError(err, t('edit.archiveError'))),
       },
     );
   };
@@ -88,10 +90,8 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
       <Dialog open onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Editar caja</DialogTitle>
-            <DialogDescription>
-              El nombre y color aplican en toda la app; el historial no cambia.
-            </DialogDescription>
+            <DialogTitle>{t('edit.title')}</DialogTitle>
+            <DialogDescription>{t('edit.description')}</DialogDescription>
           </DialogHeader>
 
           <form
@@ -102,7 +102,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
             className="space-y-4"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="edit-box-name">Nombre</Label>
+              <Label htmlFor="edit-box-name">{t('edit.nameLabel')}</Label>
               <Input
                 id="edit-box-name"
                 value={name}
@@ -112,7 +112,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
             </div>
 
             <div className="space-y-1.5">
-              <Label>Color</Label>
+              <Label>{t('edit.colorLabel')}</Label>
               <div className="flex flex-wrap gap-2">
                 {BOX_COLOR_KEYS.map((key) => {
                   const selected =
@@ -135,9 +135,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
                   );
                 })}
               </div>
-              <p className="text-[11.5px] text-ink-3">
-                Colores del sistema — se adaptan solos al modo oscuro.
-              </p>
+              <p className="text-[11.5px] text-ink-3">{t('edit.colorsNote')}</p>
             </div>
 
             <Button
@@ -145,7 +143,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
               className="w-full"
               disabled={!valid || !dirty || update.isPending}
             >
-              {update.isPending ? 'Guardando…' : 'Guardar cambios'}
+              {update.isPending ? t('edit.saving') : t('edit.save')}
             </Button>
           </form>
 
@@ -153,7 +151,7 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
             onClick={() => setConfirmArchive(true)}
             className="inline-flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-ink-3 hover:text-negative"
           >
-            <Archive className="size-3.5" /> Archivar esta caja
+            <Archive className="size-3.5" /> {t('edit.archiveAction')}
           </button>
         </DialogContent>
       </Dialog>
@@ -161,15 +159,14 @@ export function EditBoxDialog({ box, onClose }: { box: BoxBalance | null; onClos
       <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Archivar "{box.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>{t('edit.confirmTitle', { name: box.name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Sale del reparto y del dashboard, pero su historial de movimientos se conserva. Su{' '}
-              {box.pct}% quedará libre — tendrás que redistribuirlo para que el reparto sume 100.
+              {t('edit.confirmDescription', { pct: box.pct })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={archive}>Archivar</AlertDialogAction>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={archive}>{t('edit.confirmArchive')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

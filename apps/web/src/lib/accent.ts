@@ -1,8 +1,9 @@
 /** Acento del tema (data-accent en <html>): verde (default) | teal | indigo. */
+// labelKey vive en el namespace `settings` — se traduce con t() en el render.
 export const ACCENTS = [
-  { key: 'verde', label: 'Verde', swatch: '#0e7a4d' },
-  { key: 'teal', label: 'Teal', swatch: '#0f7e96' },
-  { key: 'indigo', label: 'Indigo', swatch: '#41599e' },
+  { key: 'verde', labelKey: 'appearance.accents.verde', swatch: '#0e7a4d' },
+  { key: 'teal', labelKey: 'appearance.accents.teal', swatch: '#0f7e96' },
+  { key: 'indigo', labelKey: 'appearance.accents.indigo', swatch: '#41599e' },
 ] as const;
 
 export type AccentKey = (typeof ACCENTS)[number]['key'];

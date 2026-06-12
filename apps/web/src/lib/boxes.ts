@@ -14,14 +14,19 @@ export function boxColor(name: string, colorKey?: BoxColorKey | null): string {
     : 'var(--caja-varios)';
 }
 
-/** Alerta por excepción, como el design: sobregiro / agotada / queda poco. */
-export function boxAlert(
-  b: BoxBalance,
-): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
+/**
+ * Alerta por excepción, como el design: sobregiro / agotada / queda poco.
+ * Devuelve la KEY del namespace `boxes` — se traduce con t() en el render.
+ */
+export function boxAlert(b: BoxBalance): {
+  labelKey: 'alerts.overdraft' | 'alerts.depleted' | 'alerts.runningLow';
+  tone: 'danger' | 'warn' | 'muted';
+} | null {
   if (b.accumulated !== null) return null; // fondos no alertan
-  if (b.balance < 0) return { label: 'Sobregiro', tone: 'danger' };
-  if (b.balance === 0 && b.allocated > 0) return { label: 'Agotada', tone: 'muted' };
-  if (b.allocated > 0 && b.spent / b.allocated >= 0.8) return { label: 'Queda poco', tone: 'warn' };
+  if (b.balance < 0) return { labelKey: 'alerts.overdraft', tone: 'danger' };
+  if (b.balance === 0 && b.allocated > 0) return { labelKey: 'alerts.depleted', tone: 'muted' };
+  if (b.allocated > 0 && b.spent / b.allocated >= 0.8)
+    return { labelKey: 'alerts.runningLow', tone: 'warn' };
   return null;
 }
 

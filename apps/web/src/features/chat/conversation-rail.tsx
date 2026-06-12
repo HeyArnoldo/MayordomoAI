@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   MessageCircle,
   MoreHorizontal,
@@ -35,6 +36,7 @@ function SessionRow({
   active: boolean;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation('chat');
   const rename = useRenameConversation();
   const togglePin = useTogglePin();
   const remove = useDeleteConversation();
@@ -63,17 +65,17 @@ function SessionRow({
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem
               onClick={() => {
-                const title = window.prompt('Nuevo título', conv.title);
+                const title = window.prompt(t('thread.renamePrompt'), conv.title);
                 if (title?.trim()) rename.mutate({ id: conv.id, title: title.trim() });
               }}
             >
-              <Pencil className="size-4" /> Renombrar
+              <Pencil className="size-4" /> {t('thread.rename')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => togglePin.mutate(conv.id)}>
-              <Pin className="size-4" /> {conv.pinned ? 'Desfijar' : 'Fijar'}
+              <Pin className="size-4" /> {conv.pinned ? t('thread.unpin') : t('thread.pin')}
             </DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onClick={() => remove.mutate(conv.id)}>
-              <Trash2 className="size-4" /> Eliminar
+              <Trash2 className="size-4" /> {t('thread.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -113,6 +115,7 @@ export function ConversationRail({
   onNew: () => void;
   onCollapse: () => void;
 }) {
+  const { t } = useTranslation('chat');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -141,14 +144,14 @@ export function ConversationRail({
     <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-surface">
       <div className="flex items-center justify-between p-3 pb-2">
         <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-          Conversaciones
+          {t('page.conversations')}
         </span>
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
             className={cn('size-6 text-ink-3', searching && 'bg-surface-alt text-ink')}
-            title="Buscar chats"
+            title={t('rail.searchChats')}
             onClick={() => (searching ? closeSearch() : setSearching(true))}
           >
             <Search className="size-4" />
@@ -157,7 +160,7 @@ export function ConversationRail({
             variant="ghost"
             size="icon"
             className="size-6 text-ink-3"
-            title="Ocultar conversaciones"
+            title={t('rail.hideConversations')}
             onClick={onCollapse}
           >
             <PanelLeftClose className="size-4" />
@@ -173,7 +176,7 @@ export function ConversationRail({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
-            placeholder="Buscar chats…"
+            placeholder={t('rail.searchPlaceholder')}
             className="h-8 pl-8 pr-7 text-sm"
           />
           {query && (
@@ -192,7 +195,7 @@ export function ConversationRail({
           onClick={onNew}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-ink-2 hover:bg-surface-alt"
         >
-          <Plus className="size-4 text-brand" /> Nueva conversación
+          <Plus className="size-4 text-brand" /> {t('rail.newConversation')}
         </button>
       </div>
 
@@ -201,21 +204,23 @@ export function ConversationRail({
 
         {pinned.length > 0 && (
           <>
-            <SectionLabel divider={system.length > 0}>Destacados</SectionLabel>
+            <SectionLabel divider={system.length > 0}>{t('rail.pinned')}</SectionLabel>
             <div className="space-y-0.5">{pinned.map(row)}</div>
           </>
         )}
 
         {recent.length > 0 && (
           <>
-            <SectionLabel divider={system.length > 0 || pinned.length > 0}>Recientes</SectionLabel>
+            <SectionLabel divider={system.length > 0 || pinned.length > 0}>
+              {t('rail.recent')}
+            </SectionLabel>
             <div className="space-y-0.5">{recent.map(row)}</div>
           </>
         )}
 
         {system.length + pinned.length + recent.length === 0 && (
           <p className="px-3 py-6 text-center text-sm text-ink-3">
-            {query ? `Nada para "${query}".` : 'Sin conversaciones todavía.'}
+            {query ? t('rail.noResults', { query }) : t('rail.empty')}
           </p>
         )}
       </nav>

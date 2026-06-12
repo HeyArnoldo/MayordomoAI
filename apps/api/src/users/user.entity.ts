@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { UserRole, UserStatus } from '@app/contracts';
+import { Locale, UserRole, UserStatus } from '@app/contracts';
 
 @Entity('users')
 export class User {
@@ -38,6 +38,15 @@ export class User {
   // Se setea al verificar el número u omitir ese paso. Null = onboarding pendiente.
   @Column({ type: 'timestamptz', nullable: true })
   onboardedAt: Date | null;
+
+  // Idioma de UI, WhatsApp y agente. Lo manda la web al registrarse (navigator.language).
+  @Column({ type: 'varchar', length: 5, default: 'es' })
+  language: Locale;
+
+  // Null = nunca eligió: se resuelve como USD y se deriva del prefijo del
+  // teléfono al verificarlo. Nunca se pisa una elección explícita.
+  @Column({ type: 'char', length: 3, nullable: true })
+  currency: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

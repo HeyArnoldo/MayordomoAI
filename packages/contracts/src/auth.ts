@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { currencySchema, localeSchema } from './preferences';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -16,6 +17,8 @@ export const registerSchema = z.object({
   email: z.email().max(160),
   password: z.string().min(8).max(72),
   name: z.string().min(1).max(120),
+  // Derivado de navigator.language por la web (es/en; otro → 'en'). Si falta → 'es'.
+  language: localeSchema.optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
@@ -35,6 +38,9 @@ export const authUserSchema = z.object({
   // null hasta completar el onboarding (verificar número u omitirlo).
   onboardedAt: z.string().nullable(),
   createdAt: z.string(),
+  language: localeSchema,
+  // null = nunca eligió: la UI la resuelve como USD (resolveCurrency).
+  currency: currencySchema.nullable(),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 

@@ -4,11 +4,15 @@ import { Repository } from 'typeorm';
 import { ModelMessage } from 'ai';
 import {
   Channel,
+  DEFAULT_LOCALE,
   MessageRole,
+  resolveCurrency,
   TransactionSource,
   TransactionType,
   UserStatus,
 } from '@app/contracts';
+import { formatMoney } from '@app/i18n';
+import { I18nService } from '../i18n/i18n.service';
 import { User } from '../users/user.entity';
 import { PhoneNumber } from '../users/phone-number.entity';
 import { BoxesService } from '../boxes/boxes.service';
@@ -39,8 +43,6 @@ export interface EvolutionWebhookPayload {
 
 const HISTORY_WINDOW = 12;
 
-const fmt = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2 });
-
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
@@ -56,7 +58,13 @@ export class WhatsappService {
     private readonly conversations: ConversationsService,
     private readonly evolution: EvolutionClient,
     private readonly transcription: TranscriptionService,
+    private readonly i18n: I18nService,
   ) {}
+
+  /** Monto en la moneda y el idioma del usuario — reemplaza el `S/` fijo. */
+  private money(user: User, amount: number): string {
+    return formatMoney(amount, resolveCurrency(user.currency), user.language);
+  }
 
   /**
    * Pipeline del webhook: dedup → resolver usuario → texto o voz →
@@ -97,13 +105,16 @@ export class WhatsappService {
         text = await this.transcription.transcribe(Buffer.from(base64, 'base64'), user.id);
       }
       if (!text) {
-        await this.evolution.sendText(e164, 'No pude escuchar esa nota de voz. ¿Me lo escribes?');
+        await this.evolution.sendText(
+          e164,
+          this.i18n.t(user.language, 'whatsapp.voiceNotUnderstood'),
+        );
         return;
       }
     }
 
     if (!text) {
-      await this.evolution.sendText(e164, 'Por ahora solo entiendo texto y notas de voz. 📝');
+      await this.evolution.sendText(e164, this.i18n.t(user.language, 'whatsapp.textOnly'));
       return;
     }
 
@@ -147,7 +158,7 @@ export class WhatsappService {
 
     // Fast-path por voz NO registra directo: la transcripción puede fallar.
     if (fast && !(voice && fast.kind !== 'summary')) {
-      if (fast.kind === 'summary') return this.summaryText(user.id);
+      if (fast.kind === 'summary') return this.summaryText(user);
 
       if (fast.kind === 'expense') {
         const box = boxes.find((b) => b.name === fast.boxName)!;
@@ -165,7 +176,11 @@ export class WhatsappService {
         );
         const balances = await this.boxes.withBalances(user.id);
         const updated = balances.find((b) => b.id === box.id)!;
-        return `✓ Anotado S/${fmt(fast.amount)} en ${box.name}. Te quedan S/${fmt(updated.balance)}.`;
+        return this.i18n.t(user.language, 'whatsapp.expenseLogged', {
+          amount: this.money(user, fast.amount),
+          box: box.name,
+          balance: this.money(user, updated.balance),
+        });
       }
 
       if (fast.kind === 'income') {
@@ -177,15 +192,18 @@ export class WhatsappService {
         );
         const parts = (tx.split ?? [])
           .filter((s) => s.amount > 0)
-          .map((s) => `${s.name} S/${fmt(s.amount)}`)
+          .map((s) => `${s.name} ${this.money(user, s.amount)}`)
           .join(' · ');
-        return `✓ S/${fmt(fast.amount)} repartidos: ${parts}`;
+        return this.i18n.t(user.language, 'whatsapp.incomeLogged', {
+          amount: this.money(user, fast.amount),
+          parts,
+        });
       }
     }
 
     // Lenguaje libre → el agente (mismo cerebro que el chat web).
     if (!isAiEnabled()) {
-      return 'Entiendo frases como "gasté 8 en pasajes", "me entró 500" o "resumen". Para preguntas libres, el agente aún no está configurado.';
+      return this.i18n.t(user.language, 'whatsapp.aiDisabled');
     }
     const history = await this.historyAsModelMessages(user.id, conversationId);
     const result = this.agent.run(user.id, conversationId, history, Channel.WHATSAPP, user.name);
@@ -207,28 +225,43 @@ export class WhatsappService {
       }));
   }
 
-  private async summaryText(userId: string): Promise<string> {
-    const balances = await this.boxes.withBalances(userId);
+  private async summaryText(user: User): Promise<string> {
+    const balances = await this.boxes.withBalances(user.id);
     const lines = balances
       .filter((b) => b.active)
       .map((b) => {
-        if (b.accumulated !== null) return `🟢 ${b.name}: S/${fmt(b.accumulated)} acumulado`;
+        if (b.accumulated !== null) {
+          return this.i18n.t(user.language, 'whatsapp.summary.fundLine', {
+            name: b.name,
+            amount: this.money(user, b.accumulated),
+          });
+        }
         const flag = b.balance < 0 ? '🔴' : b.spent / (b.allocated || 1) >= 0.8 ? '🟡' : '⚪';
-        return `${flag} ${b.name}: S/${fmt(b.balance)} de S/${fmt(b.allocated)}`;
+        return this.i18n.t(user.language, 'whatsapp.summary.boxLine', {
+          flag,
+          name: b.name,
+          balance: this.money(user, b.balance),
+          allocated: this.money(user, b.allocated),
+        });
       });
     const available = balances
       .filter((b) => b.accumulated === null && b.active)
       .reduce((s, b) => s + b.balance, 0);
-    return [`*Tus cajas hoy:*`, ...lines, '', `Disponible: S/${fmt(available)}`].join('\n');
+    return [
+      this.i18n.t(user.language, 'whatsapp.summary.header'),
+      ...lines,
+      '',
+      this.i18n.t(user.language, 'whatsapp.summary.available', {
+        amount: this.money(user, available),
+      }),
+    ].join('\n');
   }
 
   private async replyToUnknown(e164: string): Promise<void> {
     const today = new Date().toDateString();
     if (this.unknownReplied.get(e164) === today) return;
     this.unknownReplied.set(e164, today);
-    await this.evolution.sendText(
-      e164,
-      'Hola 👋 No encuentro una cuenta vinculada a este número. Regístrate en https://mayordomoai.xyz y vincula tu número desde Ajustes.',
-    );
+    // Número sin cuenta: no hay usuario del cual resolver idioma → default.
+    await this.evolution.sendText(e164, this.i18n.t(DEFAULT_LOCALE, 'whatsapp.unknownNumber'));
   }
 }

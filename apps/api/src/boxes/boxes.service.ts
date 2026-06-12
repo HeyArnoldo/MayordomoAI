@@ -8,20 +8,27 @@ import {
   BoxScope,
   BoxType,
   CreateBoxInput,
+  DEFAULT_LOCALE,
+  Locale,
   UpdateBoxInput,
 } from '@app/contracts';
 import { accountingMonth, fromCents, isValidPctSum, toCents } from '../common/money';
+import { I18nService } from '../i18n/i18n.service';
 import { Box } from './box.entity';
 
-/** Set por defecto para una cuenta nueva — el mismo del design. */
-const DEFAULT_BOXES: Array<Pick<BoxDto, 'name' | 'pct' | 'type'>> = [
-  { name: 'Ahorro', pct: 25, type: BoxType.FUND },
-  { name: 'Varios', pct: 20, type: BoxType.EXPENSE },
-  { name: 'Pasajes', pct: 15, type: BoxType.EXPENSE },
-  { name: 'Ocio', pct: 15, type: BoxType.EXPENSE },
-  { name: 'Diezmo', pct: 10, type: BoxType.EXPENSE },
-  { name: 'Snacks', pct: 10, type: BoxType.EXPENSE },
-  { name: 'Ofrenda', pct: 5, type: BoxType.EXPENSE },
+/**
+ * Set por defecto para una cuenta nueva — el mismo del design. Los nombres se
+ * resuelven en el idioma del usuario AL CREARLAS (keys `defaultBoxes.*` del
+ * namespace api); después son data del usuario y no se tocan.
+ */
+const DEFAULT_BOXES: Array<{ nameKey: string; pct: number; type: BoxType }> = [
+  { nameKey: 'defaultBoxes.savings', pct: 25, type: BoxType.FUND },
+  { nameKey: 'defaultBoxes.misc', pct: 20, type: BoxType.EXPENSE },
+  { nameKey: 'defaultBoxes.transport', pct: 15, type: BoxType.EXPENSE },
+  { nameKey: 'defaultBoxes.leisure', pct: 15, type: BoxType.EXPENSE },
+  { nameKey: 'defaultBoxes.tithe', pct: 10, type: BoxType.EXPENSE },
+  { nameKey: 'defaultBoxes.snacks', pct: 10, type: BoxType.EXPENSE },
+  { nameKey: 'defaultBoxes.offering', pct: 5, type: BoxType.EXPENSE },
 ];
 
 export function toBoxDto(b: Box): BoxDto {
@@ -40,15 +47,18 @@ export function toBoxDto(b: Box): BoxDto {
 
 @Injectable()
 export class BoxesService {
-  constructor(@InjectRepository(Box) private readonly repo: Repository<Box>) {}
+  constructor(
+    @InjectRepository(Box) private readonly repo: Repository<Box>,
+    private readonly i18n: I18nService,
+  ) {}
 
   findAll(userId: string): Promise<Box[]> {
     return this.repo.find({ where: { userId }, order: { sortOrder: 'ASC', createdAt: 'ASC' } });
   }
 
-  async findOne(userId: string, id: string): Promise<Box> {
+  async findOne(userId: string, id: string, locale: Locale = DEFAULT_LOCALE): Promise<Box> {
     const box = await this.repo.findOne({ where: { id, userId } });
-    if (!box) throw new NotFoundException('Caja no encontrada');
+    if (!box) throw new NotFoundException(this.i18n.t(locale, 'errors.boxNotFound'));
     return box;
   }
 
@@ -75,8 +85,13 @@ export class BoxesService {
     );
   }
 
-  async update(userId: string, id: string, input: UpdateBoxInput): Promise<Box> {
-    const box = await this.findOne(userId, id);
+  async update(
+    userId: string,
+    id: string,
+    input: UpdateBoxInput,
+    locale: Locale = DEFAULT_LOCALE,
+  ): Promise<Box> {
+    const box = await this.findOne(userId, id, locale);
     if (input.name !== undefined) box.name = input.name;
     if (input.pct !== undefined) box.pct = input.pct.toFixed(2);
     if (input.type !== undefined) box.type = input.type;
@@ -92,31 +107,39 @@ export class BoxesService {
    * resultante sume EXACTAMENTE 100. Aplica solo a ingresos futuros (el
    * historial conserva su split snapshot).
    */
-  async updateAllocation(userId: string, input: AllocationInput): Promise<Box[]> {
+  async updateAllocation(
+    userId: string,
+    input: AllocationInput,
+    locale: Locale = DEFAULT_LOCALE,
+  ): Promise<Box[]> {
     const boxes = await this.activePersonal(userId);
     const byId = new Map(boxes.map((b) => [b.id, b]));
     for (const item of input.items) {
       const box = byId.get(item.id);
       if (!box)
-        throw new BadRequestException(`Caja ${item.id} no existe o no participa del reparto`);
+        throw new BadRequestException(
+          this.i18n.t(locale, 'errors.boxNotInAllocation', { id: item.id }),
+        );
       box.pct = item.pct.toFixed(2);
     }
     const pcts = boxes.map((b) => parseFloat(b.pct));
     if (!isValidPctSum(pcts)) {
       const total = pcts.reduce((s, p) => s + p, 0);
-      throw new BadRequestException(`Los porcentajes deben sumar 100 (suman ${total.toFixed(2)})`);
+      throw new BadRequestException(
+        this.i18n.t(locale, 'errors.allocationMustSum100', { total: total.toFixed(2) }),
+      );
     }
     return this.repo.save(boxes);
   }
 
-  /** Crea el set por defecto si la cuenta no tiene cajas. Idempotente. */
-  async seedDefaults(userId: string): Promise<Box[]> {
+  /** Crea el set por defecto (en el idioma del usuario) si la cuenta no tiene cajas. Idempotente. */
+  async seedDefaults(userId: string, locale: Locale = DEFAULT_LOCALE): Promise<Box[]> {
     const existing = await this.findAll(userId);
     if (existing.length > 0) return existing;
     const boxes = DEFAULT_BOXES.map((b, i) =>
       this.repo.create({
         userId,
-        name: b.name,
+        name: this.i18n.t(locale, b.nameKey),
         pct: b.pct.toFixed(2),
         type: b.type,
         scope: BoxScope.PERSONAL,

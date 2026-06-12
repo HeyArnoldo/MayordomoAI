@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Wrench } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToolAudits } from '@/hooks/use-finance';
@@ -22,16 +23,13 @@ function compact(value: unknown): string {
  * argumentos y qué devolvió. Replayability — auditable paso a paso.
  */
 export function AgentTrail() {
+  const { t } = useTranslation('chat');
   const { data: audits = [], isLoading } = useToolAudits();
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-2xl" />;
 
   if (audits.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-ink-3">
-        Aún no hay actividad del agente. Pregúntale algo en el chat.
-      </p>
-    );
+    return <p className="py-8 text-center text-sm text-ink-3">{t('agent.empty')}</p>;
   }
 
   return (

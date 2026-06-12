@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ArrowUpDown, Mic, Trash2, X } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionSource, TransactionStatus, TransactionType } from '@app/contracts';
@@ -7,11 +8,12 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
-const SOURCE_LABELS: Record<TransactionSource, string> = {
-  [TransactionSource.WHATSAPP]: 'WhatsApp',
-  [TransactionSource.PWA]: 'PWA web',
-  [TransactionSource.IMPORT]: 'Importado',
-};
+// Keys del namespace `transactions` — se traducen con t() en el render.
+const SOURCE_LABEL_KEYS = {
+  [TransactionSource.WHATSAPP]: 'detail.source.whatsapp',
+  [TransactionSource.PWA]: 'detail.source.pwa',
+  [TransactionSource.IMPORT]: 'detail.source.import',
+} as const satisfies Record<TransactionSource, string>;
 
 function fechaLabel(tx: Transaction): string {
   const fecha = new Date(`${tx.date}T12:00:00`).toLocaleDateString('es-PE', {
@@ -41,6 +43,7 @@ export function TransactionDetailDialog({
   onClose: () => void;
   onVoid: (tx: Transaction) => void;
 }) {
+  const { t } = useTranslation(['transactions', 'common']);
   if (!tx) return null;
 
   const box = boxes.find((b) => b.id === tx.boxId);
@@ -55,11 +58,14 @@ export function TransactionDetailDialog({
   const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
 
   const rows: Array<[string, string]> = [
-    ['Tipo', isIncome ? 'Ingreso' : isTransit ? 'Tránsito' : 'Gasto'],
-    ['Caja', box?.name ?? '—'],
-    ['Fecha', fechaLabel(tx)],
-    ['Origen', SOURCE_LABELS[tx.source]],
-    ['Estado', voided ? 'Anulado' : 'Confirmado'],
+    [
+      t('detail.rows.type'),
+      isIncome ? t('types.income') : isTransit ? t('types.transit') : t('types.expense'),
+    ],
+    [t('detail.rows.box'), box?.name ?? '—'],
+    [t('detail.rows.date'), fechaLabel(tx)],
+    [t('detail.rows.source'), t(SOURCE_LABEL_KEYS[tx.source])],
+    [t('detail.rows.status'), voided ? t('detail.status.voided') : t('detail.status.confirmed')],
   ];
 
   return (
@@ -68,13 +74,13 @@ export function TransactionDetailDialog({
         showCloseButton={false}
         className="max-h-[85dvh] max-w-sm gap-3 overflow-y-auto bg-background p-4"
       >
-        <DialogTitle className="sr-only">Detalle del movimiento</DialogTitle>
+        <DialogTitle className="sr-only">{t('detail.title')}</DialogTitle>
 
         {/* cerrar: botón circular del design, sticky para sobrevivir al scroll */}
         <button
           onClick={onClose}
           className="sticky top-0 z-10 ml-auto flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink-2 shadow-card transition-colors hover:bg-surface-alt hover:text-ink"
-          title="Cerrar"
+          title={t('common:close')}
         >
           <X className="size-4" />
         </button>
@@ -101,7 +107,7 @@ export function TransactionDetailDialog({
           </div>
           {tx.voice && (
             <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-alt px-2.5 py-1 text-[11.5px] font-semibold text-ink-2">
-              <Mic className="size-3" /> nota de voz
+              <Mic className="size-3" /> {t('detail.voiceNote')}
             </span>
           )}
         </div>
@@ -110,7 +116,7 @@ export function TransactionDetailDialog({
         {tx.split && tx.split.length > 0 && (
           <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
             <div className="mb-3 font-mono text-[11px] font-medium tracking-widest text-ink-3 uppercase">
-              Reparto de este ingreso
+              {t('detail.splitTitle')}
             </div>
             <div className="flex flex-col gap-2">
               {tx.split.map((s) => (
@@ -156,11 +162,11 @@ export function TransactionDetailDialog({
             className="w-full bg-negative-soft font-semibold text-negative hover:bg-negative-soft/80 hover:text-negative"
             onClick={() => onVoid(tx)}
           >
-            <Trash2 className="size-4" /> Anular movimiento
+            <Trash2 className="size-4" /> {t('detail.voidAction')}
           </Button>
         )}
         <p className="text-center text-[11.5px] leading-relaxed text-ink-3">
-          Los movimientos no se borran: se marcan como anulados y el saldo se recalcula.
+          {t('detail.voidHint')}
         </p>
       </DialogContent>
     </Dialog>

@@ -29,6 +29,50 @@ describe('parseFastPath', () => {
       amount: 1.7,
       boxName: 'Snacks',
     });
+    expect(parseFastPath('pagué S/. 8 en pasajes', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 8,
+      boxName: 'Pasajes',
+    });
+  });
+
+  it('acepta símbolos de moneda: $, € y £', () => {
+    expect(parseFastPath('gasté $8 en pasajes', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 8,
+      boxName: 'Pasajes',
+    });
+    expect(parseFastPath('gasté € 12.50 en snacks', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 12.5,
+      boxName: 'Snacks',
+    });
+    expect(parseFastPath('pagué £5 en ocio', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 5,
+      boxName: 'Ocio',
+    });
+  });
+
+  it('acepta código ISO de 3 letras', () => {
+    expect(parseFastPath('gasté USD 20 en varios', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 20,
+      boxName: 'Varios',
+    });
+    expect(parseFastPath('anota pen 3,50 en snacks', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 3.5,
+      boxName: 'Snacks',
+    });
+  });
+
+  it('sin prefijo: el monto va en la moneda del usuario', () => {
+    expect(parseFastPath('gasté 15 en varios', BOXES)).toMatchObject({
+      kind: 'expense',
+      amount: 15,
+      boxName: 'Varios',
+    });
   });
 
   it('caja desconocida → null (decide el agente)', () => {
@@ -45,6 +89,10 @@ describe('parseFastPath', () => {
       kind: 'income',
       amount: 500,
       note: 'pago de cliente',
+    });
+    expect(parseFastPath('me entró $500', BOXES)).toMatchObject({
+      kind: 'income',
+      amount: 500,
     });
   });
 

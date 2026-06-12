@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -29,32 +31,33 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
+// labelKey vive en el namespace `common` — se traduce con t() en el render.
 const NAV = [
-  { to: '/', label: 'Inicio', icon: Home },
-  { to: '/movimientos', label: 'Movimientos', icon: List },
-  { to: '/chat', label: 'Conversaciones', icon: MessageCircle },
-  { to: '/cajas', label: 'Cajas y reparto', icon: PackageOpen },
-  { to: '/configuracion', label: 'Configuración', icon: Settings },
-];
+  { to: '/', labelKey: 'nav.home', icon: Home },
+  { to: '/movimientos', labelKey: 'nav.transactions', icon: List },
+  { to: '/chat', labelKey: 'nav.chat', icon: MessageCircle },
+  { to: '/cajas', labelKey: 'nav.boxes', icon: PackageOpen },
+  { to: '/configuracion', labelKey: 'nav.settings', icon: Settings },
+] as const;
 
-const ADMIN_NAV = { to: '/admin', label: 'Administración', icon: ShieldCheck };
+const ADMIN_NAV = { to: '/admin', labelKey: 'nav.admin', icon: ShieldCheck } as const;
 
-const PAGE_TITLES: Record<string, string> = {
-  '/': 'Inicio',
-  '/movimientos': 'Movimientos',
-  '/chat': 'Conversaciones',
-  '/cajas': 'Cajas y reparto',
-  '/configuracion': 'Configuración',
-  '/admin': 'Administración',
+const PAGE_TITLE_KEYS: Record<string, ParseKeys<'common'>> = {
+  '/': 'nav.home',
+  '/movimientos': 'nav.transactions',
+  '/chat': 'nav.chat',
+  '/cajas': 'nav.boxes',
+  '/configuracion': 'nav.settings',
+  '/admin': 'nav.admin',
 };
 
 /** Tabs mobile del design: Inicio · Movs · [+] · Chat · Cajas. */
 const TABS = [
-  { ...NAV[0], short: 'Inicio' },
-  { ...NAV[1], short: 'Movs' },
+  { ...NAV[0], shortKey: 'nav.short.home' },
+  { ...NAV[1], shortKey: 'nav.short.transactions' },
   null,
-  { ...NAV[2], short: 'Chat' },
-  { ...NAV[3], short: 'Cajas' },
+  { ...NAV[2], shortKey: 'nav.short.chat' },
+  { ...NAV[3], shortKey: 'nav.short.boxes' },
 ] as const;
 
 function DarkToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
@@ -70,6 +73,7 @@ function DarkToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void })
  * TabBar inferior con FAB central en mobile. Sin top-nav genérica.
  */
 export function AppLayout() {
+  const { t } = useTranslation('common');
   const { data: user } = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
@@ -127,11 +131,11 @@ export function AppLayout() {
 
         <nav className="flex-1 space-y-0.5 px-2.5 pt-2">
           {[...NAV, ...(user?.role === UserRole.ADMIN ? [ADMIN_NAV] : [])].map(
-            ({ to, label, icon: Icon }) => (
+            ({ to, labelKey, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
-                title={label}
+                title={t(labelKey)}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-2.5 rounded-xl py-2 text-sm font-semibold transition-colors',
@@ -141,7 +145,7 @@ export function AppLayout() {
                 }
               >
                 <Icon className="size-[18px] shrink-0" />
-                {expanded && <span className="truncate">{label}</span>}
+                {expanded && <span className="truncate">{t(labelKey)}</span>}
               </NavLink>
             ),
           )}
@@ -182,10 +186,10 @@ export function AppLayout() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setDark((d) => !d)}>
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                {dark ? 'Modo claro' : 'Modo oscuro'}
+                {dark ? t('nav.lightMode') : t('nav.darkMode')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="size-4" /> Cerrar sesión
+                <LogOut className="size-4" /> {t('nav.logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -200,7 +204,7 @@ export function AppLayout() {
             <Wordmark />
           </div>
           <h1 className="hidden text-[15px] font-bold text-ink lg:block">
-            {PAGE_TITLES[pathname] ?? 'MayordomoAI'}
+            {PAGE_TITLE_KEYS[pathname] ? t(PAGE_TITLE_KEYS[pathname]) : 'MayordomoAI'}
           </h1>
           <div className="flex items-center gap-1">
             {/* Configuración accesible desde mobile (la tabbar no la incluye) */}
@@ -248,7 +252,7 @@ export function AppLayout() {
                 }
               >
                 <tab.icon className="size-5" />
-                <span className="text-[10px] font-semibold">{tab.short}</span>
+                <span className="text-[10px] font-semibold">{t(tab.shortKey)}</span>
               </NavLink>
             ),
           )}

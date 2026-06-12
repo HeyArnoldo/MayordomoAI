@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -22,20 +24,20 @@ import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
 const FILTERS = [
-  { label: 'Todos', value: undefined },
-  { label: 'Gastos', value: TransactionType.EXPENSE },
-  { label: 'Ingresos', value: TransactionType.INCOME },
-  { label: 'Tránsito', value: TransactionType.TRANSIT },
+  { labelKey: 'filters.all', value: undefined },
+  { labelKey: 'filters.expenses', value: TransactionType.EXPENSE },
+  { labelKey: 'filters.income', value: TransactionType.INCOME },
+  { labelKey: 'filters.transit', value: TransactionType.TRANSIT },
 ] as const;
 
 /** Agrupa por fecha contable con etiquetas humanas (Hoy / Ayer / fecha). */
-function dayLabel(date: string): string {
+function dayLabel(date: string, t: TFunction<readonly ['transactions', 'common']>): string {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
   const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', {
     timeZone: 'America/Lima',
   });
-  if (date === today) return 'Hoy';
-  if (date === yesterday) return 'Ayer';
+  if (date === today) return t('dates.today');
+  if (date === yesterday) return t('dates.yesterday');
   const label = new Date(`${date}T12:00:00`).toLocaleDateString('es-PE', {
     weekday: 'short',
     day: 'numeric',
@@ -45,6 +47,7 @@ function dayLabel(date: string): string {
 }
 
 export default function TransactionsPage() {
+  const { t } = useTranslation(['transactions', 'common']);
   const [filter, setFilter] = useState<TransactionType | undefined>(undefined);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [toVoid, setToVoid] = useState<Transaction | null>(null);
@@ -79,7 +82,7 @@ export default function TransactionsPage() {
       <div className="flex flex-wrap items-center gap-1.5">
         {FILTERS.map((f) => (
           <button
-            key={f.label}
+            key={f.labelKey}
             onClick={() => setFilter(f.value)}
             className={cn(
               'rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors',
@@ -88,7 +91,7 @@ export default function TransactionsPage() {
                 : 'border border-line bg-surface text-ink-2 hover:bg-surface-alt',
             )}
           >
-            {f.label}
+            {t(f.labelKey)}
           </button>
         ))}
 
@@ -97,7 +100,7 @@ export default function TransactionsPage() {
           <button
             onClick={() => setSearchParams({}, { replace: true })}
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pr-2.5 pl-3 text-[13px] font-semibold text-ink transition-colors hover:bg-surface-alt"
-            title="Quitar filtro de caja"
+            title={t('list.removeBoxFilter')}
           >
             <span
               className="size-2 rounded-full"
@@ -113,9 +116,7 @@ export default function TransactionsPage() {
 
       {!isLoading && groups.length === 0 && (
         <p className="py-12 text-center text-sm text-ink-3">
-          {activeBox
-            ? `Sin movimientos en ${activeBox.name} todavía.`
-            : 'No hay movimientos con ese filtro.'}
+          {activeBox ? t('list.emptyBox', { box: activeBox.name }) : t('list.emptyFilter')}
         </p>
       )}
 
@@ -125,7 +126,7 @@ export default function TransactionsPage() {
           className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card"
         >
           <div className="pt-3 font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            {dayLabel(date)}
+            {dayLabel(date, t)}
           </div>
           {list.map((tx, i) => (
             <TransactionRow
@@ -153,25 +154,25 @@ export default function TransactionsPage() {
       <AlertDialog open={Boolean(toVoid)} onOpenChange={(open) => !open && setToVoid(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Anular este movimiento?</AlertDialogTitle>
+            <AlertDialogTitle>{t('void.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {toVoid?.note ?? 'Movimiento'} · S/{toVoid?.amount.toFixed(2)}. Queda visible como
-              anulado y los saldos se recalculan. No se borra nada.
+              {toVoid?.note ?? t('void.fallbackNote')} · S/{toVoid?.amount.toFixed(2)}.{' '}
+              {t('void.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (!toVoid) return;
                 voidTx.mutate(toVoid.id, {
-                  onSuccess: () => toast.success('Movimiento anulado'),
+                  onSuccess: () => toast.success(t('void.success')),
                   onError: (e) => toast.error(e.message),
                 });
                 setToVoid(null);
               }}
             >
-              Anular
+              {t('void.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -6,6 +6,8 @@ import {
   phoneSchema,
   UpdateNameInput,
   updateNameSchema,
+  UpdatePreferencesInput,
+  updatePreferencesSchema,
   VerifyCodeInput,
   verifyCodeSchema,
 } from '@app/contracts';
@@ -43,6 +45,16 @@ export class UsersController {
   ): Promise<{ name: string }> {
     const updated = await this.users.updateName(user, input.name);
     return { name: updated.name };
+  }
+
+  /** Idioma y/o moneda. Cambiar la moneda NO convierte montos históricos. */
+  @Patch('preferences')
+  async updatePreferences(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(updatePreferencesSchema)) input: UpdatePreferencesInput,
+  ): Promise<{ language: string; currency: string | null }> {
+    const updated = await this.users.updatePreferences(user, input);
+    return { language: updated.language, currency: updated.currency };
   }
 
   @Get('phones')

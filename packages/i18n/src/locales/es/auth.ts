@@ -1,0 +1,93 @@
+// Login, registro, espera (cuenta pending), onboarding y shell de auth.
+export const auth = {
+  login: {
+    title: 'Inicia sesión',
+    subtitle:
+      'Entra con tu cuenta de Google. El acceso es por invitación — tu cuenta se activa al ser aprobada.',
+    invalidCredentials: 'Credenciales inválidas',
+    or: 'O',
+    emailLabel: 'Email',
+    emailPlaceholder: 'tu@email.com',
+    passwordLabel: 'Contraseña',
+    submit: 'Entrar',
+    submitting: 'Entrando…',
+    showLocal: 'Entrar con email y contraseña',
+    noAccount: '¿Sin cuenta?',
+    registerLink: 'Regístrate',
+    waitlistCardTitle: '¿Aún no tienes acceso?',
+    waitlistCardBody:
+      'Entra con Google y quedas en la lista de espera — te activamos en cuanto haya cupo.',
+    inviteOnly: 'Acceso por invitación — tu cuenta se activa al ser aprobada',
+  },
+  register: {
+    title: 'Crear cuenta',
+    subtitle: 'Empieza en segundos',
+    nameLabel: 'Nombre',
+    namePlaceholder: 'Tu nombre',
+    emailLabel: 'Email',
+    emailPlaceholder: 'tu@email.com',
+    passwordLabel: 'Contraseña',
+    submit: 'Crear cuenta',
+    submitting: 'Creando…',
+    createError: 'No se pudo crear la cuenta. ¿El email ya existe?',
+    haveAccount: '¿Ya tienes cuenta?',
+    loginLink: 'Inicia sesión',
+  },
+  waitlist: {
+    title: 'Estás en la lista de espera',
+    body: 'Hola, {{name}}. Tu cuenta está creada y en revisión — en cuanto sea aprobada entras directo al onboarding.',
+    suspendedTitle: 'Cuenta suspendida',
+    suspendedBody: 'Tu cuenta fue suspendida. Si crees que es un error, escríbenos y lo revisamos.',
+    checking: 'Comprobando aprobación automáticamente…',
+    logout: 'Salir de la cuenta',
+  },
+  onboarding: {
+    stepOf: 'Paso {{step}} de {{total}}',
+    phone: {
+      title: 'Tu número de WhatsApp',
+      subtitle:
+        'Es el número desde el que le escribirás al mayordomo para anotar gastos. Te enviaremos un código para confirmar que es tuyo.',
+      hint: 'Solo dígitos — el código del país se elige a la izquierda. Un número solo puede pertenecer a una cuenta.',
+      submit: 'Enviar código por WhatsApp',
+      submitting: 'Enviando código…',
+      skipPrefix: 'Vincular más tarde ·',
+      skipAction: 'Omitir →',
+    },
+    code: {
+      title: 'Verifica tu número',
+      subtitle:
+        'Te enviamos un código de 6 dígitos por WhatsApp. Así nadie puede reclamar un número ajeno.',
+      phoneCardHint: 'Número desde el que escribirás al bot',
+      change: 'Cambiar',
+      notReceived: '¿No te llegó?',
+      resend: 'Reenviar código',
+      resending: 'Reenviando…',
+      verify: 'Verificar y vincular',
+      verifying: 'Verificando…',
+      oneAccount: 'Un número solo puede pertenecer a una cuenta.',
+      skip: 'Saltar →',
+    },
+    toasts: {
+      alreadyVerified: 'Número ya verificado',
+      linkError: 'No se pudo registrar el número',
+      verified: 'Número verificado y vinculado',
+      wrongCode: 'Código incorrecto',
+      resent: 'Código reenviado por WhatsApp',
+      resendError: 'No se pudo reenviar',
+      skipError: 'No se pudo omitir',
+    },
+  },
+  shell: {
+    headline1: 'Tu dinero,',
+    headline2: 'en mini-cajas.',
+    tagline:
+      'Reparte cada ingreso automáticamente y registra gastos conversando por WhatsApp. El mayordomo lleva la cuenta por ti.',
+    features: {
+      whatsapp: 'Registro por WhatsApp',
+      voice: 'Notas de voz',
+      privacy: 'Tu historial, solo tuyo',
+    },
+    mobileTagline: 'Tu dinero en mini-cajas, administrado conversando por WhatsApp.',
+    continueWithGoogle: 'Continuar con Google',
+  },
+};

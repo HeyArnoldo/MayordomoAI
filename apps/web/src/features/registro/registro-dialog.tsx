@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { TransactionType } from '@app/contracts';
 import {
@@ -14,14 +15,15 @@ import { useBoxBalances, useCreateTransaction } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
-const TYPES: Array<{ value: TransactionType; label: string }> = [
-  { value: TransactionType.EXPENSE, label: 'Gasto' },
-  { value: TransactionType.INCOME, label: 'Ingreso' },
-  { value: TransactionType.TRANSIT, label: 'Tránsito' },
-];
+const TYPES = [
+  { value: TransactionType.EXPENSE, labelKey: 'registro.typeExpense' },
+  { value: TransactionType.INCOME, labelKey: 'registro.typeIncome' },
+  { value: TransactionType.TRANSIT, labelKey: 'registro.typeTransit' },
+] as const satisfies ReadonlyArray<{ value: TransactionType; labelKey: string }>;
 
 /** Registro manual del design: tabs de tipo, monto, selector de caja, nota. */
 export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
+  const { t } = useTranslation('transactions');
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [amount, setAmount] = useState('');
@@ -45,13 +47,14 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
       },
       {
         onSuccess: () => {
-          toast.success(`✓ Registrado S/${parsed.toFixed(2)}`);
+          // El símbolo S/ queda hardcodeado: la fase de moneda/locale lo resuelve.
+          toast.success(t('registro.success', { amount: `S/${parsed.toFixed(2)}` }));
           setOpen(false);
           setAmount('');
           setNote('');
           setBoxId(null);
         },
-        onError: (err) => toast.error(`No se pudo registrar: ${err.message}`),
+        onError: (err) => toast.error(t('registro.error', { message: err.message })),
       },
     );
   };
@@ -61,20 +64,20 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Registrar movimiento</DialogTitle>
+          <DialogTitle>{t('registro.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="flex rounded-xl bg-surface-alt p-1">
-          {TYPES.map((t) => (
+          {TYPES.map((opt) => (
             <button
-              key={t.value}
-              onClick={() => setType(t.value)}
+              key={opt.value}
+              onClick={() => setType(opt.value)}
               className={cn(
                 'flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors',
-                type === t.value ? 'bg-surface text-ink shadow-card' : 'text-ink-2',
+                type === opt.value ? 'bg-surface text-ink shadow-card' : 'text-ink-2',
               )}
             >
-              {t.label}
+              {t(opt.labelKey)}
             </button>
           ))}
         </div>
@@ -122,18 +125,18 @@ export function RegistroDialog({ trigger }: { trigger: React.ReactNode }) {
         )}
 
         {type === TransactionType.INCOME && (
-          <p className="text-xs text-ink-3">Se reparte automáticamente entre tus cajas según %.</p>
+          <p className="text-xs text-ink-3">{t('registro.incomeHint')}</p>
         )}
 
         <Input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Nota (opcional)"
+          placeholder={t('registro.notePlaceholder')}
           maxLength={300}
         />
 
         <Button size="lg" disabled={!valid || create.isPending} onClick={submit}>
-          Registrar
+          {t('registro.submit')}
         </Button>
       </DialogContent>
     </Dialog>

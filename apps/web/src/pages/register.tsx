@@ -1,8 +1,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { registerSchema, type RegisterInput } from '@app/contracts';
+import { mapBrowserLanguage, registerSchema, type RegisterInput } from '@app/contracts';
 import { useAuthConfig, useMe, useRegister } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 
 export default function RegisterPage() {
+  const { t } = useTranslation('auth');
   const { data: me } = useMe();
   const { data: config } = useAuthConfig();
   const register = useRegister();
@@ -32,18 +34,22 @@ export default function RegisterPage() {
   if (config && !config.localEnabled) return <Navigate to="/login" replace />;
 
   const onSubmit = (input: RegisterInput) => {
-    register.mutate(input, {
-      onSuccess: () => navigate('/'),
-      onError: () => toast.error('No se pudo crear la cuenta. ¿El email ya existe?'),
-    });
+    // Idioma derivado del navegador (es/en; otro → en) — queda persistido en la cuenta.
+    register.mutate(
+      { ...input, language: mapBrowserLanguage(navigator.language) },
+      {
+        onSuccess: () => navigate('/'),
+        onError: () => toast.error(t('register.createError')),
+      },
+    );
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Crear cuenta</CardTitle>
-          <CardDescription>Empieza en segundos</CardDescription>
+          <CardTitle>{t('register.title')}</CardTitle>
+          <CardDescription>{t('register.subtitle')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Form {...form}>
@@ -53,9 +59,9 @@ export default function RegisterPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre</FormLabel>
+                    <FormLabel>{t('register.nameLabel')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Tu nombre" {...field} />
+                      <Input placeholder={t('register.namePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -66,9 +72,9 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('register.emailLabel')}</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="tu@email.com" {...field} />
+                      <Input type="email" placeholder={t('register.emailPlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -79,7 +85,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
+                    <FormLabel>{t('register.passwordLabel')}</FormLabel>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
@@ -88,14 +94,14 @@ export default function RegisterPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={register.isPending}>
-                {register.isPending ? 'Creando…' : 'Crear cuenta'}
+                {register.isPending ? t('register.submitting') : t('register.submit')}
               </Button>
             </form>
           </Form>
           <p className="text-center text-sm text-muted-foreground">
-            ¿Ya tienes cuenta?{' '}
+            {t('register.haveAccount')}{' '}
             <Link to="/login" className="underline">
-              Inicia sesión
+              {t('register.loginLink')}
             </Link>
           </p>
         </CardContent>

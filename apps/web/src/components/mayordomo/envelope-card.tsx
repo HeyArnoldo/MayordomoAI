@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { TrendingUp } from 'lucide-react';
 import type { BoxBalance } from '@app/contracts';
 import { Money } from '@/components/mayordomo/money';
@@ -17,6 +18,7 @@ export function EnvelopeCard({
   compact?: boolean;
   onClick?: () => void;
 }) {
+  const { t } = useTranslation('boxes');
   const color = boxColor(box.name, box.colorKey);
   const isFund = box.accumulated !== null;
   const over = box.balance < 0;
@@ -69,8 +71,13 @@ export function EnvelopeCard({
             <div className="flex items-center gap-1.5">
               <TrendingUp className="size-3" style={{ color }} />
               <span className="text-[11.5px] text-ink-2">
-                Fondo · acumula <span className="money">+S/{box.allocated.toFixed(2)}</span> este
-                mes
+                <Trans
+                  t={t}
+                  i18nKey="card.fundAccumulates"
+                  components={{
+                    amount: <span className="money">+S/{box.allocated.toFixed(2)}</span>,
+                  }}
+                />
               </span>
             </div>
           ) : (
@@ -88,10 +95,16 @@ export function EnvelopeCard({
                 <span
                   className={cn('text-[11px]', over ? 'font-bold text-negative' : 'text-ink-2')}
                 >
-                  {over ? 'Sobregiro' : `Usado ${Math.round(pctUsed)}%`}
+                  {over ? t('alerts.overdraft') : t('card.usedPct', { pct: Math.round(pctUsed) })}
                 </span>
                 <span className="money text-[10.5px] text-ink-3">
-                  de S/{box.allocated.toFixed(2)}
+                  <Trans
+                    t={t}
+                    i18nKey="card.ofAllocated"
+                    components={{
+                      amount: <span>S/{box.allocated.toFixed(2)}</span>,
+                    }}
+                  />
                 </span>
               </div>
             </>

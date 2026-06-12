@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ export function PhoneLinkDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('phone');
   const qc = useQueryClient();
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [e164, setE164] = useState('');
@@ -76,33 +78,33 @@ export function PhoneLinkDialog({
     onSuccess: (phone) => {
       invalidate();
       if (phone.verified) {
-        toast.success('Ese número ya está verificado');
+        toast.success(t('link.alreadyVerified'));
         close();
         return;
       }
       setStep('code');
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, 'No se pudo registrar el número')),
+    onError: (err) => toast.error(apiError(err, t('link.linkError'))),
   });
 
   const verify = useMutation({
     mutationFn: usersApi.verifyPhone,
     onSuccess: () => {
       invalidate();
-      toast.success('Número verificado y vinculado');
+      toast.success(t('link.verifiedLinked'));
       close();
     },
-    onError: (err) => toast.error(apiError(err, 'Código incorrecto')),
+    onError: (err) => toast.error(apiError(err, t('link.codeError'))),
   });
 
   const resend = useMutation({
     mutationFn: usersApi.resendCode,
     onSuccess: () => {
-      toast.success('Código reenviado por WhatsApp');
+      toast.success(t('link.resent'));
       setCooldown(RESEND_SECONDS);
     },
-    onError: (err) => toast.error(apiError(err, 'No se pudo reenviar')),
+    onError: (err) => toast.error(apiError(err, t('link.resendError'))),
   });
 
   const valid = E164.test(e164);
@@ -113,12 +115,12 @@ export function PhoneLinkDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="size-[18px] text-brand" />
-            {changing ? 'Cambiar número de WhatsApp' : 'Vincular WhatsApp'}
+            {changing ? t('link.changeTitle') : t('link.linkTitle')}
           </DialogTitle>
           <DialogDescription>
             {step === 'phone'
-              ? 'El número desde el que le escribes al mayordomo para anotar gastos.'
-              : `Te enviamos un código de 6 dígitos por WhatsApp al ${e164}.`}
+              ? t('link.phoneStepDescription')
+              : t('link.codeStepDescription', { phone: e164 })}
           </DialogDescription>
         </DialogHeader>
 
@@ -137,32 +139,28 @@ export function PhoneLinkDialog({
                 </span>
                 {current.verified ? (
                   <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand">
-                    <ShieldCheck className="size-3.5" /> verificado
+                    <ShieldCheck className="size-3.5" /> {t('link.verified')}
                   </span>
                 ) : (
-                  <span className="text-[11.5px] font-semibold text-warn">sin verificar</span>
+                  <span className="text-[11.5px] font-semibold text-warn">
+                    {t('link.unverified')}
+                  </span>
                 )}
               </div>
             )}
 
             <PhoneNumberInput initialE164={current?.e164} onChange={setE164} autoFocus />
-            <p className="text-[12px] text-ink-3">
-              Solo dígitos — el código del país se elige a la izquierda. Un número solo puede
-              pertenecer a una cuenta.
-            </p>
+            <p className="text-[12px] text-ink-3">{t('link.digitsHint')}</p>
 
             {changing && (
               <div className="flex items-start gap-2.5 rounded-xl border border-warn/30 bg-warn/10 px-3.5 py-2.5">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" />
-                <p className="text-[12px] leading-snug text-ink-2">
-                  Al cambiar, tu número actual deja de funcionar con el bot HASTA que verifiques el
-                  nuevo.
-                </p>
+                <p className="text-[12px] leading-snug text-ink-2">{t('link.changeWarning')}</p>
               </div>
             )}
 
             <Button type="submit" className="w-full" disabled={!valid || link.isPending}>
-              {link.isPending ? 'Enviando código…' : 'Enviar código por WhatsApp'}
+              {link.isPending ? t('link.sendingCode') : t('link.sendCode')}
             </Button>
           </form>
         ) : (
@@ -170,10 +168,10 @@ export function PhoneLinkDialog({
             <CodeInput code={codeInput.code} onChange={codeInput.setCode} />
 
             <div className="text-center text-[13px] text-ink-2">
-              ¿No te llegó?{' '}
+              {t('link.notReceived')}{' '}
               {cooldown > 0 ? (
                 <span className="text-ink-3">
-                  Reenviar código (0:{String(cooldown).padStart(2, '0')})
+                  {t('link.resendCooldown', { seconds: String(cooldown).padStart(2, '0') })}
                 </span>
               ) : (
                 <button
@@ -181,7 +179,7 @@ export function PhoneLinkDialog({
                   disabled={resend.isPending}
                   className="font-semibold text-brand"
                 >
-                  {resend.isPending ? 'Reenviando…' : 'Reenviar código'}
+                  {resend.isPending ? t('link.resending') : t('link.resend')}
                 </button>
               )}
             </div>
@@ -191,7 +189,7 @@ export function PhoneLinkDialog({
               disabled={!codeInput.full || verify.isPending}
               onClick={() => verify.mutate({ code: codeInput.value })}
             >
-              {verify.isPending ? 'Verificando…' : 'Verificar y vincular'}
+              {verify.isPending ? t('link.verifying') : t('link.verifyAndLink')}
             </Button>
             <button
               onClick={() => {
@@ -200,7 +198,7 @@ export function PhoneLinkDialog({
               }}
               className="w-full text-center text-[12.5px] font-semibold text-ink-3 hover:text-ink"
             >
-              Cambiar el número
+              {t('link.changeNumber')}
             </button>
           </div>
         )}

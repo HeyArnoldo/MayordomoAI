@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -66,6 +67,7 @@ export function PhoneNumberInput({
   onChange: (e164: string) => void;
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation('phone');
   const parsed = parseE164(initialE164);
   const [iso, setIso] = useState(parsed.iso);
   const [digits, setDigits] = useState(parsed.digits);
@@ -86,7 +88,7 @@ export function PhoneNumberInput({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-[12.5px] text-ink-2">País</Label>
+        <Label className="text-[12.5px] text-ink-2">{t('input.countryLabel')}</Label>
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
@@ -115,10 +117,10 @@ export function PhoneNumberInput({
                 return haystack.includes(q) ? 1 : 0;
               }}
             >
-              <CommandInput placeholder="Busca por país o código (51, perú, PE)…" />
+              <CommandInput placeholder={t('input.searchPlaceholder')} />
               <CommandList className="max-h-64">
-                <CommandEmpty>Ningún país coincide.</CommandEmpty>
-                <CommandGroup heading="Frecuentes">
+                <CommandEmpty>{t('input.noMatch')}</CommandEmpty>
+                <CommandGroup heading={t('input.frequent')}>
                   {FREQUENT.map((c) => (
                     <CountryOption
                       key={c.iso}
@@ -128,7 +130,7 @@ export function PhoneNumberInput({
                     />
                   ))}
                 </CommandGroup>
-                <CommandGroup heading="Todos los países">
+                <CommandGroup heading={t('input.allCountries')}>
                   {REST.map((c) => (
                     <CountryOption
                       key={c.iso}
@@ -146,7 +148,7 @@ export function PhoneNumberInput({
 
       <div className="space-y-1.5">
         <Label htmlFor="phone-national" className="text-[12.5px] text-ink-2">
-          Número de teléfono
+          {t('input.phoneLabel')}
         </Label>
         <div className="flex h-12 items-center overflow-hidden rounded-[14px] border border-line-strong bg-surface transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/20">
           {/* prefijo bloqueado: viene del selector, no se tipea */}

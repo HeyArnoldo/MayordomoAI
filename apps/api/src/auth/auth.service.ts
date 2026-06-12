@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { LoginInput, RegisterInput, UserRole } from '@app/contracts';
+import { DEFAULT_LOCALE, LoginInput, RegisterInput, UserRole } from '@app/contracts';
 import { GoogleProfileData, UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
 
@@ -38,6 +38,7 @@ export class AuthService {
       name: input.name,
       passwordHash: await bcrypt.hash(input.password, rounds),
       role: this.roleFor(input.email),
+      language: input.language ?? DEFAULT_LOCALE,
     });
     return { user, token: this.sign(user) };
   }

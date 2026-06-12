@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserRole } from '@app/contracts';
+import { UpdatePreferencesInput, UserRole } from '@app/contracts';
 import { User } from './user.entity';
 
 export interface GoogleProfileData {
@@ -36,6 +36,13 @@ export class UsersService {
   /** Nombre con el que el mayordomo se dirige al usuario (editable en Configuración). */
   updateName(user: User, name: string): Promise<User> {
     user.name = name;
+    return this.repo.save(user);
+  }
+
+  /** Idioma y/o moneda, desde Configuración o la tool del agente. */
+  updatePreferences(user: User, input: UpdatePreferencesInput): Promise<User> {
+    if (input.language !== undefined) user.language = input.language;
+    if (input.currency !== undefined) user.currency = input.currency;
     return this.repo.save(user);
   }
 

@@ -6,6 +6,7 @@ import type { UIMessage } from 'ai';
 import { ArrowDownIcon, DownloadIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
@@ -34,30 +35,38 @@ export type ConversationEmptyStateProps = ComponentProps<'div'> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = 'No messages yet',
-  description = 'Start a conversation to see messages here',
+  title,
+  description,
   icon,
   children,
   ...props
-}: ConversationEmptyStateProps) => (
-  <div
-    className={cn(
-      'flex size-full flex-col items-center justify-center gap-3 p-8 text-center',
-      className,
-    )}
-    {...props}
-  >
-    {children ?? (
-      <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
-          {description && <p className="text-muted-foreground text-sm">{description}</p>}
-        </div>
-      </>
-    )}
-  </div>
-);
+}: ConversationEmptyStateProps) => {
+  const { t } = useTranslation('chat');
+  const resolvedTitle = title ?? t('ai.conversation.emptyTitle');
+  const resolvedDescription = description ?? t('ai.conversation.emptyDescription');
+
+  return (
+    <div
+      className={cn(
+        'flex size-full flex-col items-center justify-center gap-3 p-8 text-center',
+        className,
+      )}
+      {...props}
+    >
+      {children ?? (
+        <>
+          {icon && <div className="text-muted-foreground">{icon}</div>}
+          <div className="space-y-1">
+            <h3 className="font-medium text-sm">{resolvedTitle}</h3>
+            {resolvedDescription && (
+              <p className="text-muted-foreground text-sm">{resolvedDescription}</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 

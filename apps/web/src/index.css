@@ -134,12 +134,18 @@
   --background: oklch(0.175 0.011 var(--tint-hue));
 }
 
+/*
+ * OJO: :root[data-accent] (0,2,0) le gana a .dark (0,1,0) — todo var definido
+ * en los bloques de acento light NECESITA override acá o en dark se ve claro.
+ */
 :root.dark[data-accent='teal'] {
   --brand: #53c8de;
+  --brand-soft: oklch(0.27 0.04 var(--tint-hue) / 0.33);
 }
 
 :root.dark[data-accent='indigo'] {
   --brand: #93a8e8;
+  --brand-soft: oklch(0.27 0.04 var(--tint-hue) / 0.33);
 }
 
 @theme inline {

@@ -1,5 +1,10 @@
 import { api } from '@/lib/api';
-import type { PhoneInput, UpdateNameInput, VerifyCodeInput } from '@app/contracts';
+import type {
+  PhoneInput,
+  UpdateNameInput,
+  UpdatePreferencesInput,
+  VerifyCodeInput,
+} from '@app/contracts';
 
 export interface PhoneDto {
   id: string;
@@ -12,6 +17,11 @@ export const usersApi = {
   /** Cambia el nombre con el que el mayordomo se dirige al usuario. */
   updateName: async (input: UpdateNameInput): Promise<{ name: string }> =>
     (await api.patch<{ name: string }>('/me/name', input)).data,
+  /** Idioma y/o moneda. Cambiar la moneda NO convierte montos históricos. */
+  updatePreferences: async (
+    input: UpdatePreferencesInput,
+  ): Promise<{ language: string; currency: string | null }> =>
+    (await api.patch<{ language: string; currency: string | null }>('/me/preferences', input)).data,
   /** Registra el número y dispara el código por WhatsApp. */
   linkPhone: async (input: PhoneInput): Promise<PhoneDto> =>
     (await api.post<PhoneDto>('/me/phone', input)).data,

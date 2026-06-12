@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { isAxiosError } from 'axios';
 import { BoxScope, BoxType } from '@app/contracts';
@@ -17,20 +18,13 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 const TYPE_OPTIONS = [
-  {
-    value: BoxType.EXPENSE,
-    label: 'Gasto',
-    hint: 'El saldo del mes se usa y se renueva con cada ingreso',
-  },
-  {
-    value: BoxType.FUND,
-    label: 'Fondo',
-    hint: 'Acumula histórico — para metas tipo Ahorro',
-  },
+  { value: BoxType.EXPENSE, labelKey: 'new.typeExpense', hintKey: 'new.typeExpenseHint' },
+  { value: BoxType.FUND, labelKey: 'new.typeFund', hintKey: 'new.typeFundHint' },
 ] as const;
 
 /** Alta de caja del flujo de Cajas: nace con 0% y se reparte en el editor. */
 export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
+  const { t } = useTranslation('boxes');
   const create = useCreateBox();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -52,8 +46,8 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
         onSuccess: (box) => {
           toast.success(
             business
-              ? `Caja "${box.name}" creada`
-              : `Caja "${box.name}" creada con 0% — ajusta el reparto y guarda`,
+              ? t('new.createdBusiness', { name: box.name })
+              : t('new.createdPersonal', { name: box.name }),
           );
           setOpen(false);
           setName('');
@@ -63,7 +57,7 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
         onError: (err) => {
           const msg = isAxiosError(err)
             ? ((err.response?.data as { message?: string } | undefined)?.message ?? err.message)
-            : 'No se pudo crear la caja';
+            : t('new.createError');
           toast.error(msg);
         },
       },
@@ -75,10 +69,8 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Nueva caja</DialogTitle>
-          <DialogDescription>
-            Nace con 0% del reparto — después le asignas su porcentaje en el editor.
-          </DialogDescription>
+          <DialogTitle>{t('new.title')}</DialogTitle>
+          <DialogDescription>{t('new.description')}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -89,19 +81,19 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
           className="space-y-4"
         >
           <div className="space-y-1.5">
-            <Label htmlFor="box-name">Nombre</Label>
+            <Label htmlFor="box-name">{t('new.nameLabel')}</Label>
             <Input
               id="box-name"
               autoFocus
               value={name}
               maxLength={60}
-              placeholder="Ej. Mascota, Gym, Regalos"
+              placeholder={t('new.namePlaceholder')}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tipo</Label>
+            <Label>{t('new.typeLabel')}</Label>
             <div className="grid grid-cols-2 gap-2">
               {TYPE_OPTIONS.map((opt) => (
                 <button
@@ -121,9 +113,11 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
                       type === opt.value ? 'text-brand' : 'text-ink',
                     )}
                   >
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </div>
-                  <div className="mt-0.5 text-[11.5px] leading-snug text-ink-2">{opt.hint}</div>
+                  <div className="mt-0.5 text-[11.5px] leading-snug text-ink-2">
+                    {t(opt.hintKey)}
+                  </div>
                 </button>
               ))}
             </div>
@@ -136,11 +130,11 @@ export function NewBoxDialog({ trigger }: { trigger: ReactNode }) {
               onChange={(e) => setBusiness(e.target.checked)}
               className="size-4 accent-[var(--brand)]"
             />
-            Ámbito empresa (no participa del reparto por %)
+            {t('new.businessScope')}
           </label>
 
           <Button type="submit" className="w-full" disabled={!valid || create.isPending}>
-            {create.isPending ? 'Creando…' : 'Crear caja'}
+            {create.isPending ? t('new.creating') : t('new.create')}
           </Button>
         </form>
       </DialogContent>

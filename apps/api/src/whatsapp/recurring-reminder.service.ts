@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
-import { Channel, MessageRole, UserStatus } from '@app/contracts';
+import { Channel, MessageRole, resolveCurrency, UserStatus } from '@app/contracts';
+import { formatMoney } from '@app/i18n';
+import { I18nService } from '../i18n/i18n.service';
 import { PhoneNumber } from '../users/phone-number.entity';
 import { ConversationsService } from '../chat/conversations.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { EvolutionClient } from './evolution.client';
-
-const fmt = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2 });
 
 /**
  * Recordatorio de gastos fijos: cada mañana (hora de Lima) avisa por WhatsApp
@@ -23,6 +23,7 @@ export class RecurringReminderService {
     private readonly recurring: RecurringService,
     private readonly conversations: ConversationsService,
     private readonly evolution: EvolutionClient,
+    private readonly i18n: I18nService,
     @InjectRepository(PhoneNumber) private readonly phones: Repository<PhoneNumber>,
   ) {}
 
@@ -40,9 +41,16 @@ export class RecurringReminderService {
         });
         if (!phone) continue; // sin número verificado no hay canal
 
-        const text =
-          `📌 Recordatorio: hoy vence *${item.name}* — S/${fmt(parseFloat(item.amount))} ` +
-          `(caja ${item.box.name}). ¿Lo registro? Responde "sí" y lo anoto.`;
+        // Idioma y moneda del dueño del gasto fijo — nunca un default global.
+        const text = this.i18n.t(item.user.language, 'reminders.dueToday', {
+          name: item.name,
+          amount: formatMoney(
+            parseFloat(item.amount),
+            resolveCurrency(item.user.currency),
+            item.user.language,
+          ),
+          box: item.box.name,
+        });
 
         await this.evolution.sendText(phone.e164, text);
 

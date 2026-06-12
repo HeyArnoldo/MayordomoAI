@@ -30,6 +30,8 @@ function toAuthUser(user: User): AuthUser {
     status: user.status,
     onboardedAt: user.onboardedAt ? user.onboardedAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
+    language: user.language,
+    currency: (user.currency as AuthUser['currency']) ?? null,
   };
 }
 

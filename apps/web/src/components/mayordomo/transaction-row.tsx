@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ArrowUpDown, Mic } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionStatus, TransactionType } from '@app/contracts';
@@ -21,6 +22,7 @@ export function TransactionRow({
   last?: boolean;
   onClick?: () => void;
 }) {
+  const { t } = useTranslation('transactions');
   const box = boxes.find((b) => b.id === tx.boxId);
   const isIncome = tx.type === TransactionType.INCOME;
   const isTransit = tx.type === TransactionType.TRANSIT;
@@ -31,7 +33,7 @@ export function TransactionRow({
       ? 'var(--positive)'
       : 'var(--ink-3)';
   const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
-  const label = box?.name ?? (isIncome ? 'Ingreso' : 'Tránsito');
+  const label = box?.name ?? (isIncome ? t('types.income') : t('types.transit'));
 
   return (
     <div
@@ -69,7 +71,7 @@ export function TransactionRow({
           <span className="text-ink-3">{timeLabel(tx.occurredAt)}</span>
           {voided && (
             <span className="rounded-full bg-surface-alt px-2 py-px font-semibold text-ink-3">
-              anulado
+              {t('row.voided')}
             </span>
           )}
         </div>
@@ -84,7 +86,9 @@ export function TransactionRow({
           )}
         />
         {tx.split && (
-          <div className="text-[10.5px] text-ink-3">repartido en {tx.split.length} cajas</div>
+          <div className="text-[10.5px] text-ink-3">
+            {t('row.splitAcross', { count: tx.split.length })}
+          </div>
         )}
       </div>
     </div>

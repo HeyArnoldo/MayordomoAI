@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type ToolUIPart, type UIMessage } from 'ai';
 import {
@@ -91,35 +93,44 @@ function toUIMessages(history: PersistedMessage[]): UIMessage[] {
     });
 }
 
-function greeting(): string {
+/** Key de saludo según la hora — se traduce con t() en el render. */
+function greetingKey(): 'greetings.morning' | 'greetings.afternoon' | 'greetings.evening' {
   const h = new Date().getHours();
-  if (h < 12) return 'Buenos días';
-  if (h < 19) return 'Buenas tardes';
-  return 'Buenas noches';
+  if (h < 12) return 'greetings.morning';
+  if (h < 19) return 'greetings.afternoon';
+  return 'greetings.evening';
 }
 
-const SUGGESTIONS = [
-  'Resume mi mes',
-  'Anota un gasto',
-  '¿En qué me excedo?',
-  '¿Puedo ahorrar más?',
-];
+const SUGGESTION_KEYS = [
+  'suggestions.summarizeMonth',
+  'suggestions.logExpense',
+  'suggestions.whereOverspending',
+  'suggestions.canSaveMore',
+] as const;
 
-/** Etiquetas humanas por tool — el razonamiento se muestra, no se esconde. */
-const TOOL_LABELS: Record<string, { label: string; icon: typeof Wrench }> = {
-  getBoxBalances: { label: 'Consultando saldos de tus cajas', icon: Wallet },
-  listTransactions: { label: 'Revisando tus movimientos', icon: ListOrdered },
-  searchTransactions: { label: 'Buscando en tus movimientos', icon: Search },
-  getSpendingByBox: { label: 'Sumando gastos por caja', icon: PieChart },
-  getTopExpenses: { label: 'Buscando tus gastos más grandes', icon: TrendingDown },
-  getExchangeRate: { label: 'Consultando tipo de cambio', icon: DollarSign },
-  registerTransaction: { label: 'Registrando el movimiento', icon: PenLine },
-  voidTransaction: { label: 'Anulando el movimiento', icon: Undo2 },
+/** Etiquetas humanas por tool (keys del ns chat) — el razonamiento se muestra, no se esconde. */
+const TOOL_META: Record<string, { labelKey: ParseKeys<'chat'>; icon: typeof Wrench }> = {
+  getBoxBalances: { labelKey: 'tools.getBoxBalances', icon: Wallet },
+  listTransactions: { labelKey: 'tools.listTransactions', icon: ListOrdered },
+  searchTransactions: { labelKey: 'tools.searchTransactions', icon: Search },
+  getSpendingByBox: { labelKey: 'tools.getSpendingByBox', icon: PieChart },
+  getTopExpenses: { labelKey: 'tools.getTopExpenses', icon: TrendingDown },
+  getExchangeRate: { labelKey: 'tools.getExchangeRate', icon: DollarSign },
+  registerTransaction: { labelKey: 'tools.registerTransaction', icon: PenLine },
+  voidTransaction: { labelKey: 'tools.voidTransaction', icon: Undo2 },
 };
 
-function toolMeta(type: string) {
+/** Tools sin etiqueta conocida muestran su nombre técnico tal cual. */
+function toolMeta(type: string): {
+  labelKey: ParseKeys<'chat'> | null;
+  name: string;
+  icon: typeof Wrench;
+} {
   const name = type.replace('tool-', '');
-  return TOOL_LABELS[name] ?? { label: name, icon: Wrench };
+  const meta = TOOL_META[name];
+  return meta
+    ? { labelKey: meta.labelKey, name, icon: meta.icon }
+    : { labelKey: null, name, icon: Wrench };
 }
 
 /**
@@ -144,8 +155,13 @@ function segmentParts(parts: UIMessage['parts']): Segment[] {
 
 /** Cadena de razonamiento estilo Claude: colapsada en una línea, pasos al abrir. */
 function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
-  const first = toolMeta(tools[0].type);
-  const headerLabel = tools.length === 1 ? first.label : `Razonando — ${tools.length} pasos`;
+  const { t } = useTranslation('chat');
+  const label = (meta: ReturnType<typeof toolMeta>) =>
+    meta.labelKey ? t(meta.labelKey) : meta.name;
+  const headerLabel =
+    tools.length === 1
+      ? label(toolMeta(tools[0].type))
+      : t('thread.reasoningSteps', { count: tools.length });
 
   return (
     <ChainOfThought defaultOpen={false}>
@@ -161,7 +177,7 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
             <ChainOfThoughtStep
               key={i}
               icon={meta.icon}
-              label={meta.label}
+              label={label(meta)}
               status={running ? 'active' : 'complete'}
               description={
                 tool.state === 'output-error'
@@ -173,7 +189,9 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
             />
           );
         })}
-        {done && <ChainOfThoughtStep icon={CheckCircle2} label="Listo" status="complete" />}
+        {done && (
+          <ChainOfThoughtStep icon={CheckCircle2} label={t('thread.stepDone')} status="complete" />
+        )}
       </ChainOfThoughtContent>
     </ChainOfThought>
   );
@@ -185,6 +203,7 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
  * que el usuario lo revise antes de enviar — la transcripción puede fallar.
  */
 function MicButton() {
+  const { t } = useTranslation('chat');
   const { textInput } = usePromptInputController();
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -215,7 +234,7 @@ function MicButton() {
           const prev = textInput.value.trim();
           textInput.setInput(prev ? `${prev} ${text}` : text);
         } catch {
-          toast.error('No se pudo transcribir — intenta de nuevo o escribe el mensaje');
+          toast.error(t('mic.transcribeError'));
         } finally {
           setTranscribing(false);
         }
@@ -224,7 +243,7 @@ function MicButton() {
       recorderRef.current = recorder;
       setRecording(true);
     } catch {
-      toast.error('Sin acceso al micrófono — revisa los permisos del navegador');
+      toast.error(t('mic.noAccess'));
     }
   };
 
@@ -234,7 +253,7 @@ function MicButton() {
     <PromptInputButton
       onClick={() => (recording ? stop() : void start())}
       disabled={transcribing}
-      title={recording ? 'Detener y transcribir' : 'Dictar por voz'}
+      title={recording ? t('mic.stopAndTranscribe') : t('mic.dictate')}
       className={cn(recording && 'bg-negative-soft text-negative hover:text-negative')}
     >
       {transcribing ? (
@@ -259,6 +278,7 @@ function AssistantActions({
   /** Mensajes pasados: acciones visibles solo al pasar el mouse. */
   hoverOnly?: boolean;
 }) {
+  const { t } = useTranslation('chat');
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
@@ -285,7 +305,7 @@ function AssistantActions({
 
   const vote = (v: 'up' | 'down') => {
     setVoted(v);
-    toast.success(v === 'up' ? '¡Gracias por el feedback!' : 'Gracias, lo tendremos en cuenta.');
+    toast.success(v === 'up' ? t('actions.feedbackThanks') : t('actions.feedbackNoted'));
   };
 
   return (
@@ -296,36 +316,40 @@ function AssistantActions({
           'opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100',
       )}
     >
-      <MessageAction tooltip={copied ? 'Copiado' : 'Copiar'} label="Copiar" onClick={copy}>
+      <MessageAction
+        tooltip={copied ? t('actions.copied') : t('actions.copy')}
+        label={t('actions.copy')}
+        onClick={copy}
+      >
         {copied ? <Check className="size-3.5 text-positive" /> : <Copy className="size-3.5" />}
       </MessageAction>
       {'speechSynthesis' in window && (
         <MessageAction
-          tooltip={speaking ? 'Detener' : 'Leer en voz alta'}
-          label="Leer en voz alta"
+          tooltip={speaking ? t('actions.stop') : t('actions.readAloud')}
+          label={t('actions.readAloud')}
           onClick={speak}
         >
           {speaking ? <Square className="size-3.5" /> : <Volume2 className="size-3.5" />}
         </MessageAction>
       )}
       <MessageAction
-        tooltip="Buena respuesta"
-        label="Buena respuesta"
+        tooltip={t('actions.goodResponse')}
+        label={t('actions.goodResponse')}
         onClick={() => vote('up')}
         disabled={voted !== null}
       >
         <ThumbsUp className={cn('size-3.5', voted === 'up' && 'text-positive')} />
       </MessageAction>
       <MessageAction
-        tooltip="Mala respuesta"
-        label="Mala respuesta"
+        tooltip={t('actions.badResponse')}
+        label={t('actions.badResponse')}
         onClick={() => vote('down')}
         disabled={voted !== null}
       >
         <ThumbsDown className={cn('size-3.5', voted === 'down' && 'text-negative')} />
       </MessageAction>
       {onRetry && (
-        <MessageAction tooltip="Reintentar" label="Reintentar" onClick={onRetry}>
+        <MessageAction tooltip={t('actions.retry')} label={t('actions.retry')} onClick={onRetry}>
           <RefreshCw className="size-3.5" />
         </MessageAction>
       )}
@@ -345,6 +369,7 @@ export function ChatThread({
   onCreated?: (id: string) => void;
   onTitleMaybeChanged?: () => void;
 }) {
+  const { t } = useTranslation('chat');
   const { data: me } = useMe();
   const initialMessages = useMemo(() => toUIMessages(history), [history]);
   // El id real puede nacer después del mount (borrador); el id de useChat
@@ -391,11 +416,14 @@ export function ChatThread({
         className="rounded-2xl border-line bg-surface shadow-float"
       >
         <PromptInputBody>
-          <PromptInputTextarea placeholder="Escribe un mensaje…" className="min-h-12 text-[15px]" />
+          <PromptInputTextarea
+            placeholder={t('composer.placeholder')}
+            className="min-h-12 text-[15px]"
+          />
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools>
-            <PromptInputButton disabled title="Adjuntos — próximamente">
+            <PromptInputButton disabled title={t('composer.attachmentsSoon')}>
               <Plus className="size-4" />
             </PromptInputButton>
           </PromptInputTools>
@@ -411,36 +439,39 @@ export function ChatThread({
   const errorBox = error && (
     <p className="mx-auto w-full max-w-3xl rounded-lg bg-negative-soft px-3 py-2 text-sm text-negative">
       {error.message.includes('503') || error.message.includes('credenciales')
-        ? 'El agente todavía no tiene credenciales de IA configuradas.'
-        : `Algo falló: ${error.message}`}
+        ? t('errors.noCredentials')
+        : t('errors.failed', { message: error.message })}
     </p>
   );
 
   // Pantalla de inicio tipo claude.ai/new: saludo + input centrado + chips.
   if (messages.length === 0) {
     const firstName = me?.name?.split(' ')[0];
+    const greet = t(greetingKey());
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 px-4 pb-16">
         <h1 className="flex items-center gap-3 font-serif text-3xl tracking-tight text-ink md:text-4xl">
           <Mark size={34} />
-          {greeting()}
-          {firstName ? `, ${firstName}` : ''}
+          {firstName ? t('greetings.withName', { greeting: greet, name: firstName }) : greet}
         </h1>
         <div className="w-full max-w-2xl">{promptBox}</div>
         {/* Suggestions de ai-elements es un carrusel scrollable (w-max): no centra.
             Para el empty state queremos chips centrados que envuelvan. */}
         <div className="flex w-full max-w-2xl flex-wrap justify-center gap-2">
-          {SUGGESTIONS.map((text) => (
-            <Suggestion
-              key={text}
-              suggestion={text}
-              onClick={send}
-              variant="outline"
-              className="border-line bg-surface text-[13px] font-semibold text-ink-2 shadow-card hover:bg-surface-alt"
-            >
-              {text}
-            </Suggestion>
-          ))}
+          {SUGGESTION_KEYS.map((key) => {
+            const text = t(key);
+            return (
+              <Suggestion
+                key={key}
+                suggestion={text}
+                onClick={send}
+                variant="outline"
+                className="border-line bg-surface text-[13px] font-semibold text-ink-2 shadow-card hover:bg-surface-alt"
+              >
+                {text}
+              </Suggestion>
+            );
+          })}
         </div>
         {errorBox}
       </div>
@@ -497,7 +528,7 @@ export function ChatThread({
           })}
 
           {busy && messages.at(-1)?.role === 'user' && (
-            <Shimmer className="text-sm">Pensando…</Shimmer>
+            <Shimmer className="text-sm">{t('thread.thinking')}</Shimmer>
           )}
 
           {/* Firma del mayordomo al cerrar su último mensaje, como claude.ai */}
@@ -516,9 +547,7 @@ export function ChatThread({
 
       <div className="px-4">
         <div className="mx-auto w-full max-w-3xl">{promptBox}</div>
-        <p className="py-2.5 text-center text-xs text-ink-3">
-          Mayordomo es IA y puede equivocarse. Verifica los montos importantes.
-        </p>
+        <p className="py-2.5 text-center text-xs text-ink-3">{t('thread.disclaimer')}</p>
       </div>
     </div>
   );

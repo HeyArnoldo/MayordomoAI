@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -16,9 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 
-const CONFIRM_WORD = 'ELIMINAR';
-
-/** Borrado definitivo: exige escribir ELIMINAR — irreversible a propósito. */
+/** Borrado definitivo: exige escribir la palabra de confirmación — irreversible a propósito. */
 export function DeleteAccountDialog({
   open,
   onOpenChange,
@@ -26,27 +25,30 @@ export function DeleteAccountDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation(['settings', 'common']);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState('');
+
+  const confirmWord = t('account.deleteDialog.confirmWord');
 
   const remove = useMutation({
     mutationFn: usersApi.deleteAccount,
     onSuccess: () => {
       qc.clear();
-      toast.success('Cuenta eliminada. Tu número quedó liberado.');
+      toast.success(t('account.deleteDialog.success'));
       navigate('/login', { replace: true });
     },
     onError: (err) => {
       const msg = isAxiosError(err)
         ? ((err.response?.data as { message?: string } | undefined)?.message ??
-          'No se pudo eliminar la cuenta')
-        : 'No se pudo eliminar la cuenta';
+          t('account.deleteDialog.error'))
+        : t('account.deleteDialog.error');
       toast.error(msg);
     },
   });
 
-  const armed = confirm.trim().toUpperCase() === CONFIRM_WORD;
+  const armed = confirm.trim().toUpperCase() === confirmWord;
 
   return (
     <AlertDialog
@@ -58,34 +60,37 @@ export function DeleteAccountDialog({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar tu cuenta definitivamente?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Se borran tus cajas, movimientos, conversaciones y gastos fijos. Tu número de WhatsApp
-            queda liberado para otra cuenta. Esto NO se puede deshacer.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t('account.deleteDialog.title')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('account.deleteDialog.description')}</AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="space-y-1.5">
           <p className="text-[12.5px] text-ink-2">
-            Escribe <span className="font-mono font-bold text-negative">{CONFIRM_WORD}</span> para
-            confirmar:
+            <Trans
+              t={t}
+              i18nKey="account.deleteDialog.typeToConfirm"
+              values={{ word: confirmWord }}
+              components={{ word: <span className="font-mono font-bold text-negative" /> }}
+            />
           </p>
           <Input
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            placeholder={CONFIRM_WORD}
+            placeholder={confirmWord}
             autoFocus
           />
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
           <Button
             variant="destructive"
             disabled={!armed || remove.isPending}
             onClick={() => remove.mutate()}
           >
-            {remove.isPending ? 'Eliminando…' : 'Eliminar mi cuenta'}
+            {remove.isPending
+              ? t('account.deleteDialog.deleting')
+              : t('account.deleteDialog.confirm')}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

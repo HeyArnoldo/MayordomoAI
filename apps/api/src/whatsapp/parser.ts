@@ -9,7 +9,10 @@ export type FastPathResult =
   | { kind: 'summary' }
   | null;
 
-const AMOUNT = String.raw`(?:s/\.?\s*)?(\d+(?:[.,]\d{1,2})?)`;
+// Prefijo de moneda OPCIONAL: `S/` (con o sin punto), símbolo ($ € £), código
+// ISO de 3 letras (USD, PEN, ...) o nada. El parser solo extrae el número —
+// el monto SIEMPRE se interpreta en la moneda configurada del usuario.
+const AMOUNT = String.raw`(?:s/\.?|[$€£]|[a-z]{3})?\s*(\d+(?:[.,]\d{1,2})?)`;
 
 const EXPENSE_RE = new RegExp(
   String.raw`^\s*(?:gast[eé]|pagu[eé]|compr[eé]|anota)\s+${AMOUNT}\s+(?:en|de|para)\s+(.+?)\s*$`,

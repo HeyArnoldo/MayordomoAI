@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from './config/typeorm.config';
 import { validateEnv } from './config/env.validation';
+import { I18nModule } from './i18n/i18n.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +21,7 @@ import { HealthModule } from './health/health.module';
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(dataSourceOptions),
+    I18nModule,
     UsersModule,
     AdminModule,
     AuthModule,

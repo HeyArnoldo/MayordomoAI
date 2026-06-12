@@ -5,11 +5,14 @@ import { RouterProvider } from 'react-router-dom';
 import { queryClient } from '@/lib/query-client';
 import { router } from '@/router';
 import { Toaster } from '@/components/ui/sonner';
+import { LocaleSync } from '@/components/locale-sync';
+import '@/lib/i18n';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <LocaleSync />
       <Suspense fallback={null}>
         <RouterProvider router={router} />
       </Suspense>

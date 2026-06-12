@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Clock3, LogOut, ShieldAlert } from 'lucide-react';
 import { UserStatus } from '@app/contracts';
@@ -10,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
  * la aprobación del admin y los guards de ruta llevan al onboarding solos.
  */
 export default function EsperaPage() {
+  const { t } = useTranslation('auth');
   // Polling: esperar la aprobación ES la función de esta pantalla.
   const { data: user } = useMe({ refetchInterval: 30_000 });
   const logout = useLogout();
@@ -37,20 +39,18 @@ export default function EsperaPage() {
           </div>
 
           <h2 className="mt-5 text-[26px] font-bold tracking-tight text-ink">
-            {suspended ? 'Cuenta suspendida' : 'Estás en la lista de espera'}
+            {suspended ? t('waitlist.suspendedTitle') : t('waitlist.title')}
           </h2>
           <p className="mt-2 max-w-[340px] text-[14.5px] leading-relaxed text-ink-2">
             {suspended
-              ? 'Tu cuenta fue suspendida. Si crees que es un error, escríbenos y lo revisamos.'
-              : `Hola, ${user.name.split(' ')[0]}. Tu cuenta está creada y en revisión — en cuanto sea aprobada entras directo al onboarding.`}
+              ? t('waitlist.suspendedBody')
+              : t('waitlist.body', { name: user.name.split(' ')[0] })}
           </p>
 
           {!suspended && (
             <div className="mt-6 flex items-center gap-2.5 rounded-full border border-line bg-surface py-2 pr-4 pl-3">
               <Spinner className="size-4 text-brand" />
-              <span className="text-[12.5px] font-medium text-ink-2">
-                Comprobando aprobación automáticamente…
-              </span>
+              <span className="text-[12.5px] font-medium text-ink-2">{t('waitlist.checking')}</span>
             </div>
           )}
 
@@ -59,7 +59,7 @@ export default function EsperaPage() {
             className="mt-8 inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-3 hover:text-ink"
           >
             <LogOut className="size-3.5" />
-            Salir de la cuenta
+            {t('waitlist.logout')}
           </button>
         </div>
       </div>

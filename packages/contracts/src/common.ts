@@ -17,8 +17,11 @@ export const verifyCodeSchema = z.object({
 });
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>;
 
-/** Cambio de nombre desde Configuración: es como el mayordomo llama al usuario. */
+/**
+ * Cambio de nombre desde Configuración: es como el mayordomo llama al usuario.
+ * Sin mensajes custom: min/max usan el locale global de Zod (z.config en la web).
+ */
 export const updateNameSchema = z.object({
-  name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(120, 'Máximo 120 caracteres'),
+  name: z.string().trim().min(2).max(120),
 });
 export type UpdateNameInput = z.infer<typeof updateNameSchema>;

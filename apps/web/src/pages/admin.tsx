@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
@@ -28,10 +30,13 @@ import {
 
 const USERS_KEY = ['admin', 'users'] as const;
 
-const STATUS_META: Record<UserStatus, { label: string; className: string }> = {
-  [UserStatus.PENDING]: { label: 'Pendiente', className: 'bg-warn/15 text-warn' },
-  [UserStatus.ACTIVE]: { label: 'Activa', className: 'bg-brand-soft text-brand' },
-  [UserStatus.SUSPENDED]: { label: 'Suspendida', className: 'bg-negative-soft text-negative' },
+const STATUS_META: Record<UserStatus, { labelKey: ParseKeys<'admin'>; className: string }> = {
+  [UserStatus.PENDING]: { labelKey: 'statuses.pending', className: 'bg-warn/15 text-warn' },
+  [UserStatus.ACTIVE]: { labelKey: 'statuses.active', className: 'bg-brand-soft text-brand' },
+  [UserStatus.SUSPENDED]: {
+    labelKey: 'statuses.suspended',
+    className: 'bg-negative-soft text-negative',
+  },
 };
 
 function apiError(err: unknown, fallback: string): string {
@@ -48,6 +53,7 @@ function fecha(iso: string): string {
 
 /** Panel de administración: cola de aprobación + gestión de status y roles. */
 export default function AdminPage() {
+  const { t } = useTranslation('admin');
   const { data: me } = useMe();
   const qc = useQueryClient();
 
@@ -63,18 +69,27 @@ export default function AdminPage() {
       adminApi.updateStatus(id, status),
     onSuccess: (u) => {
       invalidate();
-      toast.success(`${u.name}: cuenta ${STATUS_META[u.status].label.toLowerCase()}`);
+      toast.success(
+        t('toasts.statusChanged', {
+          name: u.name,
+          status: t(STATUS_META[u.status].labelKey).toLowerCase(),
+        }),
+      );
     },
-    onError: (err) => toast.error(apiError(err, 'No se pudo cambiar el status')),
+    onError: (err) => toast.error(apiError(err, t('toasts.statusError'))),
   });
 
   const setRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: UserRole }) => adminApi.updateRole(id, role),
     onSuccess: (u) => {
       invalidate();
-      toast.success(`${u.name} ahora es ${u.role === UserRole.ADMIN ? 'admin' : 'usuario'}`);
+      toast.success(
+        u.role === UserRole.ADMIN
+          ? t('toasts.roleChangedAdmin', { name: u.name })
+          : t('toasts.roleChangedUser', { name: u.name }),
+      );
     },
-    onError: (err) => toast.error(apiError(err, 'No se pudo cambiar el rol')),
+    onError: (err) => toast.error(apiError(err, t('toasts.roleError'))),
   });
 
   const pending = (users ?? []).filter((u) => u.status === UserStatus.PENDING);
@@ -94,17 +109,17 @@ export default function AdminPage() {
         <TabsList>
           <TabsTrigger value="pendientes" className="gap-1.5">
             <Clock3 className="size-3.5" />
-            Pendientes
+            {t('tabs.pending')}
             {pending.length > 0 && (
               <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-on-brand">
                 {pending.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="todos">Todos los usuarios</TabsTrigger>
+          <TabsTrigger value="todos">{t('tabs.allUsers')}</TabsTrigger>
           <TabsTrigger value="uso" className="gap-1.5">
             <CircleDollarSign className="size-3.5" />
-            Uso
+            {t('tabs.usage')}
           </TabsTrigger>
         </TabsList>
 
@@ -115,12 +130,8 @@ export default function AdminPage() {
               <div className="flex size-11 items-center justify-center rounded-[13px] bg-brand-soft text-brand">
                 <Check className="size-5" />
               </div>
-              <p className="mt-3 text-[14.5px] font-semibold text-ink">
-                Sin solicitudes pendientes
-              </p>
-              <p className="mt-1 text-[13px] text-ink-2">
-                Cuando alguien entre con Google aparecerá aquí.
-              </p>
+              <p className="mt-3 text-[14.5px] font-semibold text-ink">{t('pending.emptyTitle')}</p>
+              <p className="mt-1 text-[13px] text-ink-2">{t('pending.emptyBody')}</p>
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -131,7 +142,9 @@ export default function AdminPage() {
                 >
                   <UserCell user={u} />
                   <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
-                    <span className="text-[12px] text-ink-3">desde el {fecha(u.createdAt)}</span>
+                    <span className="text-[12px] text-ink-3">
+                      {t('pending.since', { date: fecha(u.createdAt) })}
+                    </span>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -140,7 +153,7 @@ export default function AdminPage() {
                       onClick={() => setStatus.mutate({ id: u.id, status: UserStatus.SUSPENDED })}
                     >
                       <UserX className="size-4" />
-                      Rechazar
+                      {t('pending.reject')}
                     </Button>
                     <Button
                       size="sm"
@@ -148,7 +161,7 @@ export default function AdminPage() {
                       onClick={() => setStatus.mutate({ id: u.id, status: UserStatus.ACTIVE })}
                     >
                       <Check className="size-4" />
-                      Aprobar
+                      {t('pending.approve')}
                     </Button>
                   </div>
                 </div>
@@ -163,11 +176,11 @@ export default function AdminPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>WhatsApp</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead className="text-right">Alta</TableHead>
+                  <TableHead>{t('table.user')}</TableHead>
+                  <TableHead>{t('table.whatsapp')}</TableHead>
+                  <TableHead>{t('table.status')}</TableHead>
+                  <TableHead>{t('table.role')}</TableHead>
+                  <TableHead className="text-right">{t('table.joined')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -191,7 +204,7 @@ export default function AdminPage() {
                       <TableCell>
                         {self ? (
                           <Badge className={STATUS_META[u.status].className}>
-                            {STATUS_META[u.status].label}
+                            {t(STATUS_META[u.status].labelKey)}
                           </Badge>
                         ) : (
                           <Select
@@ -206,7 +219,7 @@ export default function AdminPage() {
                             <SelectContent>
                               {Object.values(UserStatus).map((s) => (
                                 <SelectItem key={s} value={s}>
-                                  {STATUS_META[s].label}
+                                  {t(STATUS_META[s].labelKey)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -215,7 +228,7 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell>
                         {self ? (
-                          <Badge className="bg-brand-soft text-brand">Admin (tú)</Badge>
+                          <Badge className="bg-brand-soft text-brand">{t('table.adminYou')}</Badge>
                         ) : (
                           <Select
                             value={u.role}
@@ -225,8 +238,8 @@ export default function AdminPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={UserRole.USER}>Usuario</SelectItem>
-                              <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                              <SelectItem value={UserRole.USER}>{t('roles.user')}</SelectItem>
+                              <SelectItem value={UserRole.ADMIN}>{t('roles.admin')}</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -240,10 +253,7 @@ export default function AdminPage() {
               </TableBody>
             </Table>
           </div>
-          <p className="mt-3 text-[12px] text-ink-3">
-            No puedes cambiar tu propio rol ni status, y el último admin no puede ser degradado —
-            asigna otro admin primero.
-          </p>
+          <p className="mt-3 text-[12px] text-ink-3">{t('table.note')}</p>
         </TabsContent>
 
         {/* ── Uso y costos de IA ── */}
@@ -255,10 +265,10 @@ export default function AdminPage() {
   );
 }
 
-const KIND_LABELS: Record<string, string> = {
-  agent: 'Agente',
-  title: 'Títulos',
-  transcription: 'Voz',
+const KIND_LABEL_KEYS: Record<string, ParseKeys<'admin'>> = {
+  agent: 'usage.kinds.agent',
+  title: 'usage.kinds.title',
+  transcription: 'usage.kinds.transcription',
 };
 
 const tokens = (n: number) =>
@@ -271,6 +281,7 @@ const tokens = (n: number) =>
 const usd = (n: number) => `$${n.toFixed(n >= 1 ? 2 : 4)}`;
 
 function UsageTab() {
+  const { t } = useTranslation('admin');
   const [days, setDays] = useState('30');
 
   const { data: report, isLoading } = useQuery({
@@ -295,17 +306,18 @@ function UsageTab() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="7">Últimos 7 días</SelectItem>
-            <SelectItem value="30">Últimos 30 días</SelectItem>
-            <SelectItem value="90">Últimos 90 días</SelectItem>
+            <SelectItem value="7">{t('usage.last7')}</SelectItem>
+            <SelectItem value="30">{t('usage.last30')}</SelectItem>
+            <SelectItem value="90">{t('usage.last90')}</SelectItem>
           </SelectContent>
         </Select>
         <div className="ml-auto flex items-center gap-4 text-[13px]">
           <span className="text-ink-2">
-            <span className="font-semibold text-ink">{report.totalRequests}</span> llamadas
+            <span className="font-semibold text-ink">{report.totalRequests}</span>{' '}
+            {t('usage.calls', { count: report.totalRequests })}
           </span>
           <span className="text-ink-2">
-            costo estimado{' '}
+            {t('usage.estimatedCost')}{' '}
             <span className="money text-[15px] font-bold text-ink">{usd(report.totalCostUsd)}</span>
           </span>
         </div>
@@ -316,22 +328,20 @@ function UsageTab() {
           <div className="flex size-11 items-center justify-center rounded-[13px] bg-brand-soft text-brand">
             <CircleDollarSign className="size-5" />
           </div>
-          <p className="mt-3 text-[14.5px] font-semibold text-ink">Sin uso de IA en el período</p>
-          <p className="mt-1 text-[13px] text-ink-2">
-            Cada mensaje al agente, título y nota de voz aparecerá aquí con su costo.
-          </p>
+          <p className="mt-3 text-[14.5px] font-semibold text-ink">{t('usage.emptyTitle')}</p>
+          <p className="mt-1 text-[13px] text-ink-2">{t('usage.emptyBody')}</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead className="text-right">Llamadas</TableHead>
-                <TableHead className="text-right">Tokens in</TableHead>
-                <TableHead className="text-right">Tokens out</TableHead>
-                <TableHead>Desglose</TableHead>
-                <TableHead className="text-right">Costo est.</TableHead>
+                <TableHead>{t('table.user')}</TableHead>
+                <TableHead className="text-right">{t('usage.table.calls')}</TableHead>
+                <TableHead className="text-right">{t('usage.table.tokensIn')}</TableHead>
+                <TableHead className="text-right">{t('usage.table.tokensOut')}</TableHead>
+                <TableHead>{t('usage.table.breakdown')}</TableHead>
+                <TableHead className="text-right">{t('usage.table.estCost')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -354,7 +364,8 @@ function UsageTab() {
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(r.kinds).map(([kind, k]) => (
                         <Badge key={kind} className="bg-surface-alt text-[11px] text-ink-2">
-                          {KIND_LABELS[kind] ?? kind} · {usd(k.costUsd)}
+                          {KIND_LABEL_KEYS[kind] ? t(KIND_LABEL_KEYS[kind]) : kind} ·{' '}
+                          {usd(k.costUsd)}
                         </Badge>
                       ))}
                     </div>
@@ -369,10 +380,7 @@ function UsageTab() {
         </div>
       )}
 
-      <p className="text-[12px] text-ink-3">
-        Costos ESTIMADOS con precios locales por modelo (no es la factura del provider). Modelos sin
-        precio conocido registran tokens pero costo $0.
-      </p>
+      <p className="text-[12px] text-ink-3">{t('usage.note')}</p>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCircle, Mic, ShieldCheck } from 'lucide-react';
 import { Mark, Wordmark } from '@/components/mayordomo/mark';
 
@@ -36,6 +37,7 @@ export function EnvelopeChip({ caja, onBrand = false }: { caja?: string; onBrand
  * (panel de marca 44% + formulario) y página simple en mobile.
  */
 export function AuthShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('auth');
   return (
     <div className="flex min-h-screen bg-background">
       {/* panel de marca — solo desktop */}
@@ -48,13 +50,12 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </div>
         <div className="relative z-10">
           <h1 className="text-[38px] leading-[1.1] font-bold tracking-tight text-on-brand">
-            Tu dinero,
+            {t('shell.headline1')}
             <br />
-            en mini-cajas.
+            {t('shell.headline2')}
           </h1>
           <p className="mt-4 max-w-[380px] text-[16px] leading-relaxed text-on-brand/85">
-            Reparte cada ingreso automáticamente y registra gastos conversando por WhatsApp. El
-            mayordomo lleva la cuenta por ti.
+            {t('shell.tagline')}
           </p>
           <div className="mt-8 flex gap-2.5">
             {CAJAS_PREVIEW.map((id) => (
@@ -65,9 +66,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <div className="relative z-10 flex items-center gap-6 text-on-brand">
           {(
             [
-              [MessageCircle, 'Registro por WhatsApp'],
-              [Mic, 'Notas de voz'],
-              [ShieldCheck, 'Tu historial, solo tuyo'],
+              [MessageCircle, t('shell.features.whatsapp')],
+              [Mic, t('shell.features.voice')],
+              [ShieldCheck, t('shell.features.privacy')],
             ] as const
           ).map(([Icon, label]) => (
             <div key={label} className="flex items-center gap-2 opacity-90">
@@ -97,6 +98,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
 /** Cabecera de marca para la variante mobile (logo centrado + tagline). */
 export function MobileBrandHeader() {
+  const { t } = useTranslation('auth');
   return (
     <div className="flex flex-col items-center gap-[18px] lg:hidden">
       <Mark size={72} />
@@ -105,7 +107,7 @@ export function MobileBrandHeader() {
           Mayordomo<span className="text-brand">AI</span>
         </div>
         <p className="mx-auto mt-2 max-w-[270px] text-[15px] leading-relaxed text-ink-2">
-          Tu dinero en mini-cajas, administrado conversando por WhatsApp.
+          {t('shell.mobileTagline')}
         </p>
       </div>
     </div>
@@ -113,13 +115,8 @@ export function MobileBrandHeader() {
 }
 
 /** Botón "Continuar con Google" con el logo multicolor del design. */
-export function GoogleButton({
-  href,
-  label = 'Continuar con Google',
-}: {
-  href: string;
-  label?: string;
-}) {
+export function GoogleButton({ href, label }: { href: string; label?: string }) {
+  const { t } = useTranslation('auth');
   return (
     <a
       href={href}
@@ -140,7 +137,7 @@ export function GoogleButton({
           fill="#EA4335"
         />
       </svg>
-      {label}
+      {label ?? t('shell.continueWithGoogle')}
     </a>
   );
 }

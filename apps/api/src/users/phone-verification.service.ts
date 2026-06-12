@@ -9,7 +9,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
+import { deriveCurrencyFromE164, type Locale } from '@app/contracts';
 import { EvolutionClient } from '../whatsapp/evolution.client';
+import { I18nService } from '../i18n/i18n.service';
 import { User } from './user.entity';
 import { PhoneNumber } from './phone-number.entity';
 
@@ -29,6 +31,7 @@ export class PhoneVerificationService {
     @InjectRepository(PhoneNumber) private readonly phones: Repository<PhoneNumber>,
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly evolution: EvolutionClient,
+    private readonly i18n: I18nService,
   ) {}
 
   /** Registra (o cambia) el número del usuario y le envía un código. */
@@ -49,7 +52,7 @@ export class PhoneVerificationService {
 
     if (phone.verified) return phone; // ya verificado, nada que enviar
 
-    return this.sendCode(phone);
+    return this.sendCode(phone, user.language);
   }
 
   /** Reenvía el código vigente (regenerado) respetando el cooldown. */
@@ -63,7 +66,7 @@ export class PhoneVerificationService {
       const wait = Math.ceil((RESEND_COOLDOWN_MS - since) / 1000);
       throw new BadRequestException(`Espera ${wait}s para reenviar el código`);
     }
-    return this.sendCode(phone);
+    return this.sendCode(phone, user.language);
   }
 
   /** Valida el código; si coincide, marca verificado y completa el onboarding. */
@@ -87,7 +90,21 @@ export class PhoneVerificationService {
     const saved = await this.phones.save(phone);
 
     await this.markOnboarded(user);
+    await this.deriveCurrencyIfUnset(user, saved.e164);
     return saved;
+  }
+
+  /**
+   * Moneda derivada del país del número, SOLO si el usuario nunca eligió una
+   * (currency NULL). Una elección explícita jamás se pisa. Prefijo no mapeado:
+   * queda NULL y se resuelve como USD.
+   */
+  private async deriveCurrencyIfUnset(user: User, e164: string): Promise<void> {
+    if (user.currency !== null) return;
+    const currency = deriveCurrencyFromE164(e164);
+    if (!currency) return;
+    await this.users.update(user.id, { currency });
+    user.currency = currency;
   }
 
   /** Omitir verificación: el onboarding se completa sin número confirmado. */
@@ -96,7 +113,7 @@ export class PhoneVerificationService {
     await this.users.update(user.id, { onboardedAt: new Date() });
   }
 
-  private async sendCode(phone: PhoneNumber): Promise<PhoneNumber> {
+  private async sendCode(phone: PhoneNumber, language: Locale): Promise<PhoneNumber> {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     phone.verificationCodeHash = await bcrypt.hash(code, 10);
     phone.codeExpiresAt = new Date(Date.now() + CODE_TTL_MS);
@@ -105,7 +122,7 @@ export class PhoneVerificationService {
 
     await this.evolution.sendText(
       phone.e164,
-      `Tu código de verificación de MayordomoAI es *${code}*. Vence en 10 minutos.`,
+      this.i18n.t(language, 'whatsapp.verificationCode', { code }),
     );
     if (!this.evolution.enabled()) {
       // Modo dev sin Evolution: el código solo vive en el log.

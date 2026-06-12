@@ -48,7 +48,7 @@ export class BoxesController {
     @CurrentUser() user: User,
     @Body(new ZodValidationPipe(allocationSchema)) input: AllocationInput,
   ): Promise<BoxDto[]> {
-    return (await this.boxes.updateAllocation(user.id, input)).map(toBoxDto);
+    return (await this.boxes.updateAllocation(user.id, input, user.language)).map(toBoxDto);
   }
 
   @Patch(':id')
@@ -57,6 +57,6 @@ export class BoxesController {
     @Param(new ZodValidationPipe(idParamSchema)) { id }: IdParam,
     @Body(new ZodValidationPipe(updateBoxSchema)) input: UpdateBoxInput,
   ): Promise<BoxDto> {
-    return toBoxDto(await this.boxes.update(user.id, id, input));
+    return toBoxDto(await this.boxes.update(user.id, id, input, user.language));
   }
 }

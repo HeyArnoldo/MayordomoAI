@@ -1,0 +1,108 @@
+import type { chat as es } from '../es/chat';
+
+export const chat = {
+  thread: {
+    channelWhatsapp: 'WhatsApp + web',
+    channelSession: 'session',
+    renamePrompt: 'New title',
+    rename: 'Rename',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete',
+    reasoningSteps_one: 'Reasoning — {{count}} step',
+    reasoningSteps_other: 'Reasoning — {{count}} steps',
+    stepDone: 'Done',
+    thinking: 'Thinking…',
+    disclaimer: 'Mayordomo is AI and can make mistakes. Double-check important amounts.',
+  },
+  greetings: {
+    morning: 'Good morning',
+    afternoon: 'Good afternoon',
+    evening: 'Good evening',
+    withName: '{{greeting}}, {{name}}',
+  },
+  suggestions: {
+    summarizeMonth: 'Summarize my month',
+    logExpense: 'Log an expense',
+    whereOverspending: 'Where am I overspending?',
+    canSaveMore: 'Can I save more?',
+  },
+  tools: {
+    getBoxBalances: 'Checking your box balances',
+    listTransactions: 'Going through your transactions',
+    searchTransactions: 'Searching your transactions',
+    getSpendingByBox: 'Adding up spending by box',
+    getTopExpenses: 'Finding your biggest expenses',
+    getExchangeRate: 'Checking the exchange rate',
+    registerTransaction: 'Logging the transaction',
+    voidTransaction: 'Voiding the transaction',
+  },
+  composer: {
+    placeholder: 'Type a message…',
+    attachmentsSoon: 'Attachments — coming soon',
+  },
+  mic: {
+    dictate: 'Dictate by voice',
+    stopAndTranscribe: 'Stop and transcribe',
+    transcribeError: 'Could not transcribe — try again or type your message',
+    noAccess: 'No microphone access — check your browser permissions',
+  },
+  actions: {
+    copy: 'Copy',
+    copied: 'Copied',
+    readAloud: 'Read aloud',
+    stop: 'Stop',
+    goodResponse: 'Good response',
+    badResponse: 'Bad response',
+    retry: 'Retry',
+    feedbackThanks: 'Thanks for the feedback!',
+    feedbackNoted: 'Thanks, we will keep it in mind.',
+  },
+  errors: {
+    noCredentials: 'The agent does not have AI credentials configured yet.',
+    failed: 'Something failed: {{message}}',
+  },
+  rail: {
+    searchChats: 'Search chats',
+    hideConversations: 'Hide conversations',
+    searchPlaceholder: 'Search chats…',
+    newConversation: 'New conversation',
+    pinned: 'Pinned',
+    recent: 'Recent',
+    noResults: 'Nothing for "{{query}}".',
+    empty: 'No conversations yet.',
+  },
+  agent: {
+    empty: 'No agent activity yet. Ask it something in the chat.',
+  },
+  page: {
+    conversations: 'Conversations',
+    showConversations: 'Show conversations',
+    emptyState: 'Create a conversation to get started.',
+  },
+  ai: {
+    conversation: {
+      emptyTitle: 'No messages yet',
+      emptyDescription: 'Start a conversation to see messages here',
+    },
+    chainOfThought: {
+      header: 'Chain of Thought',
+    },
+    message: {
+      previousBranch: 'Previous branch',
+      nextBranch: 'Next branch',
+      branchPage: '{{current}} of {{total}}',
+    },
+    promptInput: {
+      placeholder: 'What would you like to know?',
+      addPhotosOrFiles: 'Add photos or files',
+      takeScreenshot: 'Take screenshot',
+      uploadFiles: 'Upload files',
+      submit: 'Submit',
+      stop: 'Stop',
+      errorAccept: 'No files match the accepted types.',
+      errorMaxFileSize: 'All files exceed the maximum size.',
+      errorMaxFiles: 'Too many files. Some were not added.',
+    },
+  },
+} satisfies typeof es;

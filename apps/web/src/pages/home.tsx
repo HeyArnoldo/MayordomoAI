@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Plus, TrendingUp } from 'lucide-react';
 import { Money } from '@/components/mayordomo/money';
@@ -10,6 +11,7 @@ import { useBoxBalances, useTransactions } from '@/hooks/use-finance';
 import { boxColor, monthLabel } from '@/lib/boxes';
 
 export default function DashboardPage() {
+  const { t } = useTranslation('boxes');
   const navigate = useNavigate();
   const { data: boxes = [], isLoading } = useBoxBalances();
   const { data: recent = [] } = useTransactions({ limit: 5 });
@@ -41,12 +43,12 @@ export default function DashboardPage() {
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            Disponible · {monthLabel()}
+            {t('home.availableMonth', { month: monthLabel() })}
           </span>
           <RegistroDialog
             trigger={
               <Button size="sm" className="gap-1.5">
-                <Plus className="size-4" /> Registrar
+                <Plus className="size-4" /> {t('home.register')}
               </Button>
             }
           />
@@ -61,8 +63,12 @@ export default function DashboardPage() {
           />
         </div>
         <p className="mt-1.5 text-xs text-ink-3">
-          Usado {Math.round(usedPct)}% de <span className="money">S/{allocated.toFixed(2)}</span>{' '}
-          asignados
+          <Trans
+            t={t}
+            i18nKey="home.usedOfAllocated"
+            values={{ pct: Math.round(usedPct) }}
+            components={{ amount: <span className="money">S/{allocated.toFixed(2)}</span> }}
+          />
         </p>
       </section>
 
@@ -82,7 +88,13 @@ export default function DashboardPage() {
               <span className="text-sm font-bold text-ink">{fund.name}</span>
             </div>
             <p className="mt-1 text-xs text-ink-2">
-              Fondo · acumula <span className="money">+S/{fund.allocated.toFixed(2)}</span> este mes
+              <Trans
+                t={t}
+                i18nKey="home.fundAccumulates"
+                components={{
+                  amount: <span className="money">+S/{fund.allocated.toFixed(2)}</span>,
+                }}
+              />
             </p>
           </div>
           <Money value={fund.accumulated!} className="text-2xl" />
@@ -93,10 +105,10 @@ export default function DashboardPage() {
       <section>
         <div className="mb-2 flex items-center justify-between">
           <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            Tus cajas
+            {t('home.yourBoxes')}
           </span>
           <Link to="/cajas" className="flex items-center gap-1 text-xs font-semibold text-brand">
-            Editar % <ArrowRight className="size-3" />
+            {t('home.editPct')} <ArrowRight className="size-3" />
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -110,7 +122,7 @@ export default function DashboardPage() {
       {business.length > 0 && (
         <section>
           <div className="mb-2 font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            Ámbito empresa
+            {t('home.businessScope')}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {business.map((b) => (
@@ -124,17 +136,17 @@ export default function DashboardPage() {
       <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
         <div className="flex items-center justify-between pt-3">
           <span className="font-mono text-[11px] font-medium uppercase tracking-widest text-ink-3">
-            Recientes
+            {t('home.recent')}
           </span>
           <Link
             to="/movimientos"
             className="flex items-center gap-1 text-xs font-semibold text-brand"
           >
-            Ver todo <ArrowRight className="size-3" />
+            {t('home.viewAll')} <ArrowRight className="size-3" />
           </Link>
         </div>
         {recent.length === 0 && (
-          <p className="py-6 text-center text-sm text-ink-3">Sin movimientos todavía.</p>
+          <p className="py-6 text-center text-sm text-ink-3">{t('home.noTransactions')}</p>
         )}
         {recent.map((tx, i) => (
           <TransactionRow key={tx.id} tx={tx} boxes={boxes} last={i === recent.length - 1} />

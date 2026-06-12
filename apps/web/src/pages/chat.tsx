@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, MessageCircle, PanelLeft, Pencil, Pin, Trash2 } from 'lucide-react';
 import { Channel, type Conversation } from '@app/contracts';
@@ -30,6 +31,7 @@ function ThreadHeader({
   /** Deja lugar al botón de expandir el rail cuando está colapsado. */
   inset?: boolean;
 }) {
+  const { t } = useTranslation('chat');
   const rename = useRenameConversation();
   const togglePin = useTogglePin();
   const remove = useDeleteConversation();
@@ -53,7 +55,9 @@ function ThreadHeader({
           <>
             {title}
             <span className="font-mono text-[10px] uppercase tracking-wider text-ink-3">
-              {conv.channel === Channel.WHATSAPP ? 'WhatsApp + web' : 'sesión'}
+              {conv.channel === Channel.WHATSAPP
+                ? t('thread.channelWhatsapp')
+                : t('thread.channelSession')}
             </span>
           </>
         ) : (
@@ -67,20 +71,20 @@ function ThreadHeader({
             <DropdownMenuContent side="right" align="start">
               <DropdownMenuItem
                 onClick={() => {
-                  const next = window.prompt('Nuevo título', conv.title);
+                  const next = window.prompt(t('thread.renamePrompt'), conv.title);
                   if (next?.trim()) rename.mutate({ id: conv.id, title: next.trim() });
                 }}
               >
-                <Pencil className="size-4" /> Renombrar
+                <Pencil className="size-4" /> {t('thread.rename')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => togglePin.mutate(conv.id)}>
-                <Pin className="size-4" /> {conv.pinned ? 'Desfijar' : 'Fijar'}
+                <Pin className="size-4" /> {conv.pinned ? t('thread.unpin') : t('thread.pin')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => remove.mutate(conv.id, { onSuccess: onDeleted })}
               >
-                <Trash2 className="size-4" /> Eliminar
+                <Trash2 className="size-4" /> {t('thread.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -91,6 +95,7 @@ function ThreadHeader({
 }
 
 export default function ChatPage() {
+  const { t } = useTranslation('chat');
   const qc = useQueryClient();
   const { data: conversations = [], isLoading } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -163,7 +168,7 @@ export default function ChatPage() {
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
         {/* Mobile: botón para abrir el drawer de conversaciones */}
         <button
-          title="Conversaciones"
+          title={t('page.conversations')}
           onClick={() => setMobileRail(true)}
           className="absolute left-2 top-2 z-20 flex size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-alt hover:text-ink md:hidden"
         >
@@ -171,7 +176,7 @@ export default function ChatPage() {
         </button>
         {!railOpen && (
           <button
-            title="Mostrar conversaciones"
+            title={t('page.showConversations')}
             onClick={() => setRailOpen(true)}
             className="absolute left-2 top-2 z-20 hidden size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-alt hover:text-ink md:flex"
           >
@@ -212,7 +217,7 @@ export default function ChatPage() {
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-ink-3">
-            Crea una conversación para empezar.
+            {t('page.emptyState')}
           </div>
         )}
       </div>

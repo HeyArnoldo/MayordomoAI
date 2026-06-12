@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Check, Minus, PackagePlus, Pencil, Plus, TriangleAlert } from 'lucide-react';
 import type { BoxBalance } from '@app/contracts';
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 /** Editor de reparto del design: ±5%, validación de 100, aplica a futuros. */
 export default function BoxesPage() {
+  const { t } = useTranslation(['boxes', 'common']);
   const { data: boxes = [], isLoading } = useBoxBalances();
   const update = useUpdateAllocation();
   const [pcts, setPcts] = useState<Record<string, number>>({});
@@ -39,7 +41,7 @@ export default function BoxesPage() {
     update.mutate(
       { items: editable.map((b) => ({ id: b.id, pct: pcts[b.id] ?? b.pct })) },
       {
-        onSuccess: () => toast.success('Reparto actualizado — aplica a ingresos futuros'),
+        onSuccess: () => toast.success(t('editor.updated')),
         onError: (e) => toast.error(e.message),
       },
     );
@@ -67,11 +69,11 @@ export default function BoxesPage() {
             <TriangleAlert className="size-5 text-negative" />
           )}
           <span className={cn('text-sm font-bold', ok ? 'text-ink' : 'text-negative')}>
-            {ok ? 'El reparto suma 100%' : `Suma ${total.toFixed(2)}% — debe ser 100%`}
+            {ok ? t('editor.sumOk') : t('editor.sumError', { total: total.toFixed(2) })}
           </span>
         </div>
         <Button size="sm" disabled={!ok || !dirty || update.isPending} onClick={save}>
-          Guardar
+          {t('common:save')}
         </Button>
       </section>
 
@@ -95,13 +97,13 @@ export default function BoxesPage() {
                 <span className="truncate text-[13.5px] font-semibold text-ink">{b.name}</span>
                 {b.accumulated !== null && (
                   <span className="rounded-full bg-surface-alt px-2 py-px text-[10.5px] font-bold text-ink-3">
-                    fondo
+                    {t('editor.fundBadge')}
                   </span>
                 )}
                 <button
                   onClick={() => setEditing(b)}
                   className="shrink-0 rounded-lg p-1 text-ink-3 transition-colors hover:bg-surface-alt hover:text-ink"
-                  title="Editar caja"
+                  title={t('editor.editBox')}
                 >
                   <Pencil className="size-3.5" />
                 </button>
@@ -151,14 +153,12 @@ export default function BoxesPage() {
         trigger={
           <Button variant="outline" className="w-full gap-2">
             <PackagePlus className="size-4" />
-            Nueva caja
+            {t('editor.newBox')}
           </Button>
         }
       />
 
-      <p className="text-center text-xs text-ink-3">
-        Los cambios aplican a ingresos futuros — el historial conserva su reparto original.
-      </p>
+      <p className="text-center text-xs text-ink-3">{t('editor.futureNote')}</p>
 
       <EditBoxDialog box={editing} onClose={() => setEditing(null)} />
     </div>
