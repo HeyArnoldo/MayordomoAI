@@ -25,7 +25,8 @@ export class User {
   @Column({ type: 'varchar', length: 64, nullable: true, unique: true })
   googleId: string | null;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  // text: las URLs de avatar de Google pueden superar cualquier varchar fijo.
+  @Column({ type: 'text', nullable: true })
   avatarUrl: string | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
