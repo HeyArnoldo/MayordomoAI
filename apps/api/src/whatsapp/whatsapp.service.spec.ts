@@ -85,8 +85,6 @@ const makeTranscription = () => ({
   transcribe: jest.fn().mockResolvedValue(null),
 });
 
-const makeRecurring = () => ({});
-
 function makeService(
   overrides: {
     evolution?: ReturnType<typeof makeEvolution>;
