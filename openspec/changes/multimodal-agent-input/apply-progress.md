@@ -241,3 +241,17 @@ Send the same receipt via web and via WhatsApp. Confirm that the agent produces 
 - [ ] I1 — Full API test run (already done as gate: 180 tests pass)
 - [ ] I2 — Run migration on local dev DB (already done in PR1: `1781453249102-AddMediaContextToMessage.ts` applied)
 - [ ] I3 — Manual end-to-end verification (steps documented above)
+
+---
+
+## Coverage Gap Closure (post-review)
+
+Two coverage gaps identified by a fresh review of `whatsapp.service.spec.ts` were closed:
+
+- **Test: oversized image → imageTooLarge, agent NOT called** — Confirmed that when `getBase64` returns a base64 string whose decoded size exceeds `MAX_IMAGE_BYTES` (4MB), the `imageTooLarge` i18n key is sent to the user via `evolution.sendText`, `agent.run` is NOT called, and the pipeline does not throw. Exercises the `base64Bytes(base64) > MAX_IMAGE_BYTES` guard at `whatsapp.service.ts:169`.
+
+- **Test: non-empty history → no duplicate current turn, image present** — Confirmed that when `listMessages` returns prior turns plus the just-appended caption row (mirroring the real flow where `appendMessage` runs before `historyAsModelMessages`), the `slice(0, -1)` at `whatsapp.service.ts:202` correctly drops that caption row, and `agent.run` receives exactly the prior turns plus one multimodal current turn (image part + caption text part), with no plain-text duplicate of the caption.
+
+Files: `apps/api/src/whatsapp/whatsapp.service.spec.ts`
+Commit: `784002e` — `test(whatsapp): cover image size guard and history dedup branches`
+Total tests after: 182 (all GREEN).
