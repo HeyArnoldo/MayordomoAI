@@ -5,6 +5,10 @@ export const api = {
     voiceNotUnderstood: 'No pude escuchar esa nota de voz. ¿Me lo escribes?',
     imageNotUnderstood: 'No pude procesar esa imagen. ¿Puedes intentarlo de nuevo?',
     imageTooLarge: 'Esa imagen supera el límite de 4 MB. Envía una imagen más pequeña.',
+    documentNotUnderstood: 'No pude procesar ese documento. ¿Puedes intentarlo de nuevo?',
+    documentTooLarge: 'Ese documento supera el límite de 8 MB.',
+    documentNoText:
+      'No pude leer texto en ese documento. El PDF parece ser escaneado — el reconocimiento óptico aún no está disponible.',
     textOnly: 'Por ahora solo entiendo texto y notas de voz. 📝',
     expenseLogged: '✓ Anotado {{amount}} en {{box}}. Te quedan {{balance}}.',
     incomeLogged: '✓ {{amount}} repartidos: {{parts}}',

@@ -1,11 +1,25 @@
 import { z } from 'zod';
 
-export const mediaItemSchema = z.object({
+const imageMediaItemSchema = z.object({
   type: z.literal('image'),
   mediaType: z.string(),
   filename: z.string().nullable(),
   size: z.number().int().nullable(),
 });
+
+const documentMediaItemSchema = z.object({
+  type: z.literal('document'),
+  mediaType: z.string(),
+  filename: z.string().nullable(),
+  size: z.number().int().nullable(),
+  /** PDF only — undefined for other formats. */
+  pageCount: z.number().int().nullable().optional(),
+});
+
+export const mediaItemSchema = z.discriminatedUnion('type', [
+  imageMediaItemSchema,
+  documentMediaItemSchema,
+]);
 export type MediaItem = z.infer<typeof mediaItemSchema>;
 
 export enum Channel {
