@@ -135,6 +135,35 @@ No `allowBuilds` changes needed — none of the new deps require native build sc
 
 ---
 
+## Judgment-Day Fixes (post-PR2 fresh review)
+
+**Branch:** `feat/document-input-channels` — no push, no PR.
+**Commits:** `3bc6739`, `7b15b31`
+
+### Tests added (Fix 1 + Fix 2)
+
+| File                       | New test                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `whatsapp.service.spec.ts` | Unsupported MIME (`application/zip`) → `documentNotUnderstood`, `agent.run` NOT called                   |
+| `whatsapp.service.spec.ts` | Strengthen success test: extracted body (`EXTRACTED_DOC_BODY`) must appear in text passed to `agent.run` |
+| `chat.controller.spec.ts`  | Valid PDF upload: extracted text in current-turn model message, no `file` part remains                   |
+
+### Refactor (Fix 3)
+
+- `apps/api/src/chat/chat.controller.ts` (~262-275): collapsed `if (err instanceof DocumentExtractionError)` + duplicate fallback into single `catch` block. Removed now-unused `DocumentExtractionError` import.
+- `apps/api/src/whatsapp/whatsapp.service.ts` (~304-315): collapsed identical `DocumentExtractionError`-branch + fallback into single `catch` block. Removed now-unused `DocumentExtractionError` import.
+
+### Gate results (judgment-day run)
+
+| Gate                                      | Result                                      |
+| ----------------------------------------- | ------------------------------------------- |
+| `pnpm --filter "./packages/**" run build` | PASS                                        |
+| `pnpm lint`                               | PASS (0 errors, pre-existing warnings only) |
+| `pnpm typecheck` (ROOT)                   | PASS                                        |
+| `pnpm test` (ROOT)                        | PASS — **277 tests**, 21 suites (+2 vs PR2) |
+
+---
+
 ## Manual Verification Steps (Phase 5.2 / 5.3 / 5.4)
 
 ### Web channel (5.2) — requires running API + Postgres
