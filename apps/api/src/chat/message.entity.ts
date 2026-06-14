@@ -7,7 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Channel, MessageRole } from '@app/contracts';
+import { Channel, MediaItem, MessageRole } from '@app/contracts';
 import { Conversation } from './conversation.entity';
 
 /**
@@ -39,6 +39,9 @@ export class Message {
 
   @Column({ type: 'jsonb', nullable: true })
   toolCalls: unknown | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  mediaContext: MediaItem[] | null;
 
   @CreateDateColumn()
   createdAt: Date;

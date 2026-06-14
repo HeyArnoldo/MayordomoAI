@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Channel, MessageRole } from '@app/contracts';
+import { Channel, MediaItem, MessageRole } from '@app/contracts';
 import { AppException } from '../common/errors/app.exception';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
@@ -112,9 +112,17 @@ export class ConversationsService {
     content: string,
     channel: Channel,
     toolCalls: unknown | null = null,
+    mediaContext: MediaItem[] | null = null,
   ): Promise<Message> {
     const msg = await this.messages.save(
-      this.messages.create({ conversationId: conv.id, role, content, channel, toolCalls }),
+      this.messages.create({
+        conversationId: conv.id,
+        role,
+        content,
+        channel,
+        toolCalls,
+        mediaContext,
+      }),
     );
     conv.lastAt = new Date();
     await this.conversations.save(conv);

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export const mediaItemSchema = z.object({
+  type: z.literal('image'),
+  mediaType: z.string(),
+  filename: z.string().nullable(),
+  size: z.number().int().nullable(),
+});
+export type MediaItem = z.infer<typeof mediaItemSchema>;
+
 export enum Channel {
   WHATSAPP = 'whatsapp',
   WEB = 'web',
@@ -38,6 +46,7 @@ export const messageSchema = z.object({
   channel: z.enum(Channel),
   toolCalls: z.unknown().nullable(),
   createdAt: z.string(),
+  mediaContext: z.array(mediaItemSchema).nullable().optional(),
 });
 export type Message = z.infer<typeof messageSchema>;
 
