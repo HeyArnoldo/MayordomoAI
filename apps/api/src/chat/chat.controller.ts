@@ -37,7 +37,14 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { User } from '../users/user.entity';
 import { AgentService } from '../agent/agent.service';
 import { TranscriptionService } from '../whatsapp/transcription.service';
-import { validateImageParts, stripImagesFromHistory } from '../agent/media.helpers';
+import {
+  validateImageParts,
+  validateDocument,
+  isLowText,
+  stripMediaFromHistory,
+} from '../agent/media.helpers';
+import { extractDocumentText, DocumentExtractionError } from '../agent/document.extract';
+import { MAX_DOCUMENTS, DOCUMENT_MIME_ALLOWLIST } from '../agent/media.constants';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
 import { ConversationsService } from './conversations.service';
@@ -189,35 +196,164 @@ export class ChatController {
       const fileParts = last.parts.filter(
         (p): p is Extract<typeof p, { type: 'file' }> => p.type === 'file',
       );
+
       if (fileParts.length > 0) {
-        try {
-          mediaContext = validateImageParts(
-            fileParts.map((p) => ({
-              type: 'file' as const,
-              mediaType: p.mediaType ?? '',
-              filename: 'filename' in p && typeof p.filename === 'string' ? p.filename : undefined,
-              url: p.url ?? '',
-            })),
-          );
-        } catch {
+        // Branch file parts into images vs documents by MIME type.
+        // Anything with an image/* MIME that is NOT in the document allowlist = image.
+        // Anything in the DOCUMENT_MIME_ALLOWLIST = document.
+        // Anything else (e.g. application/msword — unsupported doc format) = document attempt,
+        // which will fail validateDocument with document_rejected.
+        const imageParts = fileParts.filter(
+          (p) =>
+            (p.mediaType ?? '').startsWith('image/') &&
+            !(DOCUMENT_MIME_ALLOWLIST as readonly string[]).includes(p.mediaType ?? ''),
+        );
+        const documentParts = fileParts.filter((p) => !(p.mediaType ?? '').startsWith('image/'));
+
+        // Mixed image+document in one turn: reject with document_rejected (design §5.2).
+        if (imageParts.length > 0 && documentParts.length > 0) {
           throw new AppException(
-            'chat.image_rejected',
+            'chat.document_rejected',
             HttpStatus.BAD_REQUEST,
-            'Image validation failed: unsupported type, size, or count.',
+            'Mixed image and document attachments in a single turn are not supported.',
           );
+        }
+
+        if (documentParts.length > 0) {
+          // ── Document branch ────────────────────────────────────────────────
+          if (documentParts.length > MAX_DOCUMENTS) {
+            throw new AppException(
+              'chat.document_rejected',
+              HttpStatus.BAD_REQUEST,
+              `Too many documents: maximum ${MAX_DOCUMENTS} allowed per turn.`,
+            );
+          }
+
+          const docPart = documentParts[0];
+          const partUrl = docPart.url ?? '';
+          const partFilename =
+            'filename' in docPart && typeof docPart.filename === 'string'
+              ? docPart.filename
+              : undefined;
+
+          let docMeta: MediaItem;
+          try {
+            docMeta = validateDocument({
+              mediaType: docPart.mediaType ?? '',
+              filename: partFilename,
+              url: partUrl,
+            });
+          } catch {
+            throw new AppException(
+              'chat.document_rejected',
+              HttpStatus.BAD_REQUEST,
+              'Document validation failed: unsupported type, size, or format.',
+            );
+          }
+
+          // Decode base64 buffer from data URL
+          const commaIdx = partUrl.indexOf(',');
+          const b64 = commaIdx >= 0 ? partUrl.slice(commaIdx + 1) : '';
+          const buffer = Buffer.from(b64, 'base64');
+
+          let extractResult: Awaited<ReturnType<typeof extractDocumentText>>;
+          try {
+            extractResult = await extractDocumentText(buffer, docPart.mediaType ?? '');
+          } catch (err) {
+            if (err instanceof DocumentExtractionError) {
+              throw new AppException(
+                'chat.document_rejected',
+                HttpStatus.BAD_REQUEST,
+                'Document text extraction failed.',
+              );
+            }
+            throw new AppException(
+              'chat.document_rejected',
+              HttpStatus.BAD_REQUEST,
+              'Document text extraction failed.',
+            );
+          }
+
+          if (isLowText(extractResult.text)) {
+            throw new AppException(
+              'chat.document_rejected',
+              HttpStatus.BAD_REQUEST,
+              'The document contains no selectable text (possible scanned/image-only PDF).',
+            );
+          }
+
+          // Build mediaContext item (no binary, no extracted text)
+          const docMediaItem: MediaItem = {
+            type: 'document',
+            mediaType: docMeta.mediaType,
+            filename: docMeta.filename,
+            size: docMeta.size,
+            pageCount: extractResult.pageCount ?? null,
+          };
+          mediaContext = [docMediaItem];
+
+          // Inject extracted text into the user's message parts (replace the file part).
+          // The injected text is only for the model turn — it is NOT persisted.
+          const extractedText = extractResult.truncated
+            ? `${extractResult.text}\n\n[Note: document truncated to fit limits — some content omitted]`
+            : extractResult.text;
+
+          const filename = partFilename ?? docPart.mediaType ?? 'document';
+          const injectedTextPart = {
+            type: 'text' as const,
+            text: `Document: ${filename}\n\n${extractedText}`,
+          };
+
+          // Replace the document file part with the injected text part in last.parts.
+          const newParts = last.parts
+            .filter((p) => p !== docPart)
+            .concat(injectedTextPart as (typeof last.parts)[number]);
+          // Mutate body.messages so convertToModelMessages sees the injected text
+          body.messages[body.messages.length - 1] = { ...last, parts: newParts };
+        } else if (imageParts.length > 0) {
+          // ── Image branch (unchanged) ───────────────────────────────────────
+          try {
+            mediaContext = validateImageParts(
+              imageParts.map((p) => ({
+                type: 'file' as const,
+                mediaType: p.mediaType ?? '',
+                filename:
+                  'filename' in p && typeof p.filename === 'string' ? p.filename : undefined,
+                url: p.url ?? '',
+              })),
+            );
+          } catch {
+            throw new AppException(
+              'chat.image_rejected',
+              HttpStatus.BAD_REQUEST,
+              'Image validation failed: unsupported type, size, or count.',
+            );
+          }
         }
       }
     }
 
     if (last?.role === 'user') {
       // En un "reintentar" el último user ya está persistido: no duplicar.
-      const text = uiMessageText(last);
+      // For the document branch we persist ONLY the caption (or placeholder),
+      // never the injected extracted text. We read the caption from the ORIGINAL
+      // `last` message (before we replaced its parts with the injected text).
+      const persistContent = (() => {
+        if (mediaContext?.length && mediaContext[0].type === 'document') {
+          // Caption = any text part in the ORIGINAL last message (before injection)
+          const caption = uiMessageText(last);
+          if (caption.trim()) return caption;
+          const fname = mediaContext[0].filename ?? 'document';
+          return `[document: ${fname}]`;
+        }
+        return uiMessageText(last);
+      })();
       const prev = await this.conversations.lastMessage(conv.id);
-      if (!(prev?.role === MessageRole.USER && prev.content === text)) {
+      if (!(prev?.role === MessageRole.USER && prev.content === persistContent)) {
         await this.conversations.appendMessage(
           conv,
           MessageRole.USER,
-          text,
+          persistContent,
           Channel.WEB,
           null,
           mediaContext,
@@ -225,8 +361,9 @@ export class ChatController {
       }
     }
 
-    // Strip image binaries from past messages (cost guardrail); keep last user's file parts.
-    const stripped = stripImagesFromHistory(body.messages);
+    // Strip media (image/document) binaries from past messages (cost guardrail);
+    // keep last user's file parts intact for the current model turn.
+    const stripped = stripMediaFromHistory(body.messages);
     const modelMessages = await convertToModelMessages(stripped);
     const result = this.agent.run(
       user.id,
