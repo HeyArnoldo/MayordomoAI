@@ -1,11 +1,20 @@
 import { UIMessage } from 'ai';
 import { MediaItem } from '@app/contracts';
-import { MAX_IMAGE_BYTES, MAX_IMAGES } from './media.constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGES,
+  MAX_DOCUMENT_BYTES,
+  MIN_EXTRACTED_CHARS,
+  DOCUMENT_MIME_ALLOWLIST,
+} from './media.constants';
 import {
   base64Bytes,
   stripImagesFromHistory,
+  stripMediaFromHistory,
   toImagePart,
   validateImageParts,
+  validateDocument,
+  isLowText,
 } from './media.helpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -372,5 +381,262 @@ describe('stripImagesFromHistory', () => {
     expect(result.find((m) => m.id === 'asst')!.parts).toHaveLength(1);
     // last user: kept
     expect(result.find((m) => m.id === 'lu')!.parts.some((p) => p.type === 'file')).toBe(true);
+  });
+});
+
+// ── B6: validateDocument ──────────────────────────────────────────────────────
+
+describe('validateDocument', () => {
+  const validMime = DOCUMENT_MIME_ALLOWLIST[0]; // 'application/pdf'
+  const docxMime = DOCUMENT_MIME_ALLOWLIST[1]; // docx
+
+  function makeDocDataUrl(mime: string, sizeBytes: number): string {
+    const buf = Buffer.alloc(sizeBytes, 0);
+    const b64 = buf.toString('base64');
+    return `data:${mime};base64,${b64}`;
+  }
+
+  it('accepts a valid PDF within size limit and returns MediaItem with type=document', () => {
+    const url = makeDocDataUrl(validMime, 100);
+    const result = validateDocument({ mediaType: validMime, filename: 'statement.pdf', url });
+    const item: MediaItem = result;
+    expect(item.type).toBe('document');
+    expect(item.mediaType).toBe(validMime);
+    expect(item.filename).toBe('statement.pdf');
+    expect(typeof item.size).toBe('number');
+    expect(item.size).toBeGreaterThan(0);
+  });
+
+  it('accepts all DOCUMENT_MIME_ALLOWLIST types', () => {
+    for (const mime of DOCUMENT_MIME_ALLOWLIST) {
+      const url = makeDocDataUrl(mime, 100);
+      expect(() => validateDocument({ mediaType: mime, url })).not.toThrow();
+    }
+  });
+
+  it('throws when MIME type is not in DOCUMENT_MIME_ALLOWLIST', () => {
+    const url = makeDocDataUrl('application/octet-stream', 100);
+    expect(() => validateDocument({ mediaType: 'application/octet-stream', url })).toThrow();
+  });
+
+  it('throws when image MIME type is given', () => {
+    const url = makeDocDataUrl('image/jpeg', 100);
+    expect(() => validateDocument({ mediaType: 'image/jpeg', url })).toThrow();
+  });
+
+  it('throws when url does not start with data:', () => {
+    expect(() =>
+      validateDocument({
+        mediaType: validMime,
+        url: 'blob:http://localhost/abc',
+      }),
+    ).toThrow();
+  });
+
+  it('accepts file at exactly MAX_DOCUMENT_BYTES (size boundary inclusive)', () => {
+    const url = makeDocDataUrl(validMime, MAX_DOCUMENT_BYTES);
+    expect(() => validateDocument({ mediaType: validMime, url })).not.toThrow();
+    const item = validateDocument({ mediaType: validMime, url });
+    expect(item.size).toBe(MAX_DOCUMENT_BYTES);
+  });
+
+  it('throws when file exceeds MAX_DOCUMENT_BYTES', () => {
+    const url = makeDocDataUrl(validMime, MAX_DOCUMENT_BYTES + 1);
+    expect(() => validateDocument({ mediaType: validMime, url })).toThrow();
+  });
+
+  it('accepts a WhatsApp-style call (size provided directly, no url)', () => {
+    const result = validateDocument({
+      mediaType: docxMime,
+      filename: 'report.docx',
+      size: 1024,
+    });
+    expect(result.type).toBe('document');
+    expect(result.size).toBe(1024);
+  });
+
+  it('throws when WhatsApp-style size exceeds MAX_DOCUMENT_BYTES', () => {
+    expect(() =>
+      validateDocument({ mediaType: validMime, size: MAX_DOCUMENT_BYTES + 1 }),
+    ).toThrow();
+  });
+
+  it('returns null filename when not provided', () => {
+    const url = makeDocDataUrl(validMime, 100);
+    const item = validateDocument({ mediaType: validMime, url });
+    expect(item.filename).toBeNull();
+  });
+
+  it('does not include pageCount (caller fills it after extraction)', () => {
+    const url = makeDocDataUrl(validMime, 100);
+    const item = validateDocument({ mediaType: validMime, url });
+    // pageCount should not be set by validateDocument
+    expect((item as { pageCount?: number }).pageCount).toBeUndefined();
+  });
+});
+
+// ── B7: isLowText ─────────────────────────────────────────────────────────────
+
+describe('isLowText', () => {
+  it('returns true when text is empty', () => {
+    expect(isLowText('')).toBe(true);
+  });
+
+  it('returns true when text is whitespace-only', () => {
+    expect(isLowText('   \n\t  ')).toBe(true);
+  });
+
+  it('returns true when trimmed text is below MIN_EXTRACTED_CHARS', () => {
+    const shortText = 'a'.repeat(MIN_EXTRACTED_CHARS - 1);
+    expect(isLowText(shortText)).toBe(true);
+  });
+
+  it('returns false when trimmed text equals MIN_EXTRACTED_CHARS', () => {
+    const atThreshold = 'a'.repeat(MIN_EXTRACTED_CHARS);
+    expect(isLowText(atThreshold)).toBe(false);
+  });
+
+  it('returns false when text is well above MIN_EXTRACTED_CHARS', () => {
+    expect(isLowText('This is a normal document with enough text to read.')).toBe(false);
+  });
+
+  it('returns true for a single character (below threshold)', () => {
+    expect(isLowText('x')).toBe(true);
+  });
+
+  it('returns true for text with only newlines', () => {
+    expect(isLowText('\n\n\n\n\n')).toBe(true);
+  });
+});
+
+// ── B8: stripMediaFromHistory ─────────────────────────────────────────────────
+
+function makeDocFilePart(filename = 'statement.pdf', mime = 'application/pdf') {
+  return {
+    type: 'file' as const,
+    mediaType: mime,
+    filename,
+    url: 'data:application/pdf;base64,dGVzdA==',
+  };
+}
+
+function makeImageFilePart(filename = 'photo.jpg', mime = 'image/jpeg') {
+  return {
+    type: 'file' as const,
+    mediaType: mime,
+    filename,
+    url: makeDataUrl(mime, makeBase64OfSize(100)),
+  };
+}
+
+describe('stripMediaFromHistory', () => {
+  it('replaces image file parts with [image: <label>] placeholder in older messages', () => {
+    const older = makeMessage('user', [makeImageFilePart() as UIMessage['parts'][number]], 'old');
+    const last = makeMessage('user', [makeTextPart('hello')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+
+    const olderResult = result.find((m) => m.id === 'old')!;
+    expect(olderResult.parts).toHaveLength(1);
+    expect((olderResult.parts[0] as { text: string }).text).toMatch(/^\[image:/);
+  });
+
+  it('replaces document file parts with [document: <label>] placeholder in older messages', () => {
+    const older = makeMessage('user', [makeDocFilePart() as UIMessage['parts'][number]], 'old');
+    const last = makeMessage('user', [makeTextPart('hello')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+
+    const olderResult = result.find((m) => m.id === 'old')!;
+    expect(olderResult.parts).toHaveLength(1);
+    expect((olderResult.parts[0] as { text: string }).text).toMatch(/^\[document:/);
+  });
+
+  it('uses the filename in the document placeholder', () => {
+    const older = makeMessage(
+      'user',
+      [makeDocFilePart('bank-statement.pdf') as UIMessage['parts'][number]],
+      'old',
+    );
+    const last = makeMessage('user', [makeTextPart('hi')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+
+    const olderResult = result.find((m) => m.id === 'old')!;
+    expect((olderResult.parts[0] as { text: string }).text).toBe('[document: bank-statement.pdf]');
+  });
+
+  it('handles mixed image + document in the same older message', () => {
+    const older = makeMessage(
+      'user',
+      [
+        makeImageFilePart('receipt.jpg') as UIMessage['parts'][number],
+        makeDocFilePart('statement.pdf') as UIMessage['parts'][number],
+      ],
+      'old',
+    );
+    const last = makeMessage('user', [makeTextPart('hi')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+
+    const olderResult = result.find((m) => m.id === 'old')!;
+    const texts = olderResult.parts.map((p) => (p as { text: string }).text);
+    expect(texts.some((t) => t.startsWith('[image:'))).toBe(true);
+    expect(texts.some((t) => t.startsWith('[document:'))).toBe(true);
+  });
+
+  it('leaves the last user message intact', () => {
+    const last = makeMessage(
+      'user',
+      [makeDocFilePart() as UIMessage['parts'][number], makeTextPart('summarize this')],
+      'last',
+    );
+    const result = stripMediaFromHistory([last]);
+    const lastResult = result.find((m) => m.id === 'last')!;
+    expect(lastResult.parts.some((p) => p.type === 'file')).toBe(true);
+  });
+
+  it('returns same reference for messages with no file parts (no mutation)', () => {
+    const msg = makeMessage('user', [makeTextPart('just text')], 'pure');
+    const last = makeMessage('user', [makeTextPart('hello')], 'last');
+    const result = stripMediaFromHistory([msg, last]);
+    expect(result.find((m) => m.id === 'pure')).toBe(msg);
+  });
+
+  it('does not mutate input messages', () => {
+    const older = makeMessage('user', [makeDocFilePart() as UIMessage['parts'][number]], 'old');
+    const last = makeMessage('user', [makeTextPart('hi')], 'last');
+    const before = JSON.parse(JSON.stringify(older.parts));
+    stripMediaFromHistory([older, last]);
+    expect(JSON.parse(JSON.stringify(older.parts))).toEqual(before);
+  });
+
+  it('returns empty array unchanged', () => {
+    expect(stripMediaFromHistory([])).toHaveLength(0);
+  });
+
+  it('handles DOCX mime type as document placeholder', () => {
+    const older = makeMessage(
+      'user',
+      [
+        makeDocFilePart(
+          'report.docx',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ) as UIMessage['parts'][number],
+      ],
+      'old',
+    );
+    const last = makeMessage('user', [makeTextPart('hi')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+    const olderResult = result.find((m) => m.id === 'old')!;
+    expect((olderResult.parts[0] as { text: string }).text).toMatch(/^\[document:/);
+  });
+
+  it('preserves existing image behavior: uses filename as label', () => {
+    const older = makeMessage(
+      'user',
+      [makeImageFilePart('myreceipt.jpg') as UIMessage['parts'][number]],
+      'old',
+    );
+    const last = makeMessage('user', [makeTextPart('hi')], 'last');
+    const result = stripMediaFromHistory([older, last]);
+    const olderResult = result.find((m) => m.id === 'old')!;
+    expect((olderResult.parts[0] as { text: string }).text).toBe('[image: myreceipt.jpg]');
   });
 });
