@@ -101,3 +101,48 @@ No `allowBuilds` changes needed — none of the new deps require native build sc
 - `@types/mammoth` is not in the npm registry (404). mammoth ships its own TypeScript declarations in the package — no external `@types` needed. Verified: `tsc --noEmit` passes without it.
 - `stripImagesFromHistory` import site (`chat.controller.ts`) NOT updated in PR1 to keep this branch minimal. The alias ensures backward compatibility until PR2 updates it.
 - XLSX was included (not deferred to Slice 2b) — budget was acceptable since dispatcher tests use mocks (no real XLSX library overhead in test suite).
+
+---
+
+## Post-review surgical fixes (judgment-day)
+
+Fresh-review findings fixed on this branch:
+
+- **B1 (BLOCKER) — pdf-parse v2 API mismatch.** `extractPdf` was written for pdf-parse v1
+  (callable default, `{max}` option, `{text, numpages}` result) but the installed runtime is
+  v2.4.5, which exports a `PDFParse` CLASS. Rewrote `extractPdf` to the real v2 API:
+  `const { PDFParse } = require('pdf-parse'); const parser = new PDFParse({ data: buffer });
+const res = await parser.getText({ first: MAX_PDF_PAGES }); /* res.text, res.total */`
+  with `await parser.destroy()` in a `finally`. `pageCount` now reads `res.total`; truncation
+  is flagged when `res.total > MAX_PDF_PAGES`. Removed devDependency `@types/pdf-parse@^1.1.5`
+  (v1 type package paired with a v2 runtime; v2 ships its own types). Lockfile updated.
+- **S1 (SHOULD-FIX) — real round-trip tests.** Fixed the pdf-parse mock to the real v2 shape
+  (`PDFParse` class, `getText`→`{text,total}`, `destroy`). Added a committed minimal PDF fixture
+  (`src/agent/__fixtures__/sample.pdf`, text "Hello PDF World") and a genuine unmocked PDF
+  round-trip. pdf-parse v2 (pdfjs-dist) sets up its worker via a dynamic `import()` the ts-jest
+  CommonJS VM cannot run, so the PDF round-trip runs the REAL `extractDocumentText` in a separate
+  Node process via ts-node (`src/agent/__fixtures__/pdf-roundtrip-runner.ts`), invoked with
+  `execFileSync`. Added a real XLSX write-then-read round-trip (in-memory workbook via the real
+  `xlsx` lib). DOCX stays mocked (a valid minimal .docx is impractical in-test) with a comment;
+  the mock matches mammoth's real `{ value, messages }` shape.
+- **S2 (SHOULD-FIX) — RFC-4180 CSV parsing.** Replaced naive `split(',')` with a correct
+  `parseCsv` (exported) handling quoted commas, embedded newlines, and escaped quotes (`""`),
+  accepting `\n` and `\r\n`, dropping blank lines, and capping at `MAX_TABULAR_ROWS`. Added
+  unit tests for each case.
+- **N2 (NITPICK) — image placeholder.** Restored the image-variant fallback in
+  `media.helpers.ts` `stripMediaFromHistory`: image-only output is byte-identical to the old
+  `stripImagesFromHistory` (`[image: image]` when no filename/mediaType); documents fall back
+  to `[document: document]`.
+
+### Discovery (test-environment, not a production bug)
+
+pdf-parse v2 cannot execute inside the ts-jest CommonJS VM (pdfjs-dist requires
+`--experimental-vm-modules` for its worker's dynamic import). Production Node runs it fine
+(verified via direct `node` and ts-node). Hence the out-of-process round-trip runner instead of
+switching the whole Jest config to ESM.
+
+### Gates (ROOT, all pass)
+
+`pnpm install --frozen-lockfile`, `pnpm --filter "./packages/**" run build`, `pnpm lint`
+(0 errors), `pnpm typecheck`, `pnpm build`, `pnpm test` — **243 tests pass** (was 233-ish before
+these additions; +10 new tests: 7 parseCsv, 1 real PDF round-trip, 1 real XLSX round-trip, 1 DOCX).

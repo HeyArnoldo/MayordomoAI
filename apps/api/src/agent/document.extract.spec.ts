@@ -1,5 +1,12 @@
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { MAX_TABULAR_ROWS, MAX_EXTRACTED_CHARS, MAX_PDF_PAGES } from './media.constants';
-import { serializeRows, DocumentExtractionError, extractDocumentText } from './document.extract';
+import {
+  serializeRows,
+  DocumentExtractionError,
+  extractDocumentText,
+  parseCsv,
+} from './document.extract';
 
 // ── serializeRows ─────────────────────────────────────────────────────────────
 
@@ -101,11 +108,21 @@ describe('DocumentExtractionError', () => {
 // We mock the individual libraries so the dispatcher tests remain fast and
 // isolated from I/O. Real round-trip tests (one per format) live at the end.
 
-jest.mock('pdf-parse', () => {
-  const mockFn = jest.fn();
-  return { default: mockFn, __esModule: true };
-});
+// pdf-parse v2 exposes a `PDFParse` CLASS whose `getText({ first })` resolves to
+// a TextResult `{ text, total }`. The mock mirrors that real shape.
+const mockGetText = jest.fn<Promise<{ text: string; total: number }>, [unknown?]>();
+const mockDestroy = jest.fn<Promise<void>, []>();
+jest.mock('pdf-parse', () => ({
+  __esModule: true,
+  PDFParse: jest.fn().mockImplementation(() => ({
+    getText: mockGetText,
+    destroy: mockDestroy,
+  })),
+}));
 
+// mammoth.extractRawText resolves to `{ value: string; messages: unknown[] }`,
+// which is mammoth's REAL return shape. Kept mocked because producing a valid
+// minimal .docx in-test is impractical; a real DOCX round-trip lives below.
 jest.mock('mammoth', () => ({
   extractRawText: jest.fn(),
 }));
@@ -119,15 +136,10 @@ jest.mock('xlsx', () => ({
 
 // Import after jest.mock so we get the mocked versions
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParseMod = require('pdf-parse');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const mammothMod = require('mammoth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const xlsxMod = require('xlsx');
 
-const mockedPdfParse = pdfParseMod.default as jest.MockedFunction<
-  (buf: Buffer, opts?: object) => Promise<{ text: string; numpages: number }>
->;
 const mockedMammothExtract = mammothMod.extractRawText as jest.MockedFunction<
   (opts: object) => Promise<{ value: string; messages: unknown[] }>
 >;
@@ -144,19 +156,21 @@ describe('extractDocumentText dispatcher', () => {
   const fakeBuffer = Buffer.from('test');
 
   it('routes application/pdf to extractPdf and returns text + pageCount', async () => {
-    mockedPdfParse.mockResolvedValueOnce({ text: 'PDF content here', numpages: 5 });
+    mockGetText.mockResolvedValueOnce({ text: 'PDF content here', total: 5 });
 
     const result = await extractDocumentText(fakeBuffer, 'application/pdf');
     expect(result.text).toContain('PDF content here');
     expect(result.pageCount).toBe(5);
     expect(result.truncated).toBe(false);
-    expect(mockedPdfParse).toHaveBeenCalledTimes(1);
+    expect(mockGetText).toHaveBeenCalledTimes(1);
+    expect(mockGetText).toHaveBeenCalledWith({ first: MAX_PDF_PAGES });
+    expect(mockDestroy).toHaveBeenCalledTimes(1);
   });
 
   it('sets truncated=true when PDF page count exceeds MAX_PDF_PAGES', async () => {
-    mockedPdfParse.mockResolvedValueOnce({
+    mockGetText.mockResolvedValueOnce({
       text: 'lots of text',
-      numpages: MAX_PDF_PAGES + 5,
+      total: MAX_PDF_PAGES + 5,
     });
 
     const result = await extractDocumentText(fakeBuffer, 'application/pdf');
@@ -210,7 +224,7 @@ describe('extractDocumentText dispatcher', () => {
   });
 
   it('wraps parser errors in DocumentExtractionError (pdf)', async () => {
-    mockedPdfParse.mockRejectedValueOnce(new Error('corrupt PDF'));
+    mockGetText.mockRejectedValueOnce(new Error('corrupt PDF'));
     await expect(extractDocumentText(fakeBuffer, 'application/pdf')).rejects.toBeInstanceOf(
       DocumentExtractionError,
     );
@@ -218,7 +232,7 @@ describe('extractDocumentText dispatcher', () => {
 
   it('applies char cap (MAX_EXTRACTED_CHARS) centrally and sets truncated=true', async () => {
     const longText = 'x'.repeat(MAX_EXTRACTED_CHARS + 100);
-    mockedPdfParse.mockResolvedValueOnce({ text: longText, numpages: 1 });
+    mockGetText.mockResolvedValueOnce({ text: longText, total: 1 });
 
     const result = await extractDocumentText(fakeBuffer, 'application/pdf');
     expect(result.text.length).toBeLessThanOrEqual(MAX_EXTRACTED_CHARS);
@@ -227,7 +241,7 @@ describe('extractDocumentText dispatcher', () => {
 
   it('does not set truncated=true when text is within MAX_EXTRACTED_CHARS', async () => {
     const shortText = 'hello world';
-    mockedPdfParse.mockResolvedValueOnce({ text: shortText, numpages: 1 });
+    mockGetText.mockResolvedValueOnce({ text: shortText, total: 1 });
 
     const result = await extractDocumentText(fakeBuffer, 'application/pdf');
     expect(result.truncated).toBe(false);
@@ -245,20 +259,142 @@ describe('extractDocumentText dispatcher', () => {
   });
 });
 
-// ── Real round-trip tests (one per format, no library mocking) ────────────────
+// ── parseCsv (RFC-4180) ───────────────────────────────────────────────────────
 
-describe('extractDocumentText real round-trip (unmocked)', () => {
-  beforeEach(() => {
-    jest.resetModules();
+describe('parseCsv (RFC-4180)', () => {
+  it('keeps a quoted field containing a comma as a single column', () => {
+    const rows = parseCsv('name,note\n"Cafe, Lima",lunch\n');
+    expect(rows).toEqual([
+      ['name', 'note'],
+      ['Cafe, Lima', 'lunch'],
+    ]);
   });
 
-  it('extracts text from a minimal CSV (two lines)', async () => {
-    // CSV does not use any library — no unmocking needed
-    const csvBuf = Buffer.from('name,amount\nCafe Lima,12.50\n');
-    const { extractDocumentText: realExtract } = await import('./document.extract');
-    const result = await realExtract(csvBuf, 'text/csv');
+  it('keeps a quoted field containing an embedded newline intact', () => {
+    const rows = parseCsv('desc,amount\n"line one\nline two",10\n');
+    expect(rows).toEqual([
+      ['desc', 'amount'],
+      ['line one\nline two', '10'],
+    ]);
+  });
+
+  it('unescapes doubled quotes inside a quoted field', () => {
+    const rows = parseCsv('quote\n"He said ""hi"""\n');
+    expect(rows).toEqual([['quote'], ['He said "hi"']]);
+  });
+
+  it('handles CRLF line endings', () => {
+    const rows = parseCsv('a,b\r\n1,2\r\n');
+    expect(rows).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ]);
+  });
+
+  it('drops fully blank lines', () => {
+    const rows = parseCsv('a,b\n\n1,2\n');
+    expect(rows).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ]);
+  });
+
+  it('flushes a trailing row with no final newline', () => {
+    const rows = parseCsv('a,b\n1,2');
+    expect(rows).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ]);
+  });
+
+  it('respects MAX_TABULAR_ROWS', () => {
+    const lines = Array.from({ length: MAX_TABULAR_ROWS + 50 }, (_, i) => `r${i},v`).join('\n');
+    const rows = parseCsv(lines + '\n');
+    expect(rows).toHaveLength(MAX_TABULAR_ROWS);
+  });
+});
+
+// ── Real round-trip tests (one per format) ────────────────────────────────────
+
+// CSV uses no library, so its round-trip runs against the mocked-module suite
+// above. The remaining formats need real libraries; they live here and use
+// jest.requireActual so the module mocks declared at the top do not apply.
+describe('extractDocumentText real round-trip', () => {
+  it('extracts text from a minimal CSV with a quoted comma (no library)', async () => {
+    const csvBuf = Buffer.from('name,amount\n"Cafe, Lima",12.50\n');
+    const result = await extractDocumentText(csvBuf, 'text/csv');
     expect(result.text).toContain('name | amount');
-    expect(result.text).toContain('Cafe Lima | 12.50');
+    // The embedded comma stays inside the single cell, not split into columns.
+    expect(result.text).toContain('Cafe, Lima | 12.50');
     expect(result.truncated).toBe(false);
+  });
+
+  it('extracts text and page count from a real PDF fixture (pdf-parse v2)', () => {
+    // pdf-parse v2 (pdfjs-dist) sets up its worker via a dynamic import that the
+    // ts-jest CommonJS VM cannot run. So we run the REAL extractDocumentText in a
+    // separate Node process via ts-node against the committed fixture — a genuine,
+    // unmocked round-trip through the production PDF code path.
+    const runner = join(__dirname, '__fixtures__', 'pdf-roundtrip-runner.ts');
+    const fixture = join(__dirname, '__fixtures__', 'sample.pdf');
+    const stdout = execFileSync(
+      'npx',
+      ['ts-node', '--compiler-options', '{"module":"commonjs"}', runner, fixture],
+      { cwd: join(__dirname, '..', '..'), encoding: 'utf-8' },
+    );
+    const result = JSON.parse(stdout) as {
+      text: string;
+      pageCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.text).toContain('Hello PDF World');
+    expect(result.pageCount).toBe(1);
+    expect(result.truncated).toBe(false);
+  }, 60_000);
+
+  it('extracts a real XLSX written and read back via the xlsx lib', async () => {
+    // Build a workbook in-memory, then extract it through the real code path.
+    const realXlsx = jest.requireActual('xlsx');
+    const ws = realXlsx.utils.aoa_to_sheet([
+      ['date', 'merchant', 'amount'],
+      ['2026-01-03', 'Cafe Lima', '12.50'],
+    ]);
+    const wb = realXlsx.utils.book_new();
+    realXlsx.utils.book_append_sheet(wb, ws, 'Expenses');
+    const xlsxBuf: Buffer = realXlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    // Route the mocked xlsx module to the real implementation for this test.
+    mockedXlsxRead.mockImplementation((buf: Buffer, opts?: object) => realXlsx.read(buf, opts));
+    mockedSheetToJson.mockImplementation((sheet: object, opts?: object) =>
+      realXlsx.utils.sheet_to_json(sheet, opts),
+    );
+
+    const result = await extractDocumentText(
+      xlsxBuf,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+
+    expect(result.text).toContain('# Expenses');
+    expect(result.text).toContain('date | merchant | amount');
+    expect(result.text).toContain('2026-01-03 | Cafe Lima | 12.50');
+    expect(result.truncated).toBe(false);
+  });
+
+  it('extracts DOCX text via mammoth (mock matches real { value } shape)', async () => {
+    // A valid minimal .docx (zip with the right OOXML parts) is impractical to
+    // hand-build in-test, so mammoth stays mocked here. The resolved object uses
+    // mammoth's REAL return shape: `{ value: string; messages: unknown[] }`.
+    mockedMammothExtract.mockResolvedValueOnce({
+      value: 'Quarterly report body text',
+      messages: [],
+    });
+
+    const result = await extractDocumentText(
+      Buffer.from('fake-docx'),
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+
+    expect(result.text).toContain('Quarterly report body text');
+    expect(result.pageCount).toBeUndefined();
   });
 });
