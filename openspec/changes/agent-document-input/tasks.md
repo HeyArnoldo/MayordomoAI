@@ -115,14 +115,14 @@ All tasks in this phase follow RED → GREEN order. Write the failing spec first
 
 ## Phase 4: Channel Wiring — WU-2
 
-- [ ] 4.1 **RED** `apps/api/src/chat/chat.controller.spec.ts` — add tests for document branch:
+- [x] 4.1 **RED** `apps/api/src/chat/chat.controller.spec.ts` — add tests for document branch:
   - validate → extract → inject: `mediaContext` contains `type: 'document'` metadata; no extracted text in persisted content; content = caption or `[document: <name>]` placeholder.
   - Reject path: extraction throws → `AppException('chat.document_rejected', 400)`.
   - Low-text path: `isLowText` returns true → `AppException('chat.document_rejected', 400)`.
   - Count > `MAX_DOCUMENTS` → reject.
   - Mixed image+document → reject documents path (document rejected, image processed).
 
-- [ ] 4.2 **GREEN** `apps/api/src/chat/chat.controller.ts` — in the `if (last?.role === 'user')` file-parts block, add document branch:
+- [x] 4.2 **GREEN** `apps/api/src/chat/chat.controller.ts` — in the `if (last?.role === 'user')` file-parts block, add document branch:
   1. Collect `file` parts by mime: images vs documents.
   2. Validate document parts via `validateDocument`; wrap errors in `AppException('chat.document_rejected', 400)`.
   3. Decode base64 buffer from data URL.
@@ -133,7 +133,7 @@ All tasks in this phase follow RED → GREEN order. Write the failing spec first
   8. Persist: `content` = caption or `[document: <filename>]`, `mediaContext` = metadata only.
   9. Call `stripMediaFromHistory` (updated name) before passing history to `AgentService.run`.
 
-- [ ] 4.3 **RED** `apps/api/src/whatsapp/whatsapp.service.spec.ts` — add tests for `handleDocument`:
+- [x] 4.3 **RED** `apps/api/src/whatsapp/whatsapp.service.spec.ts` — add tests for `handleDocument`:
   - Happy path: `getBase64` → buffer → validate → extract → run agent → reply sent.
   - `getBase64` returns null → `documentNotUnderstood` reply, no agent call.
   - `getBase64` throws → `documentNotUnderstood` reply, logged.
@@ -142,7 +142,7 @@ All tasks in this phase follow RED → GREEN order. Write the failing spec first
   - AI disabled → `aiDisabled` reply (existing path).
   - Spec ref: WhatsApp Document Receive scenarios.
 
-- [ ] 4.4 **GREEN** `apps/api/src/whatsapp/whatsapp.service.ts` — add `documentMessage` payload type extension and `handleDocument(...)` method mirroring `handleImage`:
+- [x] 4.4 **GREEN** `apps/api/src/whatsapp/whatsapp.service.ts` — add `documentMessage` payload type extension and `handleDocument(...)` method mirroring `handleImage`:
   1. `getBase64(messageId)` in try/catch.
   2. `Buffer.from(base64, 'base64')`.
   3. `validateDocument({ mediaType: mimetype, size: buffer.length, filename })`.
@@ -153,14 +153,14 @@ All tasks in this phase follow RED → GREEN order. Write the failing spec first
   8. `stripMediaFromHistory` on history before agent run.
   9. In `processInbound`: add `if (data?.message?.documentMessage)` branch before the `!text` fallback.
 
-- [ ] 4.5 `apps/web/src/pages/chat.tsx` (or wherever `PromptInput` `accept`/`maxFileSize` are set) — extend `accept` with document MIME types; set `maxFileSize` to `MAX_DOCUMENT_BYTES` (8 MB); add inline comment explaining server enforces per-type cap (images 4 MB, docs 8 MB).
+- [x] 4.5 `apps/web/src/features/chat/chat-thread.tsx` — extend `accept` with document MIME types (PDF/DOCX/CSV/XLSX); set `maxFileSize` to `MAX_DOCUMENT_BYTES` (8 MB); add inline comment explaining server enforces per-type cap (images 4 MB, docs 8 MB).
   - TDD: N/A (UI hint); manual smoke test per 4.6.
 
 ---
 
 ## Phase 5: Integration & Gates
 
-- [ ] 5.1 ROOT CI gates — run in order and fix any failures before PR:
+- [x] 5.1 ROOT CI gates — run in order and fix any failures before PR:
   1. `pnpm install --frozen-lockfile` (lockfile must match after new deps).
   2. `pnpm --filter "./packages/**" run build` (contracts + i18n rebuilt).
   3. `pnpm lint`.

@@ -1,7 +1,7 @@
-# Apply Progress: agent-document-input (PR1 — WU-1)
+# Apply Progress: agent-document-input (PR1 + PR2 — WU-1 + WU-2)
 
-**Branch:** `feat/document-input-foundation`
-**Batch:** PR1 (Phases 1–3 = WU-1 complete)
+**Branch:** `feat/document-input-channels` (stacked on `feat/document-input-foundation`)
+**Batch:** PR2 (Phases 4–5 = WU-2 complete) — builds on PR1 (WU-1)
 **Status:** done — all ROOT gates pass
 
 ---
@@ -37,7 +37,9 @@
 
 ---
 
-## Commits (PR1)
+## Commits
+
+### PR1 (WU-1 — foundation)
 
 | Hash    | Subject                                                                                           |
 | ------- | ------------------------------------------------------------------------------------------------- |
@@ -45,6 +47,14 @@
 | 51322df | feat(contracts): mediaItem discriminated union, document_rejected code, doc constants and i18n    |
 | d224547 | feat(agent): document text extraction module (PDF, DOCX, CSV, XLSX) with TDD                      |
 | 2bf4b31 | feat(agent): document validation, isLowText helper, and generalize strip to stripMediaFromHistory |
+
+### PR2 (WU-2 — channel wiring)
+
+| Hash    | Subject                                                                |
+| ------- | ---------------------------------------------------------------------- |
+| 7348517 | feat(chat): document branch on POST /chat (extract + inject + persist) |
+| 3af7cf1 | feat(whatsapp): handle inbound document messages                       |
+| 4518b6e | feat(web): allow document attachments in composer                      |
 
 ---
 
@@ -63,6 +73,8 @@ No `allowBuilds` changes needed — none of the new deps require native build sc
 
 ## ROOT Gate Results
 
+### PR1 gates
+
 | Gate                                      | Result                                          |
 | ----------------------------------------- | ----------------------------------------------- |
 | `pnpm install --frozen-lockfile`          | PASS                                            |
@@ -70,37 +82,97 @@ No `allowBuilds` changes needed — none of the new deps require native build sc
 | `pnpm lint`                               | PASS (0 errors, pre-existing warnings only)     |
 | `pnpm typecheck` (ROOT)                   | PASS (no TS1360, no discriminated-union errors) |
 | `pnpm build`                              | PASS                                            |
-| `pnpm test`                               | PASS — 233 tests, 21 suites                     |
+| `pnpm test`                               | PASS — 243 tests, 21 suites                     |
+
+### PR2 gates (branch: feat/document-input-channels)
+
+| Gate                                      | Result                                        |
+| ----------------------------------------- | --------------------------------------------- |
+| `pnpm install --frozen-lockfile`          | PASS                                          |
+| `pnpm --filter "./packages/**" run build` | PASS                                          |
+| `pnpm lint`                               | PASS (0 errors, 4 pre-existing warnings only) |
+| `pnpm typecheck` (ROOT)                   | PASS                                          |
+| `pnpm build`                              | PASS (web build in 25s)                       |
+| `pnpm test`                               | PASS — 275 tests, 21 suites                   |
 
 ---
 
 ## Test Count
 
-- **Total API tests:** 233 (21 suites)
-- **New tests in this PR:**
-  - `document.extract.spec.ts`: 23 tests (serializeRows × 8, DocumentExtractionError × 4, dispatcher × 10, real CSV round-trip × 1)
+### PR1
+
+- **Total API tests:** 243 (21 suites, after judgment-day fixes)
+- **New tests in PR1:**
+  - `document.extract.spec.ts`: 23 tests + 10 post-review fixes (parseCsv × 7, real PDF/XLSX/DOCX round-trips)
   - `media.helpers.spec.ts` additions: 29 tests (validateDocument × 12, isLowText × 7, stripMediaFromHistory × 10)
-  - Total new: 52 tests
+  - Total new in PR1: ~52 tests
+
+### PR2
+
+- **Total API tests:** 275 (21 suites)
+- **New tests in PR2:**
+  - `chat.controller.spec.ts` additions: 19 document branch tests
+  - `whatsapp.service.spec.ts` additions: 15 handleDocument tests
+  - Total new in PR2: 34 tests
+- **Cumulative new tests (PR1 + PR2):** ~86 tests
 
 ---
 
-## What Remains for PR2 (WU-2)
+## Phase 4 — Channel Wiring (WU-2, PR2)
 
-- [ ] 4.1 RED: `chat.controller.spec.ts` — document branch tests
-- [ ] 4.2 GREEN: `chat.controller.ts` — document branch (validate → extract → inject → persist)
-- [ ] 4.3 RED: `whatsapp.service.spec.ts` — `handleDocument` tests
-- [ ] 4.4 GREEN: `whatsapp.service.ts` — `handleDocument` + `documentMessage` dispatch
-- [ ] 4.5 `apps/web/.../chat-thread.tsx` (or `chat.tsx`) — accept doc MIME types + maxFileSize update
-- Update `stripImagesFromHistory` import to `stripMediaFromHistory` in `chat.controller.ts`
-- Phases 5 (integration gates, manual smoke) apply to PR2 post-merge
+- [x] 4.1 RED: `chat.controller.spec.ts` — 19 new document branch tests (validate, extract, inject, persist, reject paths, mixed turn, strip)
+- [x] 4.2 GREEN: `chat.controller.ts` — document branch: MIME branching (image/\* vs doc/other), validateDocument, extractDocumentText, isLowText, inject extracted text into model turn, persist caption/placeholder + mediaContext only. Replace `stripImagesFromHistory` → `stripMediaFromHistory`.
+- [x] 4.3 RED: `whatsapp.service.spec.ts` — 15 new handleDocument tests (happy path, getBase64 null/throw, oversize, low-text, extract error, AI disabled, caption/no-caption)
+- [x] 4.4 GREEN: `whatsapp.service.ts` — `documentMessage` type extension + `handleDocument` method; dispatch branch in `processInbound` before `!text` fallback.
+- [x] 4.5 `apps/web/src/features/chat/chat-thread.tsx` — accept list extended with PDF/DOCX/CSV/XLSX; maxFileSize raised to 8 MB (MAX_DOCUMENT_BYTES); comment documents per-type server cap.
+
+## Phase 5 — Integration & Gates (WU-2, PR2)
+
+- [x] 5.1 ROOT CI gates — all PASS (see results below)
+- [ ] 5.2 Manual smoke — Web channel (pending post-merge with running Postgres+API)
+- [ ] 5.3 Manual smoke — WhatsApp channel (pending with Evolution instance)
+- [ ] 5.4 Verify history strip round-trip (manual)
 
 ---
 
-## Risks / Deviations
+## Manual Verification Steps (Phase 5.2 / 5.3 / 5.4)
+
+### Web channel (5.2) — requires running API + Postgres
+
+1. Open the chat web UI.
+2. Click the attachment (paperclip) button — confirm the file picker shows PDF, DOCX, CSV, XLSX MIME options.
+3. Attach a text-native PDF ≤ 8 MB + type a caption → send. Verify agent replies with a document summary.
+4. Attach a DOCX file → agent reads body text and replies.
+5. Attach a CSV file → agent can answer questions about the data rows.
+6. Attach an XLSX file → agent can read the first sheet's rows.
+7. Attach a file > 8 MB → toast shows the `chat.document_rejected` localized error message.
+8. Attach a scanned/image-only PDF (no selectable text) → toast shows the `chat.document_rejected` error.
+9. Attach an image AND a document in the same message → toast shows `chat.document_rejected` (mixed not allowed).
+
+### WhatsApp channel (5.3) — requires Evolution API + real WhatsApp number
+
+1. Send a PDF document message with a caption → agent replies with a document summary in WhatsApp.
+2. Send an oversize document (> 8 MB) → receive `documentTooLarge` WhatsApp reply.
+3. Send a scanned PDF (image-only) → receive `documentNoText` WhatsApp reply.
+4. Simulate getBase64 failure (e.g. disconnect Evolution, then send) → receive `documentNotUnderstood` reply.
+
+### History strip (5.4)
+
+1. Send a document via the web UI → agent replies.
+2. Send a follow-up text message in the same conversation.
+3. Check that the model does NOT receive the previously extracted document text in the history (only `[document: <filename>]` placeholder).
+4. Run `pnpm typecheck` after all changes — should still be green.
+
+---
+
+## Risks / Deviations (PR1 + PR2)
 
 - `@types/mammoth` is not in the npm registry (404). mammoth ships its own TypeScript declarations in the package — no external `@types` needed. Verified: `tsc --noEmit` passes without it.
-- `stripImagesFromHistory` import site (`chat.controller.ts`) NOT updated in PR1 to keep this branch minimal. The alias ensures backward compatibility until PR2 updates it.
+- `stripImagesFromHistory` import site updated in PR2 (`chat.controller.ts` now imports `stripMediaFromHistory` directly). The deprecated alias in `media.helpers.ts` can be removed in a cleanup PR.
 - XLSX was included (not deferred to Slice 2b) — budget was acceptable since dispatcher tests use mocks (no real XLSX library overhead in test suite).
+- **Evolution `documentMessage` envelope assumed**: The `documentMessage` type (`{ caption, mimetype, fileName }`) is based on Evolution API documentation and field naming conventions (mirroring `imageMessage`). The real envelope must be verified against an actual Evolution webhook payload before merging to production.
+- **@ai-sdk/react file-part shape for documents**: Documents arrive via the same `file` part mechanism as images (data-URL with MIME type). The controller branches on `image/*` prefix to separate image vs document parts. If AI-SDK adds a dedicated document part type in a future version, the branching logic should be updated.
+- **Mixed image+document** rejected by design (single-medium-per-turn for v1 simplicity). This is a known limitation documented in design §5.2.
 
 ---
 
