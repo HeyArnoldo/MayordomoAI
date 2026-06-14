@@ -45,6 +45,8 @@ export const errors = {
   chat: {
     audio_missing: 'Falta el audio',
     transcription_failed: 'No se pudo transcribir el audio',
+    image_rejected:
+      'No se pudo aceptar la imagen. Revisa el tipo de archivo, el tamaño y la cantidad de imágenes.',
   },
   agent: {
     ai_credentials_missing: 'El agente no está disponible en este momento',
