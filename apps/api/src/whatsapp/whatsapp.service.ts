@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ModelMessage } from 'ai';
+import { ImagePart, ModelMessage, TextPart, UserModelMessage } from 'ai';
 import {
   Channel,
   DEFAULT_LOCALE,
+  MediaItem,
   MessageRole,
   resolveCurrency,
   TransactionSource,
@@ -20,6 +21,8 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { AgentService } from '../agent/agent.service';
 import { isAiEnabled } from '../agent/ai.config';
 import { ConversationsService } from '../chat/conversations.service';
+import { base64Bytes, toImagePart } from '../agent/media.helpers';
+import { MAX_IMAGE_BYTES } from '../agent/media.constants';
 import { WaInboundLog } from './wa-inbound-log.entity';
 import { EvolutionClient } from './evolution.client';
 import { TranscriptionService } from './transcription.service';
@@ -35,6 +38,7 @@ export interface EvolutionWebhookPayload {
       conversation?: string;
       extendedTextMessage?: { text?: string };
       audioMessage?: object;
+      imageMessage?: { caption?: string; mimetype?: string };
       base64?: string;
     };
     messageType?: string;
@@ -113,6 +117,15 @@ export class WhatsappService {
       }
     }
 
+    // Rama de imagen: descarga el binario, construye parts multimodales y enruta al agente.
+    if (data?.message?.imageMessage) {
+      const reply = await this.handleImage(user, e164, key.id, data.message.imageMessage);
+      if (reply !== null) {
+        await this.evolution.sendText(e164, reply);
+      }
+      return;
+    }
+
     if (!text) {
       await this.evolution.sendText(e164, this.i18n.t(user.language, 'whatsapp.textOnly'));
       return;
@@ -120,6 +133,102 @@ export class WhatsappService {
 
     const reply = await this.handleText(user, text, voice, key.id);
     await this.evolution.sendText(e164, reply);
+  }
+
+  /**
+   * Maneja un imageMessage inbound: descarga base64, valida tamaño,
+   * construye el turn multimodal y lo pasa al agente (bypassing fast-path).
+   * Retorna la respuesta del agente, o null si se envió un fallback directamente.
+   */
+  private async handleImage(
+    user: User,
+    e164: string,
+    messageId: string,
+    imageMessage: { caption?: string; mimetype?: string },
+  ): Promise<string | null> {
+    let base64: string | null = null;
+    try {
+      base64 = await this.evolution.getBase64(messageId);
+    } catch (err) {
+      this.logger.error(`getBase64 falló para imageMessage ${messageId}: ${String(err)}`);
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.imageNotUnderstood'),
+      );
+      return null;
+    }
+
+    if (!base64) {
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.imageNotUnderstood'),
+      );
+      return null;
+    }
+
+    if (base64Bytes(base64) > MAX_IMAGE_BYTES) {
+      await this.evolution.sendText(e164, this.i18n.t(user.language, 'whatsapp.imageTooLarge'));
+      return null;
+    }
+
+    const mimetype = imageMessage.mimetype ?? 'image/jpeg';
+    const imagePart: ImagePart = toImagePart(base64, mimetype);
+    const caption = imageMessage.caption ?? '';
+    const mediaItems: MediaItem[] = [
+      { type: 'image', mediaType: mimetype, filename: null, size: base64Bytes(base64) },
+    ];
+
+    // Persist user turn: content = caption (or placeholder), mediaContext = metadata
+    const thread = await this.conversations.ensureWhatsAppThread(user.id);
+    const userContent = caption || `[image: ${mimetype}]`;
+    await this.conversations.appendMessage(
+      thread,
+      MessageRole.USER,
+      userContent,
+      Channel.WHATSAPP,
+      null,
+      mediaItems,
+    );
+
+    // Build multimodal turn: image part first, then optional text part.
+    const contentParts: Array<ImagePart | TextPart> = [imagePart];
+    if (caption) {
+      contentParts.push({ type: 'text', text: caption });
+    }
+
+    // Replay history (text-only — images never stored as binary) + current multimodal turn.
+    const history = await this.historyAsModelMessages(user.id, thread.id);
+    // Remove the just-appended user turn from history to avoid duplication
+    const historyWithoutCurrent = history.slice(0, -1);
+    const currentTurn: UserModelMessage = {
+      role: 'user',
+      content: contentParts,
+    };
+    const messages: ModelMessage[] = [...historyWithoutCurrent, currentTurn];
+
+    if (!isAiEnabled()) {
+      const fallback = this.i18n.t(user.language, 'whatsapp.aiDisabled');
+      await this.conversations.appendMessage(
+        thread,
+        MessageRole.ASSISTANT,
+        fallback,
+        Channel.WHATSAPP,
+      );
+      return fallback;
+    }
+
+    const result = this.agent.run(
+      user.id,
+      thread.id,
+      messages,
+      Channel.WHATSAPP,
+      user.name,
+      user.language,
+      resolveCurrency(user.currency),
+    );
+    const reply = (await result.text).trim();
+    await this.conversations.appendMessage(thread, MessageRole.ASSISTANT, reply, Channel.WHATSAPP);
+    return reply;
   }
 
   /** Texto → fast-path (gratis) o agente (razonamiento). Devuelve la respuesta. */

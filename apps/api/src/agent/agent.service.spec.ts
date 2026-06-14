@@ -140,6 +140,62 @@ describe('AgentService.suggestTitle', () => {
   });
 });
 
+// ── G1: buildSystemPrompt — receipt/vision hint ───────────────────────────────
+// These tests check that a DEDICATED image/receipt block exists in the prompt,
+// not just coincidental presence of shared words from other rules.
+
+describe('AgentService.buildSystemPrompt — receipt hint', () => {
+  let service: AgentService;
+
+  beforeEach(() => {
+    service = makeService();
+  });
+
+  it('English prompt contains a receipt-analysis block that mentions image, amount, merchant, and date together', () => {
+    const prompt = service.buildSystemPrompt('en', 'USD');
+    // The receipt block must contain all four concepts in a contiguous section.
+    // Find the line(s) that mention "image" and check the surrounding context
+    // contains amount/merchant/date guidance.
+    const lines = prompt.split('\n');
+    const receiptLineIdx = lines.findIndex((l) => /image/i.test(l) && /receipt/i.test(l));
+    expect(receiptLineIdx).toBeGreaterThanOrEqual(0);
+    // The same line or nearby lines must mention the data we want to extract.
+    const block = lines.slice(Math.max(0, receiptLineIdx - 1), receiptLineIdx + 4).join('\n');
+    expect(block).toMatch(/amount/i);
+    expect(block).toMatch(/merchant/i);
+    expect(block).toMatch(/date/i);
+  });
+
+  it('Spanish prompt contains a receipt-analysis block that mentions imagen, monto, comercio, and fecha together', () => {
+    const prompt = service.buildSystemPrompt('es', 'PEN');
+    const lines = prompt.split('\n');
+    const receiptLineIdx = lines.findIndex((l) => /imagen/i.test(l) && /recib/i.test(l));
+    expect(receiptLineIdx).toBeGreaterThanOrEqual(0);
+    const block = lines.slice(Math.max(0, receiptLineIdx - 1), receiptLineIdx + 4).join('\n');
+    expect(block).toMatch(/monto/i);
+    expect(block).toMatch(/comercio/i);
+    expect(block).toMatch(/fecha/i);
+  });
+
+  it('English receipt block instructs to PROPOSE (not silently register) and ask confirmation', () => {
+    const prompt = service.buildSystemPrompt('en', 'USD');
+    const lines = prompt.split('\n');
+    const receiptLineIdx = lines.findIndex((l) => /image/i.test(l) && /receipt/i.test(l));
+    const block = lines.slice(Math.max(0, receiptLineIdx - 1), receiptLineIdx + 4).join('\n');
+    expect(block).toMatch(/propose|suggest/i);
+    // Must include confirmation requirement
+    expect(block).toMatch(/confirm/i);
+  });
+
+  it('Spanish receipt block instructs to PROPOSE not auto-register', () => {
+    const prompt = service.buildSystemPrompt('es', 'PEN');
+    const lines = prompt.split('\n');
+    const receiptLineIdx = lines.findIndex((l) => /imagen/i.test(l) && /recib/i.test(l));
+    const block = lines.slice(Math.max(0, receiptLineIdx - 1), receiptLineIdx + 4).join('\n');
+    expect(block).toMatch(/propón|propone|sugiere/i);
+  });
+});
+
 // ── T-2.9c: locale passthrough — run() forwards locale to buildSystemPrompt ──
 
 describe('AgentService.run locale passthrough', () => {

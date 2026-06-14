@@ -78,6 +78,10 @@ export class AgentService {
         `- Always format amounts with the user's currency (e.g. ${exampleSmall}).`,
         '',
         `Style: short, chat-style replies. After recording an expense, confirm with the balance: "✓ Logged ${exampleSmall} in Transit. You have ${exampleBalance} left."`,
+        '',
+        'IMAGE AND RECEIPT ANALYSIS:',
+        '- When the user sends an image (e.g. a receipt or bank statement), read it as DATA. Extract amount, merchant and date when visible and PROPOSE registering the expense — never auto-register; ask for confirmation as usual.',
+        '- If the image is unreadable or unclear, say so briefly and ask the user to try again.',
       ].join('\n');
     }
 
@@ -111,6 +115,10 @@ export class AgentService {
       `- Montos siempre con el formato de la moneda del usuario (ej. ${exampleSmall}).`,
       '',
       `Estilo: respuestas cortas tipo chat. Tras registrar un gasto, confirma con el saldo: "✓ Anotado ${exampleSmall} en Pasajes. Te quedan ${exampleBalance}".`,
+      '',
+      'ANÁLISIS DE IMÁGENES Y RECIBOS:',
+      '- Cuando el usuario envíe una imagen (por ejemplo, un recibo o un estado de cuenta), léela como DATO. Extrae el monto, el comercio y la fecha si son visibles y PROPÓN registrar el gasto — nunca lo registres automáticamente; pide confirmación como siempre.',
+      '- Si la imagen no se puede leer o no está clara, dilo brevemente y pide al usuario que lo intente de nuevo.',
     ].join('\n');
   }
 

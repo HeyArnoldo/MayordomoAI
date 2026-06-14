@@ -120,12 +120,12 @@ Satisfies: `agent-chat/spec.md § mediaContext Metadata Persistence`
 
 ---
 
-## Work Unit D — Chat controller: server-side validation + mediaContext persistence + history strip
+## Work Unit D — Chat controller: server-side validation + mediaContext persistence + history strip ✅
 
 **Sequential — requires B4 (validateImageParts), B5 (stripImagesFromHistory), C3 (appendMessage signature), A3 (packages built).**  
 Satisfies: `agent-chat/spec.md §§ Image Parts in Agent Turn, mediaContext Metadata Persistence`, `multimodal-input/spec.md § Vision Cost Control — History Strip`
 
-### D1 — Controller: validateImageParts + stripImagesFromHistory + persist mediaContext (TDD — integration-style unit test)
+### [x] D1 — Controller: validateImageParts + stripImagesFromHistory + persist mediaContext (TDD — integration-style unit test)
 
 - TDD: YES — write controller unit tests first (mock `AgentService.run` + `appendMessage`)
 - Files:
@@ -149,12 +149,12 @@ Satisfies: `agent-chat/spec.md §§ Image Parts in Agent Turn, mediaContext Meta
 
 ---
 
-## Work Unit E — Web UI: enable attachment button + file wiring + blob-failure guard
+## Work Unit E — Web UI: enable attachment button + file wiring + blob-failure guard ✅
 
 **Can run in parallel with C and D (no API dependency — pure UI).**  
 Satisfies: `multimodal-input/spec.md § Web Image Attachment` (all scenarios)
 
-### E1 — Enable attachment button, pass files, blob-failure guard in `chat-thread.tsx`
+### [x] E1 — Enable attachment button, pass files, blob-failure guard in `chat-thread.tsx`
 
 - TDD: No (no web test runner — manual verification steps listed below)
 - Files:
@@ -177,12 +177,12 @@ Satisfies: `multimodal-input/spec.md § Web Image Attachment` (all scenarios)
 
 ---
 
-## Work Unit F — WhatsApp: imageMessage branch + payload type + fallbacks
+## Work Unit F — WhatsApp: imageMessage branch + payload type + fallbacks ✅
 
 **Sequential — requires B2 (`base64Bytes`), B3 (`toImagePart`), A3 (packages + i18n built).**  
 Satisfies: `multimodal-input/spec.md § WhatsApp Image Receive` (all scenarios), `agent-chat/spec.md § Image Parts in Agent Turn`
 
-### F1 — Payload type extension + imageMessage branch (TDD — service unit test)
+### [x] F1 — Payload type extension + imageMessage branch (TDD — service unit test)
 
 - TDD: YES — write tests first
 - Files:
@@ -212,12 +212,12 @@ Satisfies: `multimodal-input/spec.md § WhatsApp Image Receive` (all scenarios),
 
 ---
 
-## Work Unit G — Agent: receipt system-prompt hint
+## Work Unit G — Agent: receipt system-prompt hint ✅
 
 **Can run in parallel with D, E, F — only touches `agent.service.ts`.**  
 Satisfies: `agent-chat/spec.md § Receipt Prompt Hint`
 
-### G1 — Add receipt/vision hint to `buildSystemPrompt` (TDD — prompt content test)
+### [x] G1 — Add receipt/vision hint to `buildSystemPrompt` (TDD — prompt content test)
 
 - TDD: YES — write test first
 - Files:

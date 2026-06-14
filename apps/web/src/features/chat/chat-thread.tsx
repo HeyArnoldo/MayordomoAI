@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, type ToolUIPart, type UIMessage } from 'ai';
+import { DefaultChatTransport, type FileUIPart, type ToolUIPart, type UIMessage } from 'ai';
 import {
   Check,
   CheckCircle2,
@@ -10,9 +10,9 @@ import {
   DollarSign,
   ListOrdered,
   Mic,
+  Paperclip,
   PenLine,
   PieChart,
-  Plus,
   RefreshCw,
   Search,
   Square,
@@ -54,8 +54,13 @@ import {
   PromptInputTextarea,
   PromptInputTools,
   usePromptInputController,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+
+// Image attachment constraints — must match server-side constants.
+const MAX_IMAGES = 2;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MB
 import { Spinner } from '@/components/ui/spinner';
 import {
   ChainOfThought,
@@ -195,6 +200,23 @@ function ToolChain({ tools, done }: { tools: ToolUIPart[]; done: boolean }) {
         )}
       </ChainOfThoughtContent>
     </ChainOfThought>
+  );
+}
+
+/**
+ * Attachment button: opens the file dialog wired to PromptInput's hidden input.
+ * Validation constraints (type/size/count) are applied by PromptInput itself.
+ */
+function AttachButton() {
+  const { t } = useTranslation('chat');
+  const attachments = usePromptInputAttachments();
+  return (
+    <PromptInputButton
+      onClick={() => attachments.openFileDialog()}
+      title={t('composer.attachImage')}
+    >
+      <Paperclip className="size-4" />
+    </PromptInputButton>
   );
 }
 
@@ -395,19 +417,32 @@ export function ChatThread({
 
   const busy = status === 'submitted' || status === 'streaming';
 
-  const send = async (text: string) => {
+  const send = async (text: string, files: FileUIPart[] = []) => {
     const content = text.trim();
-    if (!content || busy) return;
+    if ((!content && files.length === 0) || busy) return;
+
+    // Guard: if any file's URL is still a blob: URL (conversion failed), abort and surface error.
+    const hasBrokenBlob = files.some((f) => f.url?.startsWith('blob:'));
+    if (hasBrokenBlob) {
+      toast.error(t('composer.attachmentReadFailed'));
+      return;
+    }
+
     if (!convRef.current) {
       const conv = await chatApi.create();
       convRef.current = conv.id;
       onCreated?.(conv.id);
     }
-    void sendMessage({ text: content }, { body: { conversationId: convRef.current } });
+    void sendMessage({ text: content, files }, { body: { conversationId: convRef.current } });
+  };
+
+  const handleAttachError = (err: { code: string; message: string }) => {
+    // code: 'max_files' | 'max_file_size' | 'accept'
+    toast.error(err.message);
   };
 
   const handleSubmit = (message: PromptInputMessage) => {
-    void send(message.text ?? '');
+    void send(message.text ?? '', message.files);
   };
 
   const promptBox = (
@@ -415,6 +450,11 @@ export function ChatThread({
     <PromptInputProvider>
       <PromptInput
         onSubmit={handleSubmit}
+        onError={handleAttachError}
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        maxFiles={MAX_IMAGES}
+        maxFileSize={MAX_IMAGE_BYTES}
         className="rounded-2xl border-line bg-surface shadow-float"
       >
         <PromptInputBody>
@@ -425,9 +465,7 @@ export function ChatThread({
         </PromptInputBody>
         <PromptInputFooter>
           <PromptInputTools>
-            <PromptInputButton disabled title={t('composer.attachmentsSoon')}>
-              <Plus className="size-4" />
-            </PromptInputButton>
+            <AttachButton />
           </PromptInputTools>
           <div className="flex items-center gap-1">
             <MicButton />
