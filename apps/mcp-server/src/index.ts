@@ -46,7 +46,7 @@
 import { createServer } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { config } from './config.js';
+import { getConfig } from './config.js';
 import { checkBearer } from './auth.js';
 import { tools } from './tools/index.js';
 
@@ -154,6 +154,8 @@ function readBody(req: IncomingMessage): Promise<string> {
 // ---------------------------------------------------------------------------
 // Start listening
 // ---------------------------------------------------------------------------
+
+const config = getConfig();
 
 httpServer.listen(config.PORT, () => {
   console.log(`[mcp-server] Listening on port ${config.PORT}`);

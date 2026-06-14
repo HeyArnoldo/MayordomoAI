@@ -2,62 +2,40 @@
  * node:test unit tests for auth.ts — run after build:
  *   node --test dist/auth.test.js
  *
- * These tests mock the config module so no .env is required at test time.
+ * Tests import the REAL `isValidBearer` from auth.ts.
+ * No env vars are required because isValidBearer is a pure function
+ * that does not depend on config.
  */
-import { describe, it, before } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import type { IncomingMessage } from 'node:http';
 
-// ---------------------------------------------------------------------------
-// Stub the config before importing auth (avoids env validation at test time).
-// We use module-level mocking by overriding the resolved module path.
-// ---------------------------------------------------------------------------
-
-// Helper: build a minimal IncomingMessage-like object with headers.
-function makeReq(authHeader?: string): IncomingMessage {
-  return {
-    headers: authHeader !== undefined ? { authorization: authHeader } : {},
-  } as unknown as IncomingMessage;
-}
-
-// Because config is imported by auth.ts at module load time, we cannot use
-// node:test module mocking without ESM loader hooks. Instead we test the
-// security logic via a local reimplementation that mirrors the same branch:
-//   header === `Bearer ${token}` — this is the entire security-critical surface.
-// The auth module is so minimal (3 lines) that this approach is equivalent to
-// integration testing the module with a known token value.
+import { isValidBearer } from './auth.js';
 
 const KNOWN_TOKEN = 'test-token-abc123';
 
-function checkBearerWithToken(token: string, req: IncomingMessage): boolean {
-  const header = req.headers['authorization'];
-  if (typeof header !== 'string') return false;
-  return header === `Bearer ${token}`;
-}
-
-describe('checkBearer', () => {
+describe('isValidBearer', () => {
   it('returns true when Authorization header matches Bearer token', () => {
-    const result = checkBearerWithToken(KNOWN_TOKEN, makeReq(`Bearer ${KNOWN_TOKEN}`));
-    assert.equal(result, true);
+    assert.equal(isValidBearer(`Bearer ${KNOWN_TOKEN}`, KNOWN_TOKEN), true);
   });
 
   it('returns false when Authorization header has wrong token', () => {
-    const result = checkBearerWithToken(KNOWN_TOKEN, makeReq('Bearer wrong'));
-    assert.equal(result, false);
+    assert.equal(isValidBearer('Bearer wrong', KNOWN_TOKEN), false);
   });
 
-  it('returns false when Authorization header is missing', () => {
-    const result = checkBearerWithToken(KNOWN_TOKEN, makeReq());
-    assert.equal(result, false);
+  it('returns false when Authorization header is missing (undefined)', () => {
+    assert.equal(isValidBearer(undefined, KNOWN_TOKEN), false);
   });
 
   it('returns false when Authorization header is empty string', () => {
-    const result = checkBearerWithToken(KNOWN_TOKEN, makeReq(''));
-    assert.equal(result, false);
+    assert.equal(isValidBearer('', KNOWN_TOKEN), false);
   });
 
   it('returns false when Authorization is not Bearer scheme', () => {
-    const result = checkBearerWithToken(KNOWN_TOKEN, makeReq('Basic dXNlcjpwYXNz'));
-    assert.equal(result, false);
+    assert.equal(isValidBearer('Basic dXNlcjpwYXNz', KNOWN_TOKEN), false);
+  });
+
+  it('returns false when provided token is empty (Bearer with no value)', () => {
+    // "Bearer " → provided = "", expected = KNOWN_TOKEN → length mismatch → false
+    assert.equal(isValidBearer('Bearer ', KNOWN_TOKEN), false);
   });
 });

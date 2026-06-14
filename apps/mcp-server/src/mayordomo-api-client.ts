@@ -1,7 +1,29 @@
-import { config } from './config.js';
+import { getConfig } from './config.js';
 import type { CommonToolResponse } from './types.js';
 
 const GENERIC_ERROR = 'The finance service rejected the request.';
+
+/**
+ * Converts a non-2xx API response body into a safe `{ ok: false, error }` shape.
+ * Exported so it can be unit-tested without a live config/network.
+ *
+ * - If `json` has a string `error` field, that value is forwarded (i18n-safe).
+ * - Otherwise the generic fallback message is used.
+ * - On a successful response (resOk === true) returns `{ ok: true }`.
+ */
+export function sanitizeApiError(json: unknown, resOk: boolean): { ok: boolean; error?: string } {
+  if (resOk) return { ok: true };
+
+  const apiError =
+    json !== null &&
+    typeof json === 'object' &&
+    'error' in (json as object) &&
+    typeof (json as Record<string, unknown>)['error'] === 'string'
+      ? (json as Record<string, unknown>)['error']
+      : GENERIC_ERROR;
+
+  return { ok: false, error: apiError as string };
+}
 
 /**
  * Posts to an internal /api/agent-tools/* endpoint and returns the response.
@@ -9,6 +31,8 @@ const GENERIC_ERROR = 'The finance service rejected the request.';
  * ever included in the returned object.
  */
 async function call(tool: string, body: unknown): Promise<CommonToolResponse<unknown>> {
+  const config = getConfig();
+
   let res: Response;
   try {
     res = await fetch(`${config.MAYORDOMO_API_BASE_URL}/api/agent-tools/${tool}`, {
@@ -33,15 +57,7 @@ async function call(tool: string, body: unknown): Promise<CommonToolResponse<unk
   }
 
   if (!res.ok) {
-    // Forward the i18n-safe error from the API if present; otherwise generic.
-    const apiError =
-      json !== null &&
-      typeof json === 'object' &&
-      'error' in (json as object) &&
-      typeof (json as Record<string, unknown>)['error'] === 'string'
-        ? (json as Record<string, unknown>)['error']
-        : GENERIC_ERROR;
-    return { ok: false, error: apiError as string };
+    return sanitizeApiError(json, false) as CommonToolResponse<unknown>;
   }
 
   return json as CommonToolResponse<unknown>;

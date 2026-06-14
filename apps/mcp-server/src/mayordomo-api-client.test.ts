@@ -1,29 +1,16 @@
 /**
  * node:test unit tests for mayordomo-api-client error sanitization.
- * Tests the security-critical sanitization logic via a local reimplementation
- * that mirrors the same branching in mayordomo-api-client.ts.
  *
- * The client module imports config at load time (requires real env vars),
- * so we test the sanitization logic directly without importing the module,
- * which would fail without MAYORDOMO_API_BASE_URL etc.
+ * Tests import the REAL `sanitizeApiError` from mayordomo-api-client.ts.
+ * No env vars are required because sanitizeApiError is a pure function
+ * that does not depend on config.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-const GENERIC_ERROR = 'The finance service rejected the request.';
+import { sanitizeApiError } from './mayordomo-api-client.js';
 
-// Mirror of the sanitization logic in mayordomo-api-client.ts
-function sanitizeApiError(json: unknown, resOk: boolean): { ok: boolean; error?: string } {
-  if (resOk) return { ok: true };
-  const apiError =
-    json !== null &&
-    typeof json === 'object' &&
-    'error' in (json as object) &&
-    typeof (json as Record<string, unknown>)['error'] === 'string'
-      ? (json as Record<string, unknown>)['error']
-      : GENERIC_ERROR;
-  return { ok: false, error: apiError as string };
-}
+const GENERIC_ERROR = 'The finance service rejected the request.';
 
 describe('apiClient error sanitization', () => {
   it('returns sanitized error from API json.error on non-2xx with error field', () => {
@@ -53,16 +40,15 @@ describe('apiClient error sanitization', () => {
     assert.equal(result.error, GENERIC_ERROR);
   });
 
-  it('does NOT include AGENT_TOOL_INTERNAL_KEY or secrets in error message', () => {
-    const secretKey = 'super-secret-internal-key';
-    const json = { error: `Key ${secretKey} is wrong` };
+  it('does NOT include raw error details or stack traces in the sanitized message', () => {
+    // Even if the API echoes something suspicious, the client only forwards
+    // the string as-is — it never appends secrets or internal info.
+    const json = { error: 'Request failed' };
     const result = sanitizeApiError(json, false);
-    // The api-client forwards what the backend says. The backend (NestJS)
-    // never echoes the key in error messages — this test asserts that even
-    // if an error string were returned, the client merely forwards it.
-    // The real guard is: the client never LOGS config.AGENT_TOOL_INTERNAL_KEY.
     assert.equal(result.ok, false);
     assert.ok(typeof result.error === 'string', 'error must be a string');
+    // The sanitizer must not inject any additional content.
+    assert.equal(result.error, 'Request failed');
   });
 
   it('returns ok:true on successful response (no error path triggered)', () => {
