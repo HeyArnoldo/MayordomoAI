@@ -33,6 +33,7 @@ export const ERROR_CODES = [
   'chat.audio_missing',
   'chat.transcription_failed',
   'chat.image_rejected',
+  'chat.document_rejected',
   'agent.ai_credentials_missing',
   'common.invalid_e164_format',
   'common.invalid_verification_code',

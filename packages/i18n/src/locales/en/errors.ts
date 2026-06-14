@@ -45,6 +45,8 @@ export const errors = {
     transcription_failed: 'Could not transcribe the audio',
     image_rejected:
       'The image could not be accepted. Check the file type, size, and number of images.',
+    document_rejected:
+      'The document could not be read. Check the file type, size, or that it contains selectable text.',
   },
   agent: {
     ai_credentials_missing: 'The agent is not available at this time',
