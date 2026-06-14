@@ -3,6 +3,8 @@ import type { api as es } from '../es/api';
 export const api = {
   whatsapp: {
     voiceNotUnderstood: "I couldn't make out that voice note. Could you type it for me?",
+    imageNotUnderstood: "I couldn't process that image. Could you try again?",
+    imageTooLarge: 'That image exceeds the 4 MB limit. Please send a smaller image.',
     textOnly: 'For now I only understand text and voice notes. 📝',
     expenseLogged: '✓ Logged {{amount}} in {{box}}. You have {{balance}} left.',
     incomeLogged: '✓ {{amount}} split: {{parts}}',

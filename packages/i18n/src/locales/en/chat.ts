@@ -40,6 +40,8 @@ export const chat = {
   composer: {
     placeholder: 'Type a message…',
     attachmentsSoon: 'Attachments — coming soon',
+    attachmentReadFailed: 'Could not read the attachment. Please reselect the file and try again.',
+    imageRejected: 'Image does not meet requirements (type, size, or count).',
   },
   mic: {
     dictate: 'Dictate by voice',

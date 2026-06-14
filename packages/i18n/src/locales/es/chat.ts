@@ -39,6 +39,9 @@ export const chat = {
   composer: {
     placeholder: 'Escribe un mensaje…',
     attachmentsSoon: 'Adjuntos — próximamente',
+    attachmentReadFailed:
+      'No se pudo leer el archivo adjunto. Vuelve a seleccionarlo e intenta de nuevo.',
+    imageRejected: 'La imagen no cumple los requisitos (tipo, tamaño o cantidad).',
   },
   mic: {
     dictate: 'Dictar por voz',

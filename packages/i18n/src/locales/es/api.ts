@@ -3,6 +3,8 @@
 export const api = {
   whatsapp: {
     voiceNotUnderstood: 'No pude escuchar esa nota de voz. ¿Me lo escribes?',
+    imageNotUnderstood: 'No pude procesar esa imagen. ¿Puedes intentarlo de nuevo?',
+    imageTooLarge: 'Esa imagen supera el límite de 4 MB. Envía una imagen más pequeña.',
     textOnly: 'Por ahora solo entiendo texto y notas de voz. 📝',
     expenseLogged: '✓ Anotado {{amount}} en {{box}}. Te quedan {{balance}}.',
     incomeLogged: '✓ {{amount}} repartidos: {{parts}}',
