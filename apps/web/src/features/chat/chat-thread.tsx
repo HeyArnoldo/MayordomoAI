@@ -58,9 +58,14 @@ import {
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 
-// Image attachment constraints — must match server-side constants.
+// Attachment constraints — must match server-side constants.
+// NOTE: Server enforces per-type caps: images 4 MB, documents 8 MB.
+// The client sets maxFileSize to the larger cap (MAX_DOCUMENT_BYTES) so documents
+// are not incorrectly rejected client-side. The server is the authoritative gate
+// for per-type size enforcement.
 const MAX_IMAGES = 2;
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MB
+// MAX_DOCUMENT_BYTES = 8 MB — used as client maxFileSize hint (docs win; images enforced server-side)
+const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 import { Spinner } from '@/components/ui/spinner';
 import {
   ChainOfThought,
@@ -451,10 +456,10 @@ export function ChatThread({
       <PromptInput
         onSubmit={handleSubmit}
         onError={handleAttachError}
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         multiple
         maxFiles={MAX_IMAGES}
-        maxFileSize={MAX_IMAGE_BYTES}
+        maxFileSize={MAX_DOCUMENT_BYTES}
         className="rounded-2xl border-line bg-surface shadow-float"
       >
         <PromptInputBody>
