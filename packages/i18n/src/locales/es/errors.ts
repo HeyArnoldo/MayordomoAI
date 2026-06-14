@@ -72,6 +72,10 @@ export const errors = {
   server: {
     internal_error: 'Ocurrió un error inesperado',
   },
+  agent_tools: {
+    demo_user_missing: 'Servicio no disponible',
+    demo_user_not_found: 'Servicio no disponible',
+  },
   /** Fallback for unknown codes — should not appear in normal usage. */
   _fallback: 'Ocurrió un error inesperado',
 };

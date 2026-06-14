@@ -7,6 +7,7 @@ import { AiUsageModule } from '../ai-usage/ai-usage.module';
 import { UsersModule } from '../users/users.module';
 import { AgentController } from './agent.controller';
 import { AgentService } from './agent.service';
+import { AgentToolExecutorService } from './agent-tool-executor.service';
 import { ToolAudit } from './tool-audit.entity';
 
 @Module({
@@ -19,7 +20,7 @@ import { ToolAudit } from './tool-audit.entity';
     UsersModule,
   ],
   controllers: [AgentController],
-  providers: [AgentService],
-  exports: [AgentService],
+  providers: [AgentService, AgentToolExecutorService],
+  exports: [AgentService, AgentToolExecutorService],
 })
 export class AgentModule {}

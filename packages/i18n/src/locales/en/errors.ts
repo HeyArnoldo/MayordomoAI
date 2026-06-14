@@ -70,5 +70,9 @@ export const errors = {
   server: {
     internal_error: 'An unexpected error occurred',
   },
+  agent_tools: {
+    demo_user_missing: 'Service unavailable',
+    demo_user_not_found: 'Service unavailable',
+  },
   _fallback: 'An unexpected error occurred',
 } satisfies typeof es;

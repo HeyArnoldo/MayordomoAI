@@ -44,6 +44,8 @@ export const ERROR_CODES = [
   'box.allocation_must_sum_100',
   'recurring.not_found',
   'server.internal_error',
+  'agent_tools.demo_user_missing',
+  'agent_tools.demo_user_not_found',
 ] as const;
 
 /** Stable union of all valid error codes. Never rename a member. */
