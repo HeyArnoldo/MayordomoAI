@@ -23,6 +23,7 @@ import {
   createConversationSchema,
   IdParam,
   idParamSchema,
+  MediaItem,
   Message as MessageDto,
   MessageRole,
   RenameConversationInput,
@@ -36,6 +37,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { User } from '../users/user.entity';
 import { AgentService } from '../agent/agent.service';
 import { TranscriptionService } from '../whatsapp/transcription.service';
+import { validateImageParts, stripImagesFromHistory } from '../agent/media.helpers';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
 import { ConversationsService } from './conversations.service';
@@ -68,6 +70,7 @@ function toMessageDto(m: Message): MessageDto {
     content: m.content,
     channel: m.channel,
     toolCalls: m.toolCalls,
+    mediaContext: m.mediaContext,
     createdAt: m.createdAt.toISOString(),
   };
 }
@@ -168,6 +171,7 @@ export class ChatController {
   /**
    * El chat del agente (streaming UI messages para useChat). Persiste el
    * mensaje del usuario al entrar y la respuesta (+tool calls) al terminar.
+   * Valida y extrae metadatos de imagen (file parts) del último mensaje de usuario.
    */
   @Post('chat')
   async chat(
@@ -178,16 +182,52 @@ export class ChatController {
     const conv = await this.conversations.findOne(user.id, body.conversationId);
 
     const last = body.messages.at(-1);
+
+    // Extract file parts from the last user message and validate them.
+    let mediaContext: MediaItem[] | null = null;
+    if (last?.role === 'user') {
+      const fileParts = last.parts.filter(
+        (p): p is Extract<typeof p, { type: 'file' }> => p.type === 'file',
+      );
+      if (fileParts.length > 0) {
+        try {
+          mediaContext = validateImageParts(
+            fileParts.map((p) => ({
+              type: 'file' as const,
+              mediaType: p.mediaType ?? '',
+              filename: 'filename' in p && typeof p.filename === 'string' ? p.filename : undefined,
+              url: p.url ?? '',
+            })),
+          );
+        } catch {
+          throw new AppException(
+            'chat.image_rejected',
+            HttpStatus.BAD_REQUEST,
+            'Image validation failed: unsupported type, size, or count.',
+          );
+        }
+      }
+    }
+
     if (last?.role === 'user') {
       // En un "reintentar" el último user ya está persistido: no duplicar.
       const text = uiMessageText(last);
       const prev = await this.conversations.lastMessage(conv.id);
       if (!(prev?.role === MessageRole.USER && prev.content === text)) {
-        await this.conversations.appendMessage(conv, MessageRole.USER, text, Channel.WEB);
+        await this.conversations.appendMessage(
+          conv,
+          MessageRole.USER,
+          text,
+          Channel.WEB,
+          null,
+          mediaContext,
+        );
       }
     }
 
-    const modelMessages = await convertToModelMessages(body.messages);
+    // Strip image binaries from past messages (cost guardrail); keep last user's file parts.
+    const stripped = stripImagesFromHistory(body.messages);
+    const modelMessages = await convertToModelMessages(stripped);
     const result = this.agent.run(
       user.id,
       conv.id,
