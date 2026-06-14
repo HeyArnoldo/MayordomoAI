@@ -22,3 +22,7 @@ coverage/
 
 # Cache de Vite (dev server corrido desde la raíz)
 .vite/
+
+# Local agent tooling (not part of the product)
+.atl/
+.engram/
