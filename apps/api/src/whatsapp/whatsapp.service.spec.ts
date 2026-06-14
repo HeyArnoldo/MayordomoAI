@@ -1,5 +1,6 @@
 import { WhatsappService, EvolutionWebhookPayload } from './whatsapp.service';
 import * as aiConfig from '../agent/ai.config';
+import { MAX_IMAGE_BYTES } from '../agent/media.constants';
 
 // Ensure isAiEnabled returns true for all tests in this suite
 jest.spyOn(aiConfig, 'isAiEnabled').mockReturnValue(true);
@@ -265,6 +266,76 @@ describe('WhatsappService.processInbound — imageMessage branch', () => {
 
       expect(loggerSpy).toHaveBeenCalled();
       loggerSpy.mockRestore();
+    });
+  });
+
+  describe('when the image exceeds MAX_IMAGE_BYTES', () => {
+    it('sends imageTooLarge and does NOT call agent.run', async () => {
+      // Build a raw base64 string that decodes to more than MAX_IMAGE_BYTES.
+      // base64Bytes(s) = floor(len * 3 / 4) - padding.
+      // Using len = MAX_IMAGE_BYTES * 2 (no padding) gives decoded = MAX_IMAGE_BYTES * 1.5 > MAX_IMAGE_BYTES.
+      const oversizedBase64 = 'A'.repeat(MAX_IMAGE_BYTES * 2);
+      const evolution = makeEvolution(oversizedBase64);
+      const { service, agent, i18n } = makeService({ evolution });
+      const payload = makeImagePayload({ caption: 'big image' });
+
+      await expect(service.processInbound(payload)).resolves.toBeUndefined();
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.imageTooLarge');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.imageTooLarge',
+      );
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when there is prior conversation history', () => {
+    it('passes prior turns + one multimodal current turn to agent.run (no duplicate caption row)', async () => {
+      const caption = 'here is my receipt';
+
+      // Simulate what the real flow produces: appendMessage is called before listMessages,
+      // so listMessages returns prior turns PLUS the just-appended caption row.
+      const priorMessages = [
+        { role: 'assistant', content: 'How can I help?' },
+        { role: 'user', content: 'I want to log an expense' },
+      ];
+      const captionRow = { role: 'user', content: caption };
+      const allMessages = [...priorMessages, captionRow];
+
+      const conversations = makeConversations();
+      conversations.listMessages.mockResolvedValue(allMessages);
+
+      const { service, agent } = makeService({ conversations });
+      const payload = makeImagePayload({ caption });
+
+      await service.processInbound(payload);
+
+      expect(agent.run).toHaveBeenCalled();
+      const messages: Array<{ role: string; content: unknown }> = agent.run.mock.calls[0][2];
+
+      // Should have prior turns count + exactly 1 current multimodal turn
+      expect(messages).toHaveLength(priorMessages.length + 1);
+
+      // Prior turns should be text-only (strings), not arrays
+      for (let i = 0; i < priorMessages.length; i++) {
+        expect(messages[i].role).toBe(priorMessages[i].role);
+        expect(messages[i].content).toBe(priorMessages[i].content);
+      }
+
+      // Last message must be the multimodal current turn (not the plain caption row)
+      const lastMsg = messages.at(-1)!;
+      expect(lastMsg.role).toBe('user');
+      expect(Array.isArray(lastMsg.content)).toBe(true);
+      const parts = lastMsg.content as Array<{ type: string; text?: string }>;
+      expect(parts.some((p) => p.type === 'image')).toBe(true);
+      expect(parts.some((p) => p.type === 'text' && p.text === caption)).toBe(true);
+
+      // No extra plain-text caption row should be present
+      const plainCaptionRows = messages.filter(
+        (m) => !Array.isArray(m.content) && m.content === caption,
+      );
+      expect(plainCaptionRows).toHaveLength(0);
     });
   });
 });
