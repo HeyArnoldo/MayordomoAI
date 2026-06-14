@@ -42,6 +42,7 @@ export const chat = {
     attachmentReadFailed:
       'No se pudo leer el archivo adjunto. Vuelve a seleccionarlo e intenta de nuevo.',
     imageRejected: 'La imagen no cumple los requisitos (tipo, tamaño o cantidad).',
+    attachImage: 'Adjuntar imagen',
   },
   mic: {
     dictate: 'Dictar por voz',

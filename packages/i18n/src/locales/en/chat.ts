@@ -42,6 +42,7 @@ export const chat = {
     attachmentsSoon: 'Attachments — coming soon',
     attachmentReadFailed: 'Could not read the attachment. Please reselect the file and try again.',
     imageRejected: 'Image does not meet requirements (type, size, or count).',
+    attachImage: 'Attach image',
   },
   mic: {
     dictate: 'Dictate by voice',
