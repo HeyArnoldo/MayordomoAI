@@ -50,11 +50,20 @@ describe('toolErrorMessage', () => {
   });
 
   describe('when err is a generic Error (not AppException)', () => {
-    it('returns err.message directly without calling i18n', () => {
-      const err = new Error('Something went wrong internally');
+    it('returns the generic localized message and never leaks err.message', () => {
+      i18n.t.mockReturnValue('Ocurrió un error inesperado');
+      const err = new Error('sensitive db detail: column "secret" does not exist');
       const result = toolErrorMessage(err, 'es', i18n as never);
-      expect(result).toBe('Something went wrong internally');
-      expect(i18n.t).not.toHaveBeenCalled();
+      expect(i18n.t).toHaveBeenCalledWith('es', 'errors:common.unexpected', undefined);
+      expect(result).toBe('Ocurrió un error inesperado');
+      expect(result).not.toContain('sensitive db detail');
+    });
+
+    it('falls back to a static string (not err.message) when i18n is absent', () => {
+      const err = new Error('sensitive db detail');
+      const result = toolErrorMessage(err, 'en', undefined);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result).not.toContain('sensitive db detail');
     });
   });
 

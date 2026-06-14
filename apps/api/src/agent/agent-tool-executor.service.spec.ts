@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { TransactionType } from '@app/contracts';
 import { AppException } from '../common/errors/app.exception';
 import { AgentToolExecutorService } from './agent-tool-executor.service';
@@ -58,6 +58,17 @@ function makeService(deps?: {
 // ---------------------------------------------------------------------------
 
 describe('AgentToolExecutorService', () => {
+  // Silence the expected server-side error logs that fire whenever a tool run
+  // throws a non-AppException error in these specs (they assert on the returned
+  // value, not on log output).
+  let loggerErrorSpy: jest.SpyInstance;
+  beforeEach(() => {
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    loggerErrorSpy.mockRestore();
+  });
+
   // ── Confirmation threshold (registerTransaction) ────────────────────────
   describe('registerTransaction — confirmation guard', () => {
     it('expense < threshold (50): persists immediately, no needsConfirmation', async () => {
@@ -260,6 +271,26 @@ describe('AgentToolExecutorService', () => {
       const ctx = makeCtx({ i18n: undefined });
 
       await expect(svc.getBoxBalances(ctx)).rejects.toBeInstanceOf(AppException);
+    });
+
+    it('does NOT leak the raw message of a non-AppException error to the caller', async () => {
+      const audits = makeAudits();
+      const i18n = {
+        t: jest.fn().mockReturnValue('Ocurrió un error inesperado'),
+      };
+      const boxes = {
+        withBalances: jest.fn().mockRejectedValue(new Error('sensitive db detail')),
+      };
+      const svc = makeService({ boxes, audits });
+      const ctx = makeCtx({ locale: 'es', i18n });
+
+      const result = (await svc.getBoxBalances(ctx)) as Record<string, unknown>;
+
+      expect(result.error).toBe('Ocurrió un error inesperado');
+      expect(String(result.error)).not.toContain('sensitive db detail');
+      expect(i18n.t).toHaveBeenCalledWith('es', 'errors:common.unexpected', undefined);
+      // The real error is logged server-side, never returned to the caller.
+      expect(loggerErrorSpy).toHaveBeenCalled();
     });
   });
 

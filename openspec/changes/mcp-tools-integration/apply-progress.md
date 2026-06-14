@@ -121,3 +121,16 @@
 - [ ] D-6.1-6.3 Docs
 
 **PR 2 base**: `feat/mcp-tools-backend` (after PR 1 merges to main, PR 2 targets main).
+
+---
+
+## Security review follow-up (post-apply, on feat/mcp-tools-backend)
+
+Two confirmed issues from a fresh security review were fixed:
+
+- **BLOCKER — DI boot crash**: `AgentToolsContextService` declared `private readonly i18n: Pick<I18nService,'t'>`. With `emitDecoratorMetadata`, Nest resolved the runtime token as `Object` (not a provider), so resolving the service threw at bootstrap and crashed the ENTIRE API (AgentToolsApiModule is imported in AppModule). Fixed by injecting the concrete `I18nService` token (matching `boxes.service.ts` / `agent.service.ts`). `I18nModule` is `@Global()`, so no module import change was needed. Added a Nest DI regression test (`agent-tools-context.di.spec.ts`) that compiles a minimal `Test.createTestingModule` (not AppModule) and asserts the service resolves — it FAILS against the `Pick<>` version and PASSES after the fix.
+- **SHOULD-FIX — raw error leak across the external REST trust boundary**: `toolErrorMessage` returned `err.message` for generic (non-AppException) errors, leaking TypeORM/SQL/table/column detail to the external caller (the global HttpExceptionFilter never runs because the executor swallows the throw). Fixed in `tool-error.helper.ts` to return the generic localized `errors:common.unexpected` (static fallback when i18n absent) for ANY non-AppException error. `AgentToolExecutorService.audited()` now logs the real error server-side (NestJS Logger) before returning the safe generic message. Also removed the legacy raw-`err.message` fallback in `agent-tools.ts` (in-app agent) so both paths are safe. AppException handling, the confirmation threshold, the guard, env handling, and userId resolution were left unchanged.
+
+Specs updated for the sanitization: `tool-error.helper.spec.ts` (generic-Error now asserts the generic message + no leak), `agent-tool-executor.service.spec.ts` (new test: plain `Error('sensitive db detail')` → generic message, leak-free, logged server-side).
+
+Gates (ROOT): packages build OK, `pnpm lint` 0 errors, `pnpm typecheck` OK, `pnpm test` 26 suites / 320 tests passing.

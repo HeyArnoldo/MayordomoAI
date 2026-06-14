@@ -477,11 +477,9 @@ export function buildAgentTools(
             return {
               error: ctx.i18n
                 ? toolErrorMessage(err, ctx.locale, ctx.i18n)
-                : err instanceof Error
-                  ? err.message
-                  : isEn
-                    ? 'Could not update allocation'
-                    : 'No se pudo actualizar el reparto',
+                : isEn
+                  ? 'Could not update allocation'
+                  : 'No se pudo actualizar el reparto',
               currentAllocation: proposed,
             };
           }

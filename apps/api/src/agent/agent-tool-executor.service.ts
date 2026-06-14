@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateTransactionInput, Locale, TransactionSource, TransactionType } from '@app/contracts';
@@ -8,6 +8,7 @@ import { TransactionsService, toTransactionDto } from '../transactions/transacti
 import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
 import type { I18nService } from '../i18n/i18n.service';
+import { AppException } from '../common/errors/app.exception';
 import { ToolAudit } from './tool-audit.entity';
 import { toolErrorMessage } from './tool-error.helper';
 
@@ -80,6 +81,8 @@ export interface RegisterTransactionArgs {
 
 @Injectable()
 export class AgentToolExecutorService {
+  private readonly logger = new Logger(AgentToolExecutorService.name);
+
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
@@ -102,6 +105,13 @@ export class AgentToolExecutorService {
       result = await run();
     } catch (err) {
       if (!ctx.i18n) throw err;
+      // Non-AppException errors (e.g. TypeORM QueryFailedError) may carry
+      // table/column/SQL details. Log them server-side and surface only a
+      // generic localized message to the caller (closes the leak across the
+      // external REST trust boundary). AppException messages are caller-safe.
+      if (!(err instanceof AppException)) {
+        this.logger.error(`Tool "${toolName}" failed with an unexpected error`, err as Error);
+      }
       const errorResult = { error: toolErrorMessage(err, ctx.locale, ctx.i18n) };
       await this.audits.save(
         this.audits.create({
