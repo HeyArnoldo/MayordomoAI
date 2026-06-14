@@ -21,8 +21,9 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { AgentService } from '../agent/agent.service';
 import { isAiEnabled } from '../agent/ai.config';
 import { ConversationsService } from '../chat/conversations.service';
-import { base64Bytes, toImagePart } from '../agent/media.helpers';
-import { MAX_IMAGE_BYTES } from '../agent/media.constants';
+import { base64Bytes, toImagePart, validateDocument, isLowText } from '../agent/media.helpers';
+import { extractDocumentText } from '../agent/document.extract';
+import { MAX_IMAGE_BYTES, MAX_DOCUMENT_BYTES } from '../agent/media.constants';
 import { WaInboundLog } from './wa-inbound-log.entity';
 import { EvolutionClient } from './evolution.client';
 import { TranscriptionService } from './transcription.service';
@@ -39,6 +40,8 @@ export interface EvolutionWebhookPayload {
       extendedTextMessage?: { text?: string };
       audioMessage?: object;
       imageMessage?: { caption?: string; mimetype?: string };
+      /** Evolution uses `fileName` for documents. */
+      documentMessage?: { caption?: string; mimetype?: string; fileName?: string };
       base64?: string;
     };
     messageType?: string;
@@ -120,6 +123,15 @@ export class WhatsappService {
     // Rama de imagen: descarga el binario, construye parts multimodales y enruta al agente.
     if (data?.message?.imageMessage) {
       const reply = await this.handleImage(user, e164, key.id, data.message.imageMessage);
+      if (reply !== null) {
+        await this.evolution.sendText(e164, reply);
+      }
+      return;
+    }
+
+    // Rama de documento: descarga binario, extrae texto, enruta al agente como texto.
+    if (data?.message?.documentMessage) {
+      const reply = await this.handleDocument(user, e164, key.id, data.message.documentMessage);
       if (reply !== null) {
         await this.evolution.sendText(e164, reply);
       }
@@ -216,6 +228,148 @@ export class WhatsappService {
       );
       return fallback;
     }
+
+    const result = this.agent.run(
+      user.id,
+      thread.id,
+      messages,
+      Channel.WHATSAPP,
+      user.name,
+      user.language,
+      resolveCurrency(user.currency),
+    );
+    const reply = (await result.text).trim();
+    await this.conversations.appendMessage(thread, MessageRole.ASSISTANT, reply, Channel.WHATSAPP);
+    return reply;
+  }
+
+  /**
+   * Maneja un documentMessage inbound: descarga base64, valida tamaño/mime,
+   * extrae texto, construye el turn text-only y lo pasa al agente.
+   * Retorna la respuesta del agente, o null si se envió un fallback directamente.
+   */
+  private async handleDocument(
+    user: User,
+    e164: string,
+    messageId: string,
+    documentMessage: { caption?: string; mimetype?: string; fileName?: string },
+  ): Promise<string | null> {
+    let base64: string | null = null;
+    try {
+      base64 = await this.evolution.getBase64(messageId);
+    } catch (err) {
+      this.logger.error(`getBase64 falló para documentMessage ${messageId}: ${String(err)}`);
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
+      );
+      return null;
+    }
+
+    if (!base64) {
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
+      );
+      return null;
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+    const mimetype = documentMessage.mimetype ?? 'application/pdf';
+    const filename = documentMessage.fileName ?? null;
+
+    // Size check before any parsing (zip-bomb / OOM guard)
+    if (buffer.length > MAX_DOCUMENT_BYTES) {
+      await this.evolution.sendText(e164, this.i18n.t(user.language, 'whatsapp.documentTooLarge'));
+      return null;
+    }
+
+    // Validate document (mime, size) — for WhatsApp we pass size directly
+    try {
+      validateDocument({ mediaType: mimetype, filename, size: buffer.length });
+    } catch {
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
+      );
+      return null;
+    }
+
+    // Extract text
+    let extractResult: Awaited<ReturnType<typeof extractDocumentText>>;
+    try {
+      extractResult = await extractDocumentText(buffer, mimetype);
+    } catch (err) {
+      this.logger.error(`Extracción de documento falló para ${messageId}: ${String(err)}`);
+      await this.evolution.sendText(
+        e164,
+        this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
+      );
+      return null;
+    }
+
+    // Low-text check (scanned/image-only document)
+    if (isLowText(extractResult.text)) {
+      await this.evolution.sendText(e164, this.i18n.t(user.language, 'whatsapp.documentNoText'));
+      return null;
+    }
+
+    const caption = documentMessage.caption ?? '';
+    const mediaItems: MediaItem[] = [
+      {
+        type: 'document',
+        mediaType: mimetype,
+        filename,
+        size: buffer.length,
+        pageCount: extractResult.pageCount ?? null,
+      },
+    ];
+
+    // Persist user turn: content = caption (or placeholder), mediaContext = metadata only
+    const thread = await this.conversations.ensureWhatsAppThread(user.id);
+    const userContent = caption || `[document: ${filename ?? mimetype}]`;
+    await this.conversations.appendMessage(
+      thread,
+      MessageRole.USER,
+      userContent,
+      Channel.WHATSAPP,
+      null,
+      mediaItems,
+    );
+
+    if (!isAiEnabled()) {
+      const fallback = this.i18n.t(user.language, 'whatsapp.aiDisabled');
+      await this.conversations.appendMessage(
+        thread,
+        MessageRole.ASSISTANT,
+        fallback,
+        Channel.WHATSAPP,
+      );
+      return fallback;
+    }
+
+    // Build model turn: text-only (no ImagePart — divergence from handleImage)
+    const extractedText = extractResult.truncated
+      ? `${extractResult.text}\n\n[Note: document truncated to fit limits — some content omitted]`
+      : extractResult.text;
+
+    const docLabel = filename ?? mimetype;
+    const contentParts: Array<{ type: 'text'; text: string }> = [
+      { type: 'text', text: `Document: ${docLabel}\n\n${extractedText}` },
+    ];
+    if (caption) {
+      contentParts.push({ type: 'text', text: caption });
+    }
+
+    // Replay history (text-only) + current text turn
+    const history = await this.historyAsModelMessages(user.id, thread.id);
+    // Remove the just-appended user turn from history to avoid duplication
+    const historyWithoutCurrent = history.slice(0, -1);
+    const currentTurn: ModelMessage = {
+      role: 'user',
+      content: contentParts,
+    };
+    const messages: ModelMessage[] = [...historyWithoutCurrent, currentTurn];
 
     const result = this.agent.run(
       user.id,
