@@ -1,6 +1,20 @@
 import { WhatsappService, EvolutionWebhookPayload } from './whatsapp.service';
 import * as aiConfig from '../agent/ai.config';
-import { MAX_IMAGE_BYTES } from '../agent/media.constants';
+import { MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES } from '../agent/media.constants';
+import { DocumentExtractionError } from '../agent/document.extract';
+
+// Mock extractDocumentText so WhatsApp tests don't touch real parsers
+jest.mock('../agent/document.extract', () => ({
+  ...jest.requireActual('../agent/document.extract'),
+  extractDocumentText: jest.fn(),
+}));
+jest.mock('../agent/media.helpers', () => ({
+  ...jest.requireActual('../agent/media.helpers'),
+  isLowText: jest.fn().mockReturnValue(false),
+}));
+
+import { extractDocumentText } from '../agent/document.extract';
+import { isLowText } from '../agent/media.helpers';
 
 // Ensure isAiEnabled returns true for all tests in this suite
 jest.spyOn(aiConfig, 'isAiEnabled').mockReturnValue(true);
@@ -336,6 +350,276 @@ describe('WhatsappService.processInbound — imageMessage branch', () => {
         (m) => !Array.isArray(m.content) && m.content === caption,
       );
       expect(plainCaptionRows).toHaveLength(0);
+    });
+  });
+});
+
+// ── F2: documentMessage branch ────────────────────────────────────────────────
+
+function makeDocumentPayload(
+  opts: {
+    caption?: string;
+    mimetype?: string;
+    fileName?: string;
+    base64InPayload?: string;
+  } = {},
+): EvolutionWebhookPayload {
+  return {
+    event: 'messages.upsert',
+    data: {
+      key: { remoteJid: '51999999999@s.whatsapp.net', fromMe: false, id: 'msg-doc-001' },
+      pushName: 'Test User',
+      message: {
+        documentMessage: {
+          caption: opts.caption,
+          mimetype: opts.mimetype ?? 'application/pdf',
+          fileName: opts.fileName ?? 'report.pdf',
+        },
+        ...(opts.base64InPayload ? { base64: opts.base64InPayload } : {}),
+      },
+      messageType: 'documentMessage',
+    },
+  };
+}
+
+describe('WhatsappService.processInbound — documentMessage branch', () => {
+  beforeEach(() => {
+    // Default: successful extraction returning enough text
+    (extractDocumentText as jest.Mock).mockResolvedValue({
+      text: 'This is the extracted document text with enough content to pass the low-text threshold.',
+      pageCount: 2,
+      truncated: false,
+    });
+    (isLowText as jest.Mock).mockReturnValue(false);
+  });
+
+  describe('when a document with caption arrives and extraction succeeds', () => {
+    it('calls getBase64 to retrieve the binary', async () => {
+      const { service, evolution } = makeService();
+      const payload = makeDocumentPayload({ caption: 'My bank statement' });
+
+      await service.processInbound(payload);
+
+      expect(evolution.getBase64).toHaveBeenCalledWith('msg-doc-001');
+    });
+
+    it('calls extractDocumentText with the decoded buffer', async () => {
+      const { service } = makeService();
+      const payload = makeDocumentPayload({ caption: 'analyze this' });
+
+      await service.processInbound(payload);
+
+      expect(extractDocumentText).toHaveBeenCalledWith(expect.any(Buffer), 'application/pdf');
+    });
+
+    it('calls agent.run with text-only content (no ImagePart)', async () => {
+      const { service, agent } = makeService();
+      const payload = makeDocumentPayload({ caption: 'analyze this' });
+
+      await service.processInbound(payload);
+
+      expect(agent.run).toHaveBeenCalled();
+      const runArgs = agent.run.mock.calls[0];
+      const messages: Array<{ role: string; content: unknown }> = runArgs[2];
+      const lastMsg = messages.at(-1);
+      expect(lastMsg?.role).toBe('user');
+      const content = lastMsg?.content;
+      // Content must be text-only — no image part
+      if (Array.isArray(content)) {
+        const hasImagePart = content.some((p: { type: string }) => p.type === 'image');
+        expect(hasImagePart).toBe(false);
+        const hasTextPart = content.some((p: { type: string }) => p.type === 'text');
+        expect(hasTextPart).toBe(true);
+      } else {
+        // String content also OK
+        expect(typeof content).toBe('string');
+      }
+    });
+
+    it('sends the agent reply back via evolution.sendText', async () => {
+      const { service, evolution } = makeService({
+        agent: makeAgentService('Great, I analyzed the document!'),
+      });
+      const payload = makeDocumentPayload({ caption: 'analyze this' });
+
+      await service.processInbound(payload);
+
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'Great, I analyzed the document!',
+      );
+    });
+
+    it('persists user turn with caption as content and document mediaContext', async () => {
+      const { service, conversations } = makeService();
+      const payload = makeDocumentPayload({ caption: 'my bank statement', fileName: 'bank.pdf' });
+
+      await service.processInbound(payload);
+
+      expect(conversations.appendMessage).toHaveBeenCalled();
+      const userTurnCall = conversations.appendMessage.mock.calls[0];
+      const content = userTurnCall[2];
+      const mediaCtx = userTurnCall[5];
+      expect(content).toBe('my bank statement');
+      expect(Array.isArray(mediaCtx)).toBe(true);
+      expect(mediaCtx[0]).toMatchObject({ type: 'document' });
+    });
+  });
+
+  describe('when a document WITHOUT caption arrives', () => {
+    it('calls agent.run (caption becomes empty but doc is still processed)', async () => {
+      const { service, agent } = makeService();
+      const payload = makeDocumentPayload({ caption: undefined, fileName: 'statement.pdf' });
+
+      await service.processInbound(payload);
+
+      expect(agent.run).toHaveBeenCalled();
+    });
+
+    it('persists [document: fileName] placeholder as content when no caption', async () => {
+      const { service, conversations } = makeService();
+      const payload = makeDocumentPayload({ caption: undefined, fileName: 'statement.pdf' });
+
+      await service.processInbound(payload);
+
+      const userTurnCall = conversations.appendMessage.mock.calls[0];
+      const content = userTurnCall[2];
+      expect(content).toMatch(/\[document:/);
+    });
+  });
+
+  describe('when getBase64 returns null', () => {
+    it('does NOT call agent.run', async () => {
+      const { service, agent } = makeService({
+        evolution: makeEvolution(null),
+      });
+      const payload = makeDocumentPayload({ caption: 'test doc' });
+
+      await service.processInbound(payload);
+
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+
+    it('sends the documentNotUnderstood fallback to the user', async () => {
+      const { service, evolution, i18n } = makeService({
+        evolution: makeEvolution(null),
+      });
+      const payload = makeDocumentPayload({ caption: 'test doc' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentNotUnderstood');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.documentNotUnderstood',
+      );
+    });
+  });
+
+  describe('when getBase64 throws an error', () => {
+    it('does NOT call agent.run', async () => {
+      const evolution = makeEvolution();
+      evolution.getBase64.mockRejectedValue(new Error('Evolution network error'));
+      const { service, agent } = makeService({ evolution });
+      const payload = makeDocumentPayload({ caption: 'test doc' });
+
+      await service.processInbound(payload);
+
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+
+    it('sends the documentNotUnderstood fallback to the user', async () => {
+      const evolution = makeEvolution();
+      evolution.getBase64.mockRejectedValue(new Error('Evolution network error'));
+      const { service, i18n } = makeService({ evolution });
+      const payload = makeDocumentPayload({ caption: 'test doc' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentNotUnderstood');
+    });
+
+    it('logs the error for observability', async () => {
+      const evolution = makeEvolution();
+      evolution.getBase64.mockRejectedValue(new Error('Evolution network error'));
+      const { service } = makeService({ evolution });
+      const payload = makeDocumentPayload({ caption: 'test doc' });
+      const loggerSpy = jest
+        .spyOn((service as unknown as { logger: { error: jest.Mock } }).logger, 'error')
+        .mockImplementation(() => {});
+
+      await service.processInbound(payload);
+
+      expect(loggerSpy).toHaveBeenCalled();
+      loggerSpy.mockRestore();
+    });
+  });
+
+  describe('when the document exceeds MAX_DOCUMENT_BYTES', () => {
+    it('sends documentTooLarge and does NOT call agent.run', async () => {
+      // Build a raw base64 string that decodes to more than MAX_DOCUMENT_BYTES.
+      const oversizedBase64 = 'A'.repeat(MAX_DOCUMENT_BYTES * 2);
+      const evolution = makeEvolution(oversizedBase64);
+      const { service, agent, i18n } = makeService({ evolution });
+      const payload = makeDocumentPayload({ caption: 'big doc' });
+
+      await expect(service.processInbound(payload)).resolves.toBeUndefined();
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentTooLarge');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.documentTooLarge',
+      );
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when isLowText returns true (scanned/image-only document)', () => {
+    it('sends documentNoText and does NOT call agent.run', async () => {
+      (isLowText as jest.Mock).mockReturnValue(true);
+      const { service, agent, i18n, evolution } = makeService();
+      const payload = makeDocumentPayload({ caption: 'scanned pdf' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentNoText');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.documentNoText',
+      );
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when extractDocumentText throws DocumentExtractionError', () => {
+    it('sends documentNotUnderstood and does NOT call agent.run', async () => {
+      (extractDocumentText as jest.Mock).mockRejectedValue(
+        new DocumentExtractionError('corrupt PDF'),
+      );
+      const { service, agent, i18n, evolution } = makeService();
+      const payload = makeDocumentPayload({ caption: 'bad pdf' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentNotUnderstood');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.documentNotUnderstood',
+      );
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when AI is disabled', () => {
+    it('sends aiDisabled fallback and does NOT call agent.run', async () => {
+      jest.spyOn(aiConfig, 'isAiEnabled').mockReturnValueOnce(false);
+      const { service, agent, i18n } = makeService();
+      const payload = makeDocumentPayload({ caption: 'doc when ai off' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.aiDisabled');
+      expect(agent.run).not.toHaveBeenCalled();
     });
   });
 });
