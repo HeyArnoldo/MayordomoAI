@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { resolveCurrency } from '@app/contracts';
 import { AppException } from '../common/errors/app.exception';
 import { UsersService } from '../users/users.service';
-import type { I18nService } from '../i18n/i18n.service';
+import { I18nService } from '../i18n/i18n.service';
 import type { ToolExecCtx } from '../agent/agent-tool-executor.service';
 
 const uuidSchema = z.string().uuid();
@@ -19,7 +19,7 @@ const uuidSchema = z.string().uuid();
 export class AgentToolsContextService {
   constructor(
     private readonly users: UsersService,
-    private readonly i18n: Pick<I18nService, 't'>,
+    private readonly i18n: I18nService,
   ) {}
 
   async build(req: Request): Promise<ToolExecCtx> {
