@@ -39,6 +39,13 @@ export const envSchema = z.object({
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
   ADMIN_NAME: z.string().optional(),
+
+  // Internal MCP / agent-tools API. Both are optional so existing deployments
+  // that do not set them still boot. Endpoints are fail-closed by the guard
+  // (401) when AGENT_TOOL_INTERNAL_KEY is absent, and the context service throws
+  // a SERVICE_UNAVAILABLE error when FOUNDRY_DEMO_USER_ID is absent.
+  AGENT_TOOL_INTERNAL_KEY: z.string().optional(),
+  FOUNDRY_DEMO_USER_ID: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

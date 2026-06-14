@@ -4,12 +4,10 @@ import { Repository } from 'typeorm';
 import {
   BoxScope,
   BoxType,
-  CreateTransactionInput,
   Locale,
   localeSchema,
   currencySchema,
   SUPPORTED_CURRENCIES,
-  TransactionSource,
   TransactionType,
 } from '@app/contracts';
 import { formatMoney } from '@app/i18n';
@@ -20,6 +18,7 @@ import { UsersService } from '../users/users.service';
 import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
 import { toolErrorMessage } from './tool-error.helper';
+import { AgentToolExecutorService } from './agent-tool-executor.service';
 
 /**
  * Herramientas del agente. GUARDRAILS CLAVE:
@@ -96,20 +95,25 @@ async function audited<T>(
   return result;
 }
 
-/** "all"/"todas"/"*" del modelo = sin filtro de caja. */
-const ALL_BOXES = new Set(['all', 'todas', 'todos', '*']);
+export function buildAgentTools(
+  ctx: AgentToolsContext,
+  executor?: AgentToolExecutorService,
+): ToolSet {
+  // Build or reuse executor. When omitted (in-app agent path), construct from
+  // ctx service handles so agent-tools.spec.ts stays green without DI changes.
+  const exec =
+    executor ??
+    new AgentToolExecutorService(ctx.boxes, ctx.transactions, ctx.recurring, ctx.users, ctx.audits);
 
-/** Semana ISO de una fecha YYYY-MM-DD → "2026-W23" (para groupBy=week). */
-function isoWeek(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  const day = d.getUTCDay() || 7; // lunes=1 ... domingo=7
-  d.setUTCDate(d.getUTCDate() + 4 - day); // jueves de la semana ISO
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
-}
+  // Per-call context for the executor (strips service handles).
+  const ec = {
+    userId: ctx.userId,
+    conversationId: ctx.conversationId,
+    locale: ctx.locale,
+    currency: ctx.currency,
+    i18n: ctx.i18n,
+  };
 
-export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
   // Helpers locales para formatear montos en la moneda/idioma del usuario.
   const fmt = (amount: number) => formatMoney(amount, ctx.currency, ctx.locale);
   const threshold = fmt(CONFIRMATION_THRESHOLD);
@@ -121,8 +125,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
         ? 'Current state of all the user\'s boxes: % allocated, monthly allocated amount, spent, available balance and accumulated funds. Use for "how am I doing", "how much do I have left", "balance".'
         : 'Estado actual de todas las cajas del usuario: % asignado, monto asignado del mes, gastado, saldo disponible y acumulado (fondos). Úsala para "cómo voy", "cuánto me queda", "saldo".',
       inputSchema: z.object({}),
-      execute: async (args) =>
-        audited(ctx, 'getBoxBalances', args, () => ctx.boxes.withBalances(ctx.userId)),
+      execute: async (_args) => exec.getBoxBalances(ec),
     }),
 
     queryTransactions: tool({
@@ -177,146 +180,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
         orderBy: z.enum(['date', 'amount']).default('date'),
         limit: z.number().int().min(1).max(100).default(30),
       }),
-      execute: async (args) =>
-        audited(ctx, 'queryTransactions', args, async () => {
-          const allBoxes = await ctx.boxes.findAll(ctx.userId);
-
-          // Resuelve nombres → ids (filtro en memoria: list() solo filtra por una caja).
-          let boxIds: Set<string> | null = null;
-          const wanted = (args.boxNames ?? []).filter(
-            (n) => !ALL_BOXES.has(n.trim().toLowerCase()),
-          );
-          if (wanted.length > 0) {
-            const ids = new Set<string>();
-            const missing: string[] = [];
-            for (const name of wanted) {
-              const box = allBoxes.find((b) => b.name.toLowerCase() === name.trim().toLowerCase());
-              if (box) ids.add(box.id);
-              else missing.push(name);
-            }
-            if (missing.length > 0) {
-              return {
-                error: isEn
-                  ? `These boxes do not exist: ${missing.join(', ')}`
-                  : `Estas cajas no existen: ${missing.join(', ')}`,
-                availableBoxes: allBoxes.filter((b) => b.active).map((b) => b.name),
-                hint: isEn
-                  ? 'Omit boxNames to search across ALL boxes.'
-                  : 'Omite boxNames para buscar en TODAS las cajas.',
-              };
-            }
-            boxIds = ids;
-          }
-
-          // Texto/cajas/agregación se filtran post-query: hay que escanear más filas.
-          const scanAll =
-            args.groupBy !== 'none' ||
-            !!args.textQuery ||
-            boxIds !== null ||
-            args.orderBy === 'amount';
-          const txs = await ctx.transactions.list(ctx.userId, {
-            type: args.type,
-            from: args.from,
-            to: args.to,
-            includeVoided: false,
-            limit: scanAll ? 500 : args.limit,
-            offset: 0,
-          });
-
-          // Si llegan exactamente 500 filas, el escaneo pudo quedar truncado.
-          const truncated = txs.length === 500;
-
-          const names = new Map(allBoxes.map((b) => [b.id, b.name]));
-          const q = args.textQuery?.trim().toLowerCase();
-          const matches = txs
-            .map(toTransactionDto)
-            .filter((t) => !boxIds || (t.boxId !== null && boxIds.has(t.boxId)))
-            .filter((t) => !q || (t.note?.toLowerCase().includes(q) ?? false))
-            .map((t) => ({ ...t, boxName: t.boxId ? (names.get(t.boxId) ?? null) : null }));
-
-          const round2 = (n: number) => Math.round(n * 100) / 100;
-          const total = round2(matches.reduce((s, t) => s + t.amount, 0));
-
-          if (args.groupBy === 'none') {
-            const sorted =
-              args.orderBy === 'amount'
-                ? [...matches].sort((a, b) => b.amount - a.amount)
-                : matches;
-            return {
-              matches: sorted.slice(0, args.limit),
-              count: matches.length,
-              total,
-              ...(truncated
-                ? {
-                    warning: isEn
-                      ? 'Only the most recent 500 transactions were scanned; results may be incomplete. Narrow the date range for exact figures.'
-                      : 'Solo se escanearon los 500 movimientos más recientes; los resultados pueden estar incompletos. Acota el rango de fechas para cifras exactas.',
-                  }
-                : {}),
-            };
-          }
-
-          const keyOf = (t: (typeof matches)[number]): string => {
-            switch (args.groupBy) {
-              case 'box':
-                return t.boxName ?? (isEn ? '(no box)' : '(sin caja)');
-              case 'day':
-                return t.date;
-              case 'month':
-                return t.date.slice(0, 7);
-              default:
-                return isoWeek(t.date);
-            }
-          };
-          const groups = new Map<string, { total: number; count: number; max: number }>();
-          for (const t of matches) {
-            const k = keyOf(t);
-            const g = groups.get(k) ?? { total: 0, count: 0, max: 0 };
-            g.total += t.amount;
-            g.count += 1;
-            g.max = Math.max(g.max, t.amount);
-            groups.set(k, g);
-          }
-
-          // Por caja: el asignado del mes permite detectar excesos (% del asignado).
-          const allocated =
-            args.groupBy === 'box'
-              ? new Map(
-                  (await ctx.boxes.withBalances(ctx.userId)).map((b) => [b.name, b.allocated]),
-                )
-              : null;
-
-          const rows = [...groups.entries()]
-            .map(([key, g]) => ({
-              group: key,
-              total: round2(g.total),
-              count: g.count,
-              avg: round2(g.total / g.count),
-              max: round2(g.max),
-              ...(allocated
-                ? {
-                    allocated: allocated.get(key) ?? null,
-                    pctOfAllocated:
-                      (allocated.get(key) ?? 0) > 0
-                        ? Math.round((g.total / allocated.get(key)!) * 100)
-                        : null,
-                  }
-                : {}),
-            }))
-            .sort((a, b) => b.total - a.total);
-          return {
-            groups: rows,
-            count: matches.length,
-            total,
-            ...(truncated
-              ? {
-                  warning: isEn
-                    ? 'Only the most recent 500 transactions were scanned; results may be incomplete. Narrow the date range for exact figures.'
-                    : 'Solo se escanearon los 500 movimientos más recientes; los resultados pueden estar incompletos. Acota el rango de fechas para cifras exactas.',
-                }
-              : {}),
-          };
-        }),
+      execute: async (args) => exec.queryTransactions(ec, args),
     }),
 
     registerTransaction: tool({
@@ -347,53 +211,7 @@ export function buildAgentTools(ctx: AgentToolsContext): ToolSet {
               : 'true SOLO si el usuario ya confirmó explícitamente este registro',
           ),
       }),
-      execute: async (args) =>
-        audited(ctx, 'registerTransaction', args, async () => {
-          // Guardrail server-side: el umbral no es negociable por prompt.
-          if (
-            args.type === TransactionType.EXPENSE &&
-            args.amount >= CONFIRMATION_THRESHOLD &&
-            !args.userConfirmed
-          ) {
-            return {
-              needsConfirmation: true,
-              message: isEn
-                ? `High amount (${fmt(args.amount)}). Ask the user for confirmation before recording.`
-                : `Monto alto (${fmt(args.amount)}). Pide confirmación al usuario antes de registrar.`,
-            };
-          }
-          let boxId: string | null | undefined;
-          if (args.type === TransactionType.EXPENSE) {
-            if (!args.boxName) {
-              return {
-                error: isEn
-                  ? 'An expense requires the box name'
-                  : 'Un gasto necesita el nombre de la caja',
-              };
-            }
-            const all = await ctx.boxes.findAll(ctx.userId);
-            boxId = all.find((b) => b.name.toLowerCase() === args.boxName!.toLowerCase())?.id;
-            if (!boxId) {
-              return {
-                error: isEn
-                  ? `Box "${args.boxName}" does not exist`
-                  : `No existe la caja "${args.boxName}"`,
-                availableBoxes: all.filter((b) => b.active).map((b) => b.name),
-              };
-            }
-          }
-          const input: CreateTransactionInput = {
-            type: args.type,
-            boxId: boxId ?? null,
-            amount: Math.round(args.amount * 100) / 100,
-            note: args.note,
-          };
-          const tx = await ctx.transactions.create(ctx.userId, input, TransactionSource.PWA);
-          // Devuelve el saldo resultante para que el bot responda con el saldo disponible.
-          const balances = await ctx.boxes.withBalances(ctx.userId);
-          const box = balances.find((b) => b.id === tx.boxId);
-          return { registered: toTransactionDto(tx), boxBalance: box ?? null };
-        }),
+      execute: async (args) => exec.registerTransaction(ec, args),
     }),
 
     getExchangeRate: tool({
