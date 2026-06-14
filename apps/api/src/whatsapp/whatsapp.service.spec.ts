@@ -413,6 +413,12 @@ describe('WhatsappService.processInbound — documentMessage branch', () => {
     });
 
     it('calls agent.run with text-only content (no ImagePart)', async () => {
+      const EXTRACTED = 'EXTRACTED_DOC_BODY';
+      (extractDocumentText as jest.Mock).mockResolvedValueOnce({
+        text: EXTRACTED,
+        pageCount: 1,
+        truncated: false,
+      });
       const { service, agent } = makeService();
       const payload = makeDocumentPayload({ caption: 'analyze this' });
 
@@ -428,11 +434,15 @@ describe('WhatsappService.processInbound — documentMessage branch', () => {
       if (Array.isArray(content)) {
         const hasImagePart = content.some((p: { type: string }) => p.type === 'image');
         expect(hasImagePart).toBe(false);
-        const hasTextPart = content.some((p: { type: string }) => p.type === 'text');
-        expect(hasTextPart).toBe(true);
+        // The extracted document body must appear in one of the text parts
+        const combinedText = content
+          .filter((p: { type: string; text?: string }) => p.type === 'text')
+          .map((p: { type: string; text?: string }) => p.text ?? '')
+          .join('\n');
+        expect(combinedText).toContain(EXTRACTED);
       } else {
-        // String content also OK
-        expect(typeof content).toBe('string');
+        // String content must also carry the extracted text
+        expect(String(content)).toContain(EXTRACTED);
       }
     });
 
@@ -598,6 +608,27 @@ describe('WhatsappService.processInbound — documentMessage branch', () => {
       );
       const { service, agent, i18n, evolution } = makeService();
       const payload = makeDocumentPayload({ caption: 'bad pdf' });
+
+      await service.processInbound(payload);
+
+      expect(i18n.t).toHaveBeenCalledWith(expect.anything(), 'whatsapp.documentNotUnderstood');
+      expect(evolution.sendText).toHaveBeenCalledWith(
+        '+51999999999',
+        'i18n:whatsapp.documentNotUnderstood',
+      );
+      expect(agent.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the document has an unsupported MIME type', () => {
+    it('sends documentNotUnderstood and does NOT call agent.run', async () => {
+      // application/zip is not in the allowed MIME list — validateDocument should throw
+      const { service, agent, i18n, evolution } = makeService();
+      const payload = makeDocumentPayload({
+        caption: 'here is my zip',
+        mimetype: 'application/zip',
+        fileName: 'archive.zip',
+      });
 
       await service.processInbound(payload);
 

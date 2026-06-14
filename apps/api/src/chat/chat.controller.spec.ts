@@ -665,6 +665,47 @@ describe('ChatController (document branch)', () => {
 
       expect(extractDocumentText).toHaveBeenCalledWith(expect.any(Buffer), 'application/pdf');
     });
+
+    it('passes extracted document text (not a file part) to agent.run in the current-turn message', async () => {
+      const EXTRACTED_DOC_BODY = 'EXTRACTED_DOC_BODY';
+      (extractDocumentText as jest.Mock).mockResolvedValueOnce({
+        text: EXTRACTED_DOC_BODY,
+        pageCount: 2,
+        truncated: false,
+      });
+      agent.run.mockReturnValue(makeRunResult());
+      const messages = makeDocumentMessages(
+        [{ mediaType: 'application/pdf', url: makeDocDataUrl(), filename: 'report.pdf' }],
+        'please summarize',
+      );
+      const body = { conversationId: 'c1', messages };
+      const res = {};
+
+      await controller.chat(user as never, body as never, res as never);
+
+      expect(agent.run).toHaveBeenCalled();
+      const modelMessages: Array<{ role: string; content: unknown }> = agent.run.mock.calls[0][2];
+      const lastMsg = modelMessages.at(-1);
+      expect(lastMsg?.role).toBe('user');
+
+      // The current-turn message must NOT have any file part for the document
+      if (Array.isArray(lastMsg?.content)) {
+        const hasFilePart = (lastMsg.content as Array<{ type: string }>).some(
+          (p) => p.type === 'file',
+        );
+        expect(hasFilePart).toBe(false);
+
+        // It MUST have a text part containing the extracted body
+        const combinedText = (lastMsg.content as Array<{ type: string; text?: string }>)
+          .filter((p) => p.type === 'text')
+          .map((p) => p.text ?? '')
+          .join('\n');
+        expect(combinedText).toContain(EXTRACTED_DOC_BODY);
+      } else {
+        // String content path — must also carry extracted text
+        expect(String(lastMsg?.content)).toContain(EXTRACTED_DOC_BODY);
+      }
+    });
   });
 
   describe('when extractDocumentText throws DocumentExtractionError', () => {
