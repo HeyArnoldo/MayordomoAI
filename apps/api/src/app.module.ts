@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { BoxesModule } from './boxes/boxes.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { AgentModule } from './agent/agent.module';
+import { AgentToolsApiModule } from './agent-tools-api/agent-tools-api.module';
 import { ChatModule } from './chat/chat.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module';
     BoxesModule,
     TransactionsModule,
     AgentModule,
+    AgentToolsApiModule,
     ChatModule,
     WhatsappModule,
     HealthModule,
