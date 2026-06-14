@@ -81,7 +81,7 @@ Satisfies: `multimodal-input/spec.md § Channel Parity`, design §§2, 4.2, 5.4,
 
 - TDD: YES — write tests first
 - Files:
-  - `apps/api/src/agent/media.helpers.spec.ts` — add scenarios: strips file parts from all messages except the last user message, leaves text/tool parts intact for all messages, does NOT strip the last user message's image parts, handles history with no images (no-op)
+  - `apps/api/src/agent/media.helpers.spec.ts` — add scenarios: replaces image file parts with a `[image: …]` text placeholder in all messages except the last user message (filename used when present, mediaType fallback otherwise), leaves text/tool parts intact for all messages, image-only message becomes exactly one text placeholder part (never empty parts), does NOT strip the last user message's image parts, handles history with no images (no-op)
   - `apps/api/src/agent/media.helpers.ts` — implement `stripImagesFromHistory`
 - Test target: `pnpm --filter @app/api run test -- media.helpers`
 

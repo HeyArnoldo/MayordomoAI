@@ -63,6 +63,16 @@ describe('base64Bytes', () => {
     const b64 = buf.toString('base64');
     expect(base64Bytes(b64)).toBe(1024);
   });
+
+  it('treats a data: prefixed string as raw input (caller must strip prefix)', () => {
+    // base64Bytes expects the RAW payload only. If a full data URL is passed,
+    // the byte count includes the prefix bytes and is therefore NOT equal to
+    // the byte count of the underlying payload. This documents the contract:
+    // callers (validateImageParts) strip the prefix before calling.
+    const payload = makeBase64OfSize(100);
+    const dataUrl = makeDataUrl('image/jpeg', payload);
+    expect(base64Bytes(dataUrl)).not.toBe(base64Bytes(payload));
+  });
 });
 
 // ── B3: toImagePart ───────────────────────────────────────────────────────────
@@ -168,6 +178,49 @@ describe('validateImageParts', () => {
     expect(() => validateImageParts(parts)).not.toThrow();
     expect(validateImageParts(parts)).toHaveLength(MAX_IMAGES);
   });
+
+  it('accepts EXACTLY 2 images (count boundary inclusive)', () => {
+    const parts = [
+      makeFilePart('image/jpeg', 100, 'a.jpg'),
+      makeFilePart('image/png', 100, 'b.png'),
+    ];
+    expect(() => validateImageParts(parts)).not.toThrow();
+    expect(validateImageParts(parts)).toHaveLength(2);
+  });
+
+  it('rejects 3 images (one over the count boundary)', () => {
+    const parts = [
+      makeFilePart('image/jpeg', 100, 'a.jpg'),
+      makeFilePart('image/jpeg', 100, 'b.jpg'),
+      makeFilePart('image/jpeg', 100, 'c.jpg'),
+    ];
+    expect(() => validateImageParts(parts)).toThrow();
+  });
+
+  it('accepts an image at EXACTLY MAX_IMAGE_BYTES (size boundary inclusive)', () => {
+    const atLimit = makeFilePart('image/jpeg', MAX_IMAGE_BYTES, 'exact.jpg');
+    expect(() => validateImageParts([atLimit])).not.toThrow();
+    const [item] = validateImageParts([atLimit]);
+    expect(item.size).toBe(MAX_IMAGE_BYTES);
+  });
+
+  it('rejects an image one byte over MAX_IMAGE_BYTES', () => {
+    const overLimit = makeFilePart('image/jpeg', MAX_IMAGE_BYTES + 1, 'over.jpg');
+    expect(() => validateImageParts([overLimit])).toThrow();
+  });
+
+  it('fails fast on a mix of valid and invalid parts', () => {
+    const valid = makeFilePart('image/jpeg', 100, 'ok.jpg');
+    const invalid = {
+      type: 'file' as const,
+      mediaType: 'application/pdf',
+      filename: 'doc.pdf',
+      url: 'data:application/pdf;base64,dGVzdA==',
+    };
+    // A single invalid part must cause the whole call to reject.
+    expect(() => validateImageParts([valid, invalid])).toThrow();
+    expect(() => validateImageParts([invalid, valid])).toThrow();
+  });
 });
 
 // ── B5: stripImagesFromHistory ────────────────────────────────────────────────
@@ -185,7 +238,7 @@ function makeMessage(role: UIMessage['role'], parts: UIMessage['parts'], id = 'm
 }
 
 describe('stripImagesFromHistory', () => {
-  it('strips file parts from all messages except the last user message', () => {
+  it('replaces file parts with a text placeholder in all messages except the last user message', () => {
     const older = makeMessage(
       'user',
       [...makeFileParts(1), makeTextPart('here is a receipt')],
@@ -194,14 +247,73 @@ describe('stripImagesFromHistory', () => {
     const last = makeMessage('user', [...makeFileParts(1), makeTextPart('and this one')], 'last');
     const result = stripImagesFromHistory([older, last]);
 
-    // older user message: file part stripped, text part kept
+    // older user message: file part replaced by placeholder, original text kept
     const olderResult = result.find((m) => m.id === 'old')!;
     expect(olderResult.parts.some((p) => p.type === 'file')).toBe(false);
-    expect(olderResult.parts.some((p) => p.type === 'text')).toBe(true);
+    expect(olderResult.parts.some((p) => p.type === 'text' && p.text.startsWith('[image:'))).toBe(
+      true,
+    );
+    expect(olderResult.parts.some((p) => p.type === 'text' && p.text === 'here is a receipt')).toBe(
+      true,
+    );
+    // No empty turn — count is preserved (image → placeholder, text stays)
+    expect(olderResult.parts).toHaveLength(2);
 
     // last user message: file part kept intact
     const lastResult = result.find((m) => m.id === 'last')!;
     expect(lastResult.parts.some((p) => p.type === 'file')).toBe(true);
+  });
+
+  it('turns an image-only message into exactly one text placeholder part (filename used)', () => {
+    const imageOnly = makeMessage('user', [...makeFileParts(1)], 'io');
+    const lastUser = makeMessage('user', [makeTextPart('thanks')], 'lu');
+    const result = stripImagesFromHistory([imageOnly, lastUser]);
+
+    const ioResult = result.find((m) => m.id === 'io')!;
+    expect(ioResult.parts).toHaveLength(1);
+    const [part] = ioResult.parts;
+    expect(part.type).toBe('text');
+    expect((part as { text: string }).text).toBe('[image: img.jpg]');
+  });
+
+  it('uses mediaType as the placeholder label when no filename is present', () => {
+    const noNamePart = {
+      type: 'file' as const,
+      mediaType: 'image/png',
+      url: makeDataUrl('image/png', makeBase64OfSize(100)),
+    };
+    const imageOnly = makeMessage('user', [noNamePart] as UIMessage['parts'], 'io');
+    const lastUser = makeMessage('user', [makeTextPart('thanks')], 'lu');
+    const result = stripImagesFromHistory([imageOnly, lastUser]);
+
+    const ioResult = result.find((m) => m.id === 'io')!;
+    expect(ioResult.parts).toHaveLength(1);
+    expect((ioResult.parts[0] as { text: string }).text).toBe('[image: image/png]');
+  });
+
+  it('replaces the image in-position in a mixed text+image message', () => {
+    const mixed = makeMessage(
+      'user',
+      [makeTextPart('before'), ...makeFileParts(1), makeTextPart('after')],
+      'mx',
+    );
+    const lastUser = makeMessage('user', [makeTextPart('thanks')], 'lu');
+    const result = stripImagesFromHistory([mixed, lastUser]);
+
+    const mxResult = result.find((m) => m.id === 'mx')!;
+    expect(mxResult.parts).toHaveLength(3);
+    expect((mxResult.parts[0] as { text: string }).text).toBe('before');
+    expect(mxResult.parts[1].type).toBe('text');
+    expect((mxResult.parts[1] as { text: string }).text).toBe('[image: img.jpg]');
+    expect((mxResult.parts[2] as { text: string }).text).toBe('after');
+  });
+
+  it('does not mutate the input messages', () => {
+    const older = makeMessage('user', [...makeFileParts(1), makeTextPart('hi')], 'old');
+    const lastUser = makeMessage('user', [makeTextPart('thanks')], 'lu');
+    const before = JSON.parse(JSON.stringify(older.parts));
+    stripImagesFromHistory([older, lastUser]);
+    expect(JSON.parse(JSON.stringify(older.parts))).toEqual(before);
   });
 
   it('leaves text parts intact for all messages and does not strip non-file parts', () => {

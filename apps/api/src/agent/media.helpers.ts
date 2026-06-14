@@ -5,6 +5,12 @@ import { IMAGE_MIME_ALLOWLIST, MAX_IMAGE_BYTES, MAX_IMAGES } from './media.const
 /**
  * Computes the decoded byte length of a base64-encoded string.
  * Accounts for `=` and `==` padding characters.
+ *
+ * NOTE: this expects the RAW base64 payload only — NOT a full data URL.
+ * Callers (e.g. `validateImageParts`) MUST strip any `data:<mime>;base64,`
+ * prefix before calling. If a `data:` prefixed string is passed, the returned
+ * count includes the prefix bytes and will be wrong; that is the caller's
+ * contract violation, not handled here.
  */
 export function base64Bytes(base64: string): number {
   if (!base64) return 0;
@@ -77,11 +83,18 @@ export function validateImageParts(
 }
 
 /**
- * Removes file (image) parts from every message in `messages` EXCEPT the
- * last user message. Text, tool, and all other part types are left intact.
+ * Replaces file (image) binary parts with a short text placeholder in every
+ * message in `messages` EXCEPT the last user message. Text, tool, and all other
+ * part types are left intact.
  *
  * This is the cost-guardrail that prevents image binaries from being replayed
- * into the model on subsequent turns.
+ * into the model on subsequent turns, while preserving conversational context
+ * via a textual note (e.g. `[image: receipt.jpg]`). Replacing — rather than
+ * dropping — also guarantees an image-only turn never becomes `parts: []`,
+ * which downstream `convertToModelMessages` would reject.
+ *
+ * Inputs are never mutated. Messages with no image parts are returned by
+ * reference unchanged.
  */
 export function stripImagesFromHistory(messages: UIMessage[]): UIMessage[] {
   if (messages.length === 0) return [];
@@ -99,9 +112,18 @@ export function stripImagesFromHistory(messages: UIMessage[]): UIMessage[] {
     // Last user message: keep everything intact
     if (idx === lastUserIdx) return msg;
 
-    // All other messages: drop file parts
-    const filteredParts = msg.parts.filter((p) => p.type !== 'file');
-    if (filteredParts.length === msg.parts.length) return msg; // no change, same ref
-    return { ...msg, parts: filteredParts };
+    // No image parts → no change, return same reference
+    if (!msg.parts.some((p) => p.type === 'file')) return msg;
+
+    // Replace each image/file binary part with a short text placeholder,
+    // keeping all other parts (text, tool, …) in their original position.
+    const mappedParts = msg.parts.map((p) => {
+      if (p.type !== 'file') return p;
+      const filePart = p as { type: 'file'; mediaType?: string; filename?: string };
+      const label = filePart.filename ?? filePart.mediaType ?? 'image';
+      return { type: 'text' as const, text: `[image: ${label}]` };
+    });
+
+    return { ...msg, parts: mappedParts as UIMessage['parts'] };
   });
 }
