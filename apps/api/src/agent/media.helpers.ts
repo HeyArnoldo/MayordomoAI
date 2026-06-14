@@ -199,9 +199,12 @@ export function stripMediaFromHistory(messages: UIMessage[]): UIMessage[] {
     const mappedParts = msg.parts.map((p) => {
       if (p.type !== 'file') return p;
       const filePart = p as { type: 'file'; mediaType?: string; filename?: string };
-      const label = filePart.filename ?? filePart.mediaType ?? 'file';
       const isDoc = (filePart.mediaType ?? '').match(/pdf|word|sheet|csv|excel|document/i);
       const prefix = isDoc ? 'document' : 'image';
+      // Fall back to the prefix variant so image-only output stays byte-identical
+      // to the original stripImagesFromHistory (`[image: image]` when no
+      // filename/mediaType); documents fall back to `[document: document]`.
+      const label = filePart.filename ?? filePart.mediaType ?? prefix;
       return { type: 'text' as const, text: `[${prefix}: ${label}]` };
     });
 
