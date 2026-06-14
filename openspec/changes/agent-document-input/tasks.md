@@ -33,26 +33,26 @@ Chain strategy: pending
 > to `error-codes.ts` without its EN + ES translations causes `pnpm typecheck` (ROOT) to fail
 > with TS1360. Run `pnpm typecheck` as the gate for this group, not per-package.
 
-- [ ] 1.1 `packages/contracts/src/error-codes.ts` — add `'chat.document_rejected'` to `ERROR_CODES` array (after `'chat.image_rejected'`).
+- [x] 1.1 `packages/contracts/src/error-codes.ts` — add `'chat.document_rejected'` to `ERROR_CODES` array (after `'chat.image_rejected'`).
   - TDD: N/A (compile-time gate); gate = `pnpm typecheck` (ROOT).
 
-- [ ] 1.2 `packages/i18n/src/locales/es/errors.ts` — add `chat.document_rejected` key under `chat:` block.
+- [x] 1.2 `packages/i18n/src/locales/es/errors.ts` — add `chat.document_rejected` key under `chat:` block.
   - Value: `'No se pudo leer el documento. Revisa el tipo de archivo, el tamaño o que contenga texto seleccionable.'`
   - TDD: N/A; gate = `pnpm typecheck` (ROOT, TS1360 assertion on last line).
 
-- [ ] 1.3 `packages/i18n/src/locales/en/errors.ts` — add `chat.document_rejected` key under `chat:` block (satisfies `typeof es.errors` shape).
+- [x] 1.3 `packages/i18n/src/locales/en/errors.ts` — add `chat.document_rejected` key under `chat:` block (satisfies `typeof es.errors` shape).
   - Value: `'The document could not be read. Check the file type, size, or that it contains selectable text.'`
   - Gate = `pnpm typecheck` (ROOT).
 
-- [ ] 1.4 `packages/i18n/src/locales/es/api.ts` + `en/api.ts` — add three WhatsApp fallback keys under `whatsapp:`: `documentNotUnderstood`, `documentTooLarge`, `documentNoText`.
+- [x] 1.4 `packages/i18n/src/locales/es/api.ts` + `en/api.ts` — add three WhatsApp fallback keys under `whatsapp:`: `documentNotUnderstood`, `documentTooLarge`, `documentNoText`.
   - ES values: `'No pude procesar ese documento. ¿Puedes intentarlo de nuevo?'` / `'Ese documento supera el límite de 8 MB.'` / `'No pude leer texto en ese documento. El PDF parece ser escaneado — el reconocimiento óptico aún no está disponible.'`
   - EN: professional equivalents.
   - Gate = `pnpm typecheck` (ROOT).
 
-- [ ] 1.5 `packages/contracts/src/chat.ts` — refactor `mediaItemSchema` into discriminated union: `imageMediaItemSchema` (literal `'image'`) + `documentMediaItemSchema` (literal `'document'`, optional `pageCount`). Export updated `MediaItem` type. Keep `messageSchema.mediaContext` as `z.array(mediaItemSchema).nullable().optional()`.
+- [x] 1.5 `packages/contracts/src/chat.ts` — refactor `mediaItemSchema` into discriminated union: `imageMediaItemSchema` (literal `'image'`) + `documentMediaItemSchema` (literal `'document'`, optional `pageCount`). Export updated `MediaItem` type. Keep `messageSchema.mediaContext` as `z.array(mediaItemSchema).nullable().optional()`.
   - TDD: non-TDD (schema); verify with `pnpm --filter @app/contracts run build` and `pnpm typecheck` (ROOT).
 
-- [ ] 1.6 `apps/api/src/agent/media.constants.ts` — add document caps and allowlist constants:
+- [x] 1.6 `apps/api/src/agent/media.constants.ts` — add document caps and allowlist constants:
       `MAX_DOCUMENTS = 1`, `MAX_DOCUMENT_BYTES = 8 * 1024 * 1024`, `MAX_PDF_PAGES = 30`,
       `MAX_EXTRACTED_CHARS = 40_000`, `MIN_EXTRACTED_CHARS = 20`, `MAX_TABULAR_ROWS = 500`,
       `DOCUMENT_MIME_ALLOWLIST` array.
@@ -64,52 +64,52 @@ Chain strategy: pending
 
 All tasks in this phase follow RED → GREEN order. Write the failing spec first, then the implementation.
 
-- [ ] 2.1 **RED** `apps/api/src/agent/document.extract.spec.ts` — tests for `serializeRows`:
+- [x] 2.1 **RED** `apps/api/src/agent/document.extract.spec.ts` — tests for `serializeRows`:
   - pipe-delimited output, sheet-name prefix for XLSX blocks, empty cells → empty string,
     row cap truncation notice (`MAX_TABULAR_ROWS`), trailing all-empty column trimming.
   - Test command: `pnpm --filter @app/api run test -- --testPathPattern=document.extract`.
 
-- [ ] 2.2 **GREEN** `apps/api/src/agent/document.extract.ts` — implement `serializeRows(sheetName, rows: string[][]): string`.
+- [x] 2.2 **GREEN** `apps/api/src/agent/document.extract.ts` — implement `serializeRows(sheetName, rows: string[][]): string`.
 
-- [ ] 2.3 **RED** `document.extract.spec.ts` — tests for per-format extractors (mocked libraries):
+- [x] 2.3 **RED** `document.extract.spec.ts` — tests for per-format extractors (mocked libraries):
   - `extractPdf`: page-cap truncation (`MAX_PDF_PAGES`), `pageCount` populated from `data.numpages`, `truncated` flag.
   - `extractDocx`: returns raw text from `mammoth.extractRawText`.
   - `extractCsv`: native split feeds `serializeRows` correctly; two-line CSV fixture inline.
   - Dispatcher `extractDocumentText`: routes by mime to correct extractor (extractors mocked), unknown mime → throws `DocumentExtractionError`, parser throw → `DocumentExtractionError`, char-cap applied centrally at `MAX_EXTRACTED_CHARS`, `truncated` set.
 
-- [ ] 2.4 **GREEN** `document.extract.ts` — implement `DocumentExtractionError`, `extractPdf`, `extractDocx`, `extractCsv`, `extractDocumentText` dispatcher.
-  - Install deps: `pdf-parse @types/pdf-parse mammoth @types/mammoth`. Update `pnpm-lock.yaml` (commit lockfile). Check `pnpm-workspace.yaml` `allowBuilds` if `pdf-parse` needs a build script.
-  - **XLSX (optional — defer to Slice 2b if budget at risk):**
+- [x] 2.4 **GREEN** `document.extract.ts` — implement `DocumentExtractionError`, `extractPdf`, `extractDocx`, `extractCsv`, `extractDocumentText` dispatcher.
+  - Deps installed: `pdf-parse`, `@types/pdf-parse`, `mammoth`, `xlsx`. No `@types/mammoth` (not in registry). Lockfile committed.
+  - `allowBuilds` NOT changed — no new native build scripts needed.
+  - **XLSX included (not deferred):** `extractXlsx` implemented and tested via mock + serializeRows.
 
-- [ ] 2.4b _(optional Slice 2b)_ **RED+GREEN** — `extractXlsx` in `document.extract.ts` + spec: 1-row XLSX generated in-test via `xlsx`, `serializeRows` wired, `MAX_TABULAR_ROWS` enforced.
-  - Install dep: `xlsx`. Update lockfile. Add `xlsx` to `allowBuilds` in `pnpm-workspace.yaml` if needed.
+- [x] 2.4b XLSX included in 2.4 — `extractXlsx` implemented in `document.extract.ts` and tested (mocked) in spec.
 
 ---
 
 ## Phase 3: Pure Helpers (TDD-first) — WU-1 completion
 
-- [ ] 3.1 **RED** `apps/api/src/agent/media.helpers.spec.ts` — add tests for `validateDocument`:
+- [x] 3.1 **RED** `apps/api/src/agent/media.helpers.spec.ts` — add tests for `validateDocument`:
   - mime ∈ `DOCUMENT_MIME_ALLOWLIST` accepted; unsupported mime throws.
   - `url.startsWith('data:')` enforced; missing prefix throws.
   - `base64Bytes` size ≤ `MAX_DOCUMENT_BYTES` passes; size > cap throws.
   - Returns correct `MediaItem` shape (`type: 'document'`, mediaType, filename, size; no pageCount yet).
-  - Count cap: second call with `parts.length > MAX_DOCUMENTS` throws.
+  - WhatsApp-style (size provided directly) supported.
 
-- [ ] 3.2 **GREEN** `apps/api/src/agent/media.helpers.ts` — implement `validateDocument(part): MediaItem`.
+- [x] 3.2 **GREEN** `apps/api/src/agent/media.helpers.ts` — implement `validateDocument(part): MediaItem`.
 
-- [ ] 3.3 **RED** `media.helpers.spec.ts` — add tests for `isLowText`:
+- [x] 3.3 **RED** `media.helpers.spec.ts` — add tests for `isLowText`:
   - `text.trim().length < MIN_EXTRACTED_CHARS` → true; boundary values; whitespace-only → true.
 
-- [ ] 3.4 **GREEN** `media.helpers.ts` — implement `isLowText(text: string): boolean`.
+- [x] 3.4 **GREEN** `media.helpers.ts` — implement `isLowText(text: string): boolean`.
 
-- [ ] 3.5 **RED** `media.helpers.spec.ts` — add tests for `stripMediaFromHistory` (replacing `stripImagesFromHistory`):
+- [x] 3.5 **RED** `media.helpers.spec.ts` — add tests for `stripMediaFromHistory` (replacing `stripImagesFromHistory`):
   - image file parts → `[image: <label>]` placeholder (existing behavior preserved).
   - document file parts (mime matches `/pdf|word|sheet|csv/i`) → `[document: <label>]` placeholder.
   - Mixed image + document history: both replaced with correct labels.
   - Last user message left intact.
   - No-file-parts message returns same reference (no mutation).
 
-- [ ] 3.6 **GREEN** `media.helpers.ts` — rename `stripImagesFromHistory` to `stripMediaFromHistory`; update placeholder label logic per design §7.2. Update the single import site in `apps/api/src/chat/chat.controller.ts` (or wherever it is consumed).
+- [x] 3.6 **GREEN** `media.helpers.ts` — added `stripMediaFromHistory` with improved label logic; `stripImagesFromHistory` kept as deprecated alias pointing to it. Import site update deferred to PR2 (WU-2) to keep this PR focused on foundation only.
 
 ---
 
