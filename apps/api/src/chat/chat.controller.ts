@@ -43,7 +43,7 @@ import {
   isLowText,
   stripMediaFromHistory,
 } from '../agent/media.helpers';
-import { extractDocumentText, DocumentExtractionError } from '../agent/document.extract';
+import { extractDocumentText } from '../agent/document.extract';
 import { MAX_DOCUMENTS, DOCUMENT_MIME_ALLOWLIST } from '../agent/media.constants';
 import { Conversation } from './conversation.entity';
 import { Message } from './message.entity';
@@ -259,14 +259,7 @@ export class ChatController {
           let extractResult: Awaited<ReturnType<typeof extractDocumentText>>;
           try {
             extractResult = await extractDocumentText(buffer, docPart.mediaType ?? '');
-          } catch (err) {
-            if (err instanceof DocumentExtractionError) {
-              throw new AppException(
-                'chat.document_rejected',
-                HttpStatus.BAD_REQUEST,
-                'Document text extraction failed.',
-              );
-            }
+          } catch {
             throw new AppException(
               'chat.document_rejected',
               HttpStatus.BAD_REQUEST,

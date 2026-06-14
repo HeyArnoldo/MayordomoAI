@@ -22,7 +22,7 @@ import { AgentService } from '../agent/agent.service';
 import { isAiEnabled } from '../agent/ai.config';
 import { ConversationsService } from '../chat/conversations.service';
 import { base64Bytes, toImagePart, validateDocument, isLowText } from '../agent/media.helpers';
-import { extractDocumentText, DocumentExtractionError } from '../agent/document.extract';
+import { extractDocumentText } from '../agent/document.extract';
 import { MAX_IMAGE_BYTES, MAX_DOCUMENT_BYTES } from '../agent/media.constants';
 import { WaInboundLog } from './wa-inbound-log.entity';
 import { EvolutionClient } from './evolution.client';
@@ -301,13 +301,6 @@ export class WhatsappService {
       extractResult = await extractDocumentText(buffer, mimetype);
     } catch (err) {
       this.logger.error(`Extracción de documento falló para ${messageId}: ${String(err)}`);
-      if (err instanceof DocumentExtractionError) {
-        await this.evolution.sendText(
-          e164,
-          this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
-        );
-        return null;
-      }
       await this.evolution.sendText(
         e164,
         this.i18n.t(user.language, 'whatsapp.documentNotUnderstood'),
