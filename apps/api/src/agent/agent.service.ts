@@ -11,9 +11,11 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { UsersService } from '../users/users.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 import { I18nService } from '../i18n/i18n.service';
 import { agentModel, agentModelName, isAiEnabled, parserModel, parserModelName } from './ai.config';
 import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
+import { buildOnboardingPrompt } from './prompts/onboarding.prompt';
 import { ToolAudit } from './tool-audit.entity';
 
 /** Tope duro de iteraciones del bucle agéntico (guardrail de costo/loops). */
@@ -32,6 +34,7 @@ export class AgentService {
     private readonly recurring: RecurringService,
     private readonly usage: AiUsageService,
     private readonly users: UsersService,
+    private readonly onboarding: OnboardingService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
     private readonly i18n: I18nService,
   ) {}
@@ -126,6 +129,10 @@ export class AgentService {
    * Corre el agente sobre un historial y devuelve el stream (web lo pipea
    * como UI messages; WhatsApp espera el texto final). userId viene SIEMPRE
    * del backend — jamás del modelo.
+   *
+   * When `isOnboardingMode` is true the agent uses the onboarding system-prompt
+   * variant (guided box creation) instead of the standard assistant prompt.
+   * The same tools and guardrails apply in both modes (ADR-5).
    */
   run(
     userId: string,
@@ -135,6 +142,7 @@ export class AgentService {
     userName?: string,
     locale: Locale = 'es',
     currency = 'PEN',
+    isOnboardingMode = false,
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
       throw new AppException(
@@ -150,15 +158,20 @@ export class AgentService {
       transactions: this.transactions,
       recurring: this.recurring,
       users: this.users,
+      onboarding: this.onboarding,
       audits: this.audits,
       locale,
       currency,
       i18n: this.i18n,
     });
 
+    const systemPrompt = isOnboardingMode
+      ? buildOnboardingPrompt(locale, currency, userName)
+      : this.buildSystemPrompt(locale, currency, userName);
+
     return streamText({
       model: agentModel(),
-      system: this.buildSystemPrompt(locale, currency, userName),
+      system: systemPrompt,
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
@@ -174,6 +187,15 @@ export class AgentService {
         });
       },
     });
+  }
+
+  /**
+   * Checks whether the user is still in the AI onboarding flow and returns
+   * the appropriate run mode flag. Called by controllers/WhatsApp service
+   * before invoking run().
+   */
+  async resolveOnboardingMode(userId: string): Promise<boolean> {
+    return this.onboarding.isOnboarding(userId);
   }
 
   /**

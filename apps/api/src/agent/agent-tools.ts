@@ -16,6 +16,7 @@ import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
 import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
 import { toolErrorMessage } from './tool-error.helper';
@@ -39,6 +40,8 @@ export interface AgentToolsContext {
   transactions: TransactionsService;
   recurring: RecurringService;
   users: UsersService;
+  /** OnboardingService — required for confirmOnboarding tool; optional for backward compat. */
+  onboarding?: OnboardingService;
   audits: Repository<ToolAudit>;
   /** Idioma del usuario (persistido en DB). */
   locale: Locale;
@@ -676,6 +679,44 @@ export function buildAgentTools(
             };
           }
           return { updated: toBoxDto(updated) };
+        }),
+    }),
+
+    confirmOnboarding: tool({
+      description: isEn
+        ? 'Marks the AI onboarding flow as complete. Call this ONLY after: (1) all desired boxes have been created, (2) all active percent-mode boxes sum to exactly 100%, and (3) the user has confirmed the setup looks correct. Calling this exits onboarding mode and switches the agent to standard mode for future messages.'
+        : 'Marca el flujo de onboarding de IA como completado. Llama a esta tool SOLO después de: (1) todas las cajas deseadas fueron creadas, (2) las cajas en modo percent activas suman exactamente 100%, y (3) el usuario confirmó que la configuración está correcta. Llamar esto sale del modo onboarding y cambia el agente a modo estándar para mensajes futuros.',
+      inputSchema: z.object({}),
+      execute: async (_args) =>
+        audited(ctx, 'confirmOnboarding', _args, async () => {
+          if (!ctx.onboarding) {
+            return {
+              error: isEn
+                ? 'Onboarding service not available in this context.'
+                : 'El servicio de onboarding no está disponible en este contexto.',
+            };
+          }
+          // Validate percent-box invariant before marking complete
+          const personal = await ctx.boxes.activePersonal(ctx.userId);
+          const percentBoxes = personal.filter((b) => (b.mode ?? 'percent') === 'percent');
+          const pctSum =
+            Math.round(percentBoxes.reduce((s, b) => s + parseFloat(b.pct), 0) * 100) / 100;
+          if (percentBoxes.length > 0 && pctSum !== 100) {
+            return {
+              error: isEn
+                ? `Cannot complete onboarding: percent boxes sum to ${pctSum}%, not 100%. Adjust the allocation with updateAllocation first.`
+                : `No se puede completar el onboarding: las cajas percent suman ${pctSum}%, no 100%. Ajusta el reparto con updateAllocation primero.`,
+              currentPctSum: pctSum,
+              percentBoxes: percentBoxes.map((b) => ({ name: b.name, pct: parseFloat(b.pct) })),
+            };
+          }
+          await ctx.onboarding.confirmOnboarding(ctx.userId);
+          return {
+            completed: true,
+            message: isEn
+              ? 'Onboarding complete! The agent is now in standard mode.'
+              : '¡Onboarding completado! El agente está ahora en modo estándar.',
+          };
         }),
     }),
 

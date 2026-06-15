@@ -63,6 +63,7 @@ const makeConversationsService = () => ({
 const makeAgentService = () => ({
   run: jest.fn(),
   suggestTitle: jest.fn(),
+  resolveOnboardingMode: jest.fn().mockResolvedValue(false),
 });
 
 const makeTranscriptionService = () => ({
@@ -212,6 +213,7 @@ describe('ChatController', () => {
         'En User',
         'en',
         'USD',
+        false, // isOnboardingMode — false for mock
       );
     });
 
