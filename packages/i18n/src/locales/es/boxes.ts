@@ -62,6 +62,12 @@ export const boxes = {
       'Sale del reparto y del dashboard, pero su historial de movimientos se conserva. Su {{pct}}% quedará libre — tendrás que redistribuirlo para que el reparto sume 100.',
     confirmArchive: 'Archivar',
   },
+  archived: {
+    title: 'Archivadas',
+    reactivate: 'Reactivar',
+    reactivated: '"{{name}}" reactivada — asígnale un % y guarda el reparto',
+    reactivateError: 'No se pudo reactivar la caja',
+  },
   card: {
     fundAccumulates: 'Fondo · acumula <amount/> este mes',
     usedPct: 'Usado {{pct}}%',
