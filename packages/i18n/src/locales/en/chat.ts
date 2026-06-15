@@ -79,6 +79,8 @@ export const chat = {
     showConversations: 'Show conversations',
     emptyState: 'Create a conversation to get started.',
   },
+  onboardingBanner:
+    'You are in the onboarding flow — Mayordomo will guide you to set up your budget. When done, you will be taken to the main chat.',
   ai: {
     conversation: {
       emptyTitle: 'No messages yet',

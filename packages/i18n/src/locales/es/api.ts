@@ -24,6 +24,8 @@ export const api = {
       'Hola 👋 No encuentro una cuenta vinculada a este número. Regístrate en https://mayordomoai.xyz y vincula tu número desde Ajustes.',
     verificationCode:
       'Tu código de verificación de MayordomoAI es *{{code}}*. Vence en 10 minutos.',
+    onboardingStarter:
+      '¡Hola, {{name}}! 🎉 Tu número ya está vinculado a MayordomoAI.\n\nAhora te ayudo a construir tu presupuesto personalizado en unos minutos. Juntos vamos a:\n\n💼 Registrar tus gastos fijos (alquiler, suscripciones...)\n🎯 Crear tus metas de ahorro\n📊 Distribuir el resto entre tus categorías de gasto\n\n¿Cuánto es tu ingreso mensual? Te propongo un punto de partida 👇',
   },
   reminders: {
     dueToday:
