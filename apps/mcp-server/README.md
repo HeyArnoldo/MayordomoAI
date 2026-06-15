@@ -139,8 +139,8 @@ Each app in this monorepo deploys as its own Coolify **Application** (built from
    - Build pack: **Dockerfile**.
    - Dockerfile location: `apps/mcp-server/Dockerfile`.
    - Build context / base directory: the **repo root** (it's a pnpm monorepo).
-   - Exposed port: `3001`. Coolify assigns an HTTPS domain → Foundry uses `https://<domain>/mcp`.
-   - Health check path: `/health` (the image also ships a Docker `HEALTHCHECK` on it).
+   - Exposed port: `3001`. Production domain: `https://mcp.mayordomoai.xyz` → Foundry uses `https://mcp.mayordomoai.xyz/mcp`.
+   - Health check path: `/health` (the image also ships a Docker `HEALTHCHECK` on it) → `https://mcp.mayordomoai.xyz/health`.
 
 2. **Set its environment variables** (Coolify panel — not a `.env` file):
    - `PORT=3001`
@@ -152,7 +152,7 @@ Each app in this monorepo deploys as its own Coolify **Application** (built from
 
 4. The **frontend** (`apps/web`) needs **no** changes for this integration.
 
-5. In Foundry: Tools → Add → Custom → MCP → URL `https://<mcp-domain>/mcp` → Bearer = `MCP_AUTH_TOKEN`.
+5. In Foundry: Tools → Add → Custom → MCP → URL `https://mcp.mayordomoai.xyz/mcp` → Bearer = `MCP_AUTH_TOKEN`.
 
 ---
 
