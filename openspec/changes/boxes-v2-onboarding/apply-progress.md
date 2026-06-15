@@ -252,3 +252,127 @@ All S1 tasks (S1-D1 + S1-T1 through S1-T9) are done. S1-T10 root CI gate can now
 | S1-T7 createBox/updateBox guards | [x] Done |
 | S1-T8 Agent tools                | [x] Done |
 | S1-T9 Web editor                 | [x] Done |
+
+---
+
+## Batch: 3 — S3 (Remove transit)
+
+**Date**: 2026-06-15
+**Branch**: feat/remove-transit
+**Mode**: Standard (TDD for S3-T1 invariant validator; no test runner for web)
+**Slice**: S3 — Remove transit transaction type (independent slice)
+
+---
+
+## Completed Tasks (S3)
+
+### S3-T1 — Migration: void transit rows + verify-zero gate
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts` — hand-written (NOT generated; DB must not be touched)
+  - `up()` step 1: `UPDATE transactions SET status='voided', deletedAt=now() WHERE type='transit' AND deletedAt IS NULL`
+  - `up()` step 2: verify-zero COUNT gate — throws and aborts if any non-voided transit rows remain
+  - `up()` step 3a–d: RENAME old enum → CREATE 2-value enum → ALTER COLUMN USING cast → DROP old enum
+  - `down()`: restores 3-value enum; voided transit rows cannot auto-restore their type (documented)
+- `apps/api/src/database/seeds/run-seed.ts` — removed TRANSIT seed row; updated count comment (15→14)
+
+**TDD**: `assertNoTransitRows` pure helper tested in `transactions.service.spec.ts` — 4 cases (empty, all voided, one active, multiple active)
+
+### S3-T2 — Enum narrow (combined into S3-T1 migration)
+
+**Status**: [x] Done (part of 1781510000000-RemoveTransitType.ts)
+
+### S3-T3 — Remove TRANSIT from TransactionType enum (contracts)
+
+**Status**: [x] Done
+
+**Files**:
+
+- `packages/contracts/src/transactions.ts` — removed `TRANSIT = 'transit'` from `TransactionType` enum; removed transit comment from `createTransactionSchema` boxId field; `z.enum(TransactionType)` now auto-rejects transit in all schemas
+- `apps/api/src/transactions/transaction.entity.ts` — removed transit comment from boxId field
+- `apps/api/src/transactions/transactions.service.ts` — removed transit comment from create() jsdoc
+
+### S3-T4 — Remove transit from agent tools and MCP tools
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/api/src/agent/agent-tools.ts` — updated `queryTransactions` description (removed "transits" references); updated `registerTransaction` description; updated `type` field describe text to `income | expense` (removed "| transit")
+- `apps/mcp-server/src/tools/register-transaction.ts` — schema changed from `z.enum(['income','expense','transit'])` to `z.enum(['income','expense'])`; boxName describe updated; tool description updated
+- `apps/mcp-server/src/tools/query-transactions.ts` — schema type field changed from 3-value to 2-value enum
+
+### S3-T5 — Remove transit from i18n catalogs
+
+**Status**: [x] Done
+
+**Files**:
+
+- `packages/i18n/src/locales/es/transactions.ts` — removed `filters.transit`, `registro.typeTransit`, `types.transit`
+- `packages/i18n/src/locales/en/transactions.ts` — same removals (kept in sync; `satisfies typeof es` constraint passes)
+
+### S3-T6 — Web: remove transit from UI components
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/web/src/features/registro/registro-dialog.tsx` — removed `TransactionType.TRANSIT` entry from `TYPES` array
+- `apps/web/src/pages/transactions.tsx` — removed `{ labelKey: 'filters.transit', value: TransactionType.TRANSIT }` from `FILTERS` array
+- `apps/web/src/components/mayordomo/transaction-row.tsx` — removed `ArrowUpDown` import; removed `isTransit` const; `Icon` simplified to `ArrowDown : ArrowUp`; `label` fallback uses `t('types.expense')` for legacy voided transit rows (no-box case); `Money` sign/className simplified
+- `apps/web/src/components/mayordomo/transaction-detail.tsx` — removed `ArrowUpDown` import; removed `isTransit` const; `Icon` simplified; type row uses `t('types.expense')` for all non-income; `Money` sign simplified
+
+**Safe fallback for legacy transit rows**: voided transit rows that may exist pre-migration will display as "expense" category with a minus sign — inert, no balance impact, consistent with voided status.
+
+### S3-T7 — Root CI gate
+
+**Status**: [x] Done
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, 4 pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS (all 5 packages)                    |
+| `pnpm --filter @app/api run test`            | PASS — 367 tests, 27 suites              |
+
+---
+
+## TDD Cycle Evidence (S3)
+
+| Task                        | RED                                       | GREEN                                    | REFACTOR |
+| --------------------------- | ----------------------------------------- | ---------------------------------------- | -------- |
+| S3-T1 assertNoTransitRows   | Tests written before migration helper     | 4 tests pass (pure helper)               | —        |
+| S3-T3 schema transit reject | Tests written first (transit not in enum) | 4 schema tests pass (2 reject, 2 accept) | —        |
+
+---
+
+## Commits (S3)
+
+1. `253676c` — `feat(contracts): remove transit from TransactionType enum and i18n catalogs`
+2. `5fb6440` — `feat(migrations): add RemoveTransitType migration — void transit rows then narrow enum`
+3. `55e55b2` — `feat(api): remove transit type from service, entity, seed, and agent tool descriptions`
+4. `c3086ed` — `feat(mcp-server): remove transit from register and query transaction tool schemas`
+5. `2b2de78` — `feat(web): remove transit type from UI components and transaction filter`
+6. `c8b59c1` — `test(transactions): add transit-rejection and assertNoTransitRows invariant tests for S3`
+
+---
+
+## S3 Complete Summary
+
+All S3 tasks (S3-T1 through S3-T7) are done. Ready for sdd-verify.
+
+| Task                            | Status   |
+| ------------------------------- | -------- |
+| S3-T1 Migration (void + narrow) | [x] Done |
+| S3-T2 Enum narrow               | [x] Done |
+| S3-T3 Contracts enum            | [x] Done |
+| S3-T4 Agent + MCP tools         | [x] Done |
+| S3-T5 i18n catalogs             | [x] Done |
+| S3-T6 Web UI                    | [x] Done |
+| S3-T7 Root CI gate              | [x] Done |

@@ -132,13 +132,13 @@ export function buildAgentTools(
     queryTransactions: tool({
       description: isEn
         ? "Flexible query over the user's transactions: filtering, text search and aggregation in ONE tool. " +
-          'ALL filters are optional: without type it returns income+expenses+transits; without boxNames it searches ALL boxes; ' +
+          'ALL filters are optional: without type it returns income+expenses; without boxNames it searches ALL boxes; ' +
           'without dates it returns the most recent. textQuery searches the note ("taxi", "supermarket"). ' +
           'groupBy=box/day/week/month aggregates with total, count and average per group — use it for ' +
           '"where am I overspending", "which box do I spend the most in", monthly comparisons. ' +
           'orderBy=amount for the biggest expenses. Dates in YYYY-MM-DD (America/Lima timezone).'
         : 'Consulta flexible sobre los movimientos del usuario: filtros, búsqueda por texto y agregación en UNA tool. ' +
-          'TODOS los filtros son opcionales: sin type trae ingresos+gastos+tránsitos; sin boxNames busca en TODAS las cajas; ' +
+          'TODOS los filtros son opcionales: sin type trae ingresos+gastos; sin boxNames busca en TODAS las cajas; ' +
           'sin fechas trae lo más reciente. textQuery busca en la nota ("taxi", "supermercado"). ' +
           'groupBy=box/day/week/month agrega con total, cantidad y promedio por grupo — úsala para ' +
           '"en qué me excedo", "en qué caja gasto más", comparativas mensuales. ' +
@@ -149,8 +149,8 @@ export function buildAgentTools(
           .optional()
           .describe(
             isEn
-              ? 'income | expense | transit. OMIT for all types.'
-              : 'income | expense | transit. OMITIR para todos los tipos.',
+              ? 'income | expense. OMIT for all types.'
+              : 'income | expense. OMITIR para todos los tipos.',
           ),
         boxNames: z
           .array(z.string())
@@ -186,10 +186,10 @@ export function buildAgentTools(
 
     registerTransaction: tool({
       description: isEn
-        ? `Records a transaction (expense in a box, income distributed by %, or transit). ` +
+        ? `Records a transaction (expense in a box, or income distributed by %). ` +
           `RULE: if it is an expense >= ${threshold} or comes from a doubtful voice transcription, ` +
           `FIRST ask the user and call this tool with userConfirmed=true only after their explicit "yes".`
-        : `Registra un movimiento (gasto en una caja, ingreso que se reparte por %, o tránsito). ` +
+        : `Registra un movimiento (gasto en una caja, o ingreso que se reparte por %). ` +
           `REGLA: si es un gasto >= ${threshold} o viene de una transcripción de voz dudosa, ` +
           `PRIMERO pregunta al usuario y llama esta tool con userConfirmed=true solo después de su "sí".`,
       inputSchema: z.object({

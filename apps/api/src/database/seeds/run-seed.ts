@@ -172,13 +172,6 @@ async function seedDemoFinances(ds: DataSource, user: User): Promise<void> {
       when: daysAgo(1, 16, 2),
     }),
     tx({
-      type: TransactionType.TRANSIT,
-      amount: 30,
-      note: 'Yape Marco — reenvío',
-      source: W,
-      when: daysAgo(1, 11, 20),
-    }),
-    tx({
       type: E,
       box: 'Empresa',
       amount: 372.71,
@@ -252,7 +245,7 @@ async function seedDemoFinances(ds: DataSource, user: User): Promise<void> {
       voided: true,
     }),
   ]);
-  console.log(`[seed] datos demo: ${boxes.length} cajas + 15 transacciones para ${user.email}`);
+  console.log(`[seed] datos demo: ${boxes.length} cajas + 14 transacciones para ${user.email}`);
 }
 
 async function run(): Promise<void> {

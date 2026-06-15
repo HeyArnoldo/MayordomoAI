@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 const TYPES = [
   { value: TransactionType.EXPENSE, labelKey: 'registro.typeExpense' },
   { value: TransactionType.INCOME, labelKey: 'registro.typeIncome' },
-  { value: TransactionType.TRANSIT, labelKey: 'registro.typeTransit' },
 ] as const satisfies ReadonlyArray<{ value: TransactionType; labelKey: string }>;
 
 /** Registro manual del design: tabs de tipo, monto, selector de caja, nota. */

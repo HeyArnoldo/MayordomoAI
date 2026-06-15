@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowDown, ArrowUp, ArrowUpDown, Mic } from 'lucide-react';
+import { ArrowDown, ArrowUp, Mic } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionStatus, TransactionType } from '@app/contracts';
 import type { Locale } from '@app/contracts';
@@ -32,15 +32,15 @@ export function TransactionRow({
   const locale = useLocale();
   const box = boxes.find((b) => b.id === tx.boxId);
   const isIncome = tx.type === TransactionType.INCOME;
-  const isTransit = tx.type === TransactionType.TRANSIT;
   const voided = tx.status === TransactionStatus.VOIDED;
   const color = box
     ? boxColor(box.name, box.colorKey)
     : isIncome
       ? 'var(--positive)'
       : 'var(--ink-3)';
-  const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
-  const label = box?.name ?? (isIncome ? t('types.income') : t('types.transit'));
+  const Icon = isIncome ? ArrowDown : ArrowUp;
+  // Legacy voided transit rows have no box — show generic expense label as fallback.
+  const label = box?.name ?? (isIncome ? t('types.income') : t('types.expense'));
 
   return (
     <div
@@ -86,11 +86,8 @@ export function TransactionRow({
       <div className="shrink-0 text-right">
         <Money
           value={tx.amount}
-          sign={isIncome ? '+' : isTransit ? '↔' : '−'}
-          className={cn(
-            'text-sm',
-            isIncome ? 'text-positive' : isTransit ? 'text-ink-2' : 'text-ink',
-          )}
+          sign={isIncome ? '+' : '−'}
+          className={cn('text-sm', isIncome ? 'text-positive' : 'text-ink')}
         />
         {tx.split && (
           <div className="text-[10.5px] text-ink-3">

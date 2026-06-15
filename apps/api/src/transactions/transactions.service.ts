@@ -41,7 +41,7 @@ export class TransactionsService {
 
   /**
    * Registra una transacción. Gasto exige caja del usuario; ingreso calcula y
-   * congela el split por % (snapshot); tránsito no toca cajas.
+   * congela el split por % (snapshot).
    * waMessageId hace la operación idempotente frente a webhooks repetidos.
    */
   async create(
