@@ -176,3 +176,36 @@ Root `.env.example` was already updated in PR1 (AGENT_TOOL_INTERNAL_KEY + FOUNDR
 - Error responses to Foundry: only `{ ok: false, error: "<i18n-safe-string>" }` — no stack traces, hostnames, or secrets.
 - `userId` field is absent from all MCP tool input shapes — Foundry cannot supply it.
 - `needsConfirmation` is relayed verbatim — the MCP server never auto-confirms.
+
+---
+
+## Post-PR2 Quality Fixes (commit 80aeed8 — branch feat/mcp-tools-server)
+
+### Fix 1 — Tests now exercise real production modules
+
+**Problem**: `auth.test.ts` and `mayordomo-api-client.test.ts` contained local reimplementations of the production logic because `config.ts` ran env validation at import time, blocking any test that imported those modules without real env vars.
+
+**Solution**:
+
+- `config.ts`: converted to a lazy memoized `getConfig()` function. Env validation runs only on first call (at server startup), not at import time. No behavioral change when booting the server.
+- `auth.ts`: extracted `isValidBearer(authHeader, expectedToken)` as a pure exported function with no config dependency. `checkBearer(req)` calls `isValidBearer` + `getConfig()`.
+- `mayordomo-api-client.ts`: exported `sanitizeApiError(json, resOk)` as a pure function. `call()` uses `getConfig()` lazily.
+- `auth.test.ts`: imports and tests the real `isValidBearer` (6 tests).
+- `mayordomo-api-client.test.ts`: imports and tests the real `sanitizeApiError` (6 tests).
+
+### Fix 2 — Constant-time bearer comparison (mcp-server only)
+
+**Problem**: `auth.ts` used `===` string equality for the bearer token comparison, which is vulnerable to timing attacks.
+
+**Solution**: `isValidBearer` now uses `crypto.timingSafeEqual`. Length mismatch returns `false` immediately (before calling `timingSafeEqual`, which would throw on different-length buffers). Equal-length buffers are compared in constant time.
+
+**Follow-up (future PR)**: The NestJS backend guard in `apps/api/src/agent/agent-tools-auth.guard.ts` uses a string equality check for `AGENT_TOOL_INTERNAL_KEY` and should also be migrated to `crypto.timingSafeEqual`. Not touched in this PR (different branch/PR scope).
+
+### Gate Results
+
+| Gate                                                              | Result                                      |
+| ----------------------------------------------------------------- | ------------------------------------------- |
+| `pnpm --filter @app/mcp-server run build`                         | PASS (tsc clean)                            |
+| `node --test dist/auth.test.js dist/mayordomo-api-client.test.js` | PASS — 12/12                                |
+| `pnpm typecheck` (ROOT)                                           | PASS (6 packages, 0 errors)                 |
+| `pnpm lint` (ROOT)                                                | PASS (0 errors, pre-existing warnings only) |
