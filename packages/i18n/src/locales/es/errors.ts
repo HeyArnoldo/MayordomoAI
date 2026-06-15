@@ -65,6 +65,10 @@ export const errors = {
     not_found: 'Caja no encontrada',
     not_in_allocation: 'La caja {{id}} no existe o no participa del reparto',
     allocation_must_sum_100: 'Los porcentajes deben sumar 100 (suman {{total}})',
+    fixed_requires_amount: 'Una caja de monto fijo requiere fixedAmount mayor a 0',
+    fixed_exceeds_income:
+      'El total de cajas fijas ({{fixedTotal}}) supera el ingreso mensual ({{income}})',
+    mode_not_supported_for_scope: 'El modo fijo solo aplica a cajas personales',
   },
   recurring: {
     not_found: 'Gasto fijo no encontrado',
