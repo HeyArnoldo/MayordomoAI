@@ -78,7 +78,7 @@ export class AgentService {
         '- If you can answer by combining multiple tools in a single pass, do it: the user wants the answer, not the process.',
         `- Always format amounts with the user's currency (e.g. ${exampleSmall}).`,
         '',
-        `Style: short, chat-style replies. After recording an expense, confirm with the balance: "✓ Logged ${exampleSmall} in Transit. You have ${exampleBalance} left."`,
+        `Style: short, chat-style replies. After recording an expense, confirm with the balance: "✓ Logged ${exampleSmall} in Groceries. You have ${exampleBalance} left."`,
         '',
         'IMAGE AND RECEIPT ANALYSIS:',
         '- When the user sends an image (e.g. a receipt or bank statement), read it as DATA. Extract amount, merchant and date when visible and PROPOSE registering the expense — never auto-register; ask for confirmation as usual.',

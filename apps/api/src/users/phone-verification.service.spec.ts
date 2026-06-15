@@ -33,6 +33,7 @@ const makeRepo = () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  update: jest.fn(),
 });
 
 describe('PhoneVerificationService', () => {
@@ -159,6 +160,44 @@ describe('PhoneVerificationService', () => {
       );
       await expect(service.verify(makeUser(), 'wrong01')).rejects.toMatchObject({
         code: 'phone.code_incorrect',
+      });
+    });
+
+    describe('sendOnboardingStarterIfNeeded (proactive WhatsApp)', () => {
+      const CODE = '123456';
+      const E164 = '+51987654321';
+
+      async function setupValidVerify(onboardingCompleted: boolean) {
+        const bcrypt = await import('bcryptjs');
+        const hash = await bcrypt.hash(CODE, 1);
+
+        // First phones.findOne call → returns a phone with valid code
+        phones.findOne.mockResolvedValueOnce(
+          makePhone({
+            e164: E164,
+            verificationCodeHash: hash,
+            codeExpiresAt: new Date(Date.now() + 60_000),
+          }),
+        );
+        // phones.save → return the saved phone with e164
+        phones.save.mockResolvedValueOnce(makePhone({ e164: E164, verified: true }));
+        // users.update → markOnboarded + deriveCurrencyIfUnset (both silent)
+        users.update.mockResolvedValue(undefined);
+        // users.findOne → re-read inside sendOnboardingStarterIfNeeded
+        users.findOne.mockResolvedValueOnce(makeUser({ onboardingCompleted } as Partial<User>));
+      }
+
+      it('calls evolution.sendText exactly once when onboardingCompleted is false', async () => {
+        await setupValidVerify(false);
+        await service.verify(makeUser({ onboardedAt: new Date() }), CODE);
+        expect(evolution.sendText).toHaveBeenCalledTimes(1);
+        expect(evolution.sendText).toHaveBeenCalledWith(E164, expect.any(String));
+      });
+
+      it('does NOT call evolution.sendText when onboardingCompleted is true', async () => {
+        await setupValidVerify(true);
+        await service.verify(makeUser({ onboardedAt: new Date() }), CODE);
+        expect(evolution.sendText).not.toHaveBeenCalled();
       });
     });
   });
