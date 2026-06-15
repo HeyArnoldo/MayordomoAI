@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessageCircle, PanelLeft, Pencil, Pin, Trash2 } from 'lucide-react';
+import { ChevronDown, MessageCircle, PanelLeft, Pencil, Pin, Sparkles, Trash2 } from 'lucide-react';
 import { Channel, type Conversation } from '@app/contracts';
 import { ConversationRail } from '@/features/chat/conversation-rail';
 import { ChatThread } from '@/features/chat/chat-thread';
@@ -12,6 +13,7 @@ import {
   useRenameConversation,
   useTogglePin,
 } from '@/hooks/use-conversations';
+import { useOnboardingGuard } from '@/features/auth/hooks/useOnboardingGuard';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
@@ -94,9 +96,37 @@ function ThreadHeader({
   );
 }
 
+/**
+ * Banner shown while the AI onboarding flow is active (onboardingCompleted = false).
+ * Disappears automatically when the agent marks onboarding as complete.
+ */
+function OnboardingBanner() {
+  const { t } = useTranslation('chat');
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-brand/30 bg-brand-soft px-4 py-2.5 text-[13px] text-ink-2 shadow-sm">
+      <Sparkles className="size-4 shrink-0 text-brand" />
+      <span>{t('onboardingBanner')}</span>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const { t } = useTranslation('chat');
+  const navigate = useNavigate();
   const qc = useQueryClient();
+  const { isOnboarding } = useOnboardingGuard();
+  // Track previous onboarding state to detect when it flips false → true (completed).
+  const prevOnboarding = useRef(isOnboarding);
+
+  // Navigate to home when onboarding completes (flag flips from true to false).
+  useEffect(() => {
+    if (prevOnboarding.current && !isOnboarding) {
+      void qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+      navigate('/', { replace: true });
+    }
+    prevOnboarding.current = isOnboarding;
+  }, [isOnboarding, navigate, qc]);
+
   const { data: conversations = [], isLoading } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
   // Borrador: chat nuevo SIN fila en BD; se materializa al primer mensaje.
@@ -166,6 +196,12 @@ export default function ChatPage() {
       )}
 
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
+        {/* Onboarding banner: shown while onboardingCompleted is false */}
+        {isOnboarding && (
+          <div className="absolute inset-x-0 bottom-20 z-20 mx-4 mb-2 md:bottom-4">
+            <OnboardingBanner />
+          </div>
+        )}
         {/* Mobile: botón para abrir el drawer de conversaciones */}
         <button
           title={t('page.conversations')}

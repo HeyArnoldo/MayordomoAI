@@ -38,7 +38,9 @@ export default function OnboardingPage() {
 
   const finish = async () => {
     await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
-    navigate('/', { replace: true });
+    // After the phone step (onboardedAt set), route to /chat where the AI
+    // onboarding flow continues if onboardingCompleted is still false.
+    navigate('/chat', { replace: true });
   };
 
   const link = useMutation({
