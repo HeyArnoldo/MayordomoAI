@@ -2,6 +2,7 @@ import { tool, ToolSet } from 'ai';
 import { z } from 'zod';
 import { Repository } from 'typeorm';
 import {
+  BoxMode,
   BoxScope,
   BoxType,
   Locale,
@@ -488,11 +489,13 @@ export function buildAgentTools(
 
     createBox: tool({
       description: isEn
-        ? 'Creates a new box (envelope). It is created with 0% allocation: right after creating it, ' +
-          'propose the new allocation with updateAllocation so the set sums 100 again. ' +
+        ? 'Creates a new box (envelope). ' +
+          'For percent mode (default): created with 0% allocation — right after, propose the new allocation with updateAllocation so the set sums 100 again. ' +
+          'For fixed mode: provide fixedAmount (monthly amount off-the-top). Fixed mode is personal-only. ' +
           'type "expense" resets monthly; "fund" accumulates (savings).'
-        : 'Crea una caja (sobre) nueva. Se crea con 0% de reparto: justo después de crearla, ' +
-          'propón el nuevo reparto con updateAllocation para que el set vuelva a sumar 100. ' +
+        : 'Crea una caja (sobre) nueva. ' +
+          'Modo percent (default): se crea con 0% de reparto — justo después propón el nuevo reparto con updateAllocation para que vuelva a sumar 100. ' +
+          'Modo fixed: indica fixedAmount (monto fijo mensual, descontado primero). Solo para cajas personales. ' +
           'type "expense" reinicia cada mes; "fund" acumula (ahorro).',
       inputSchema: z.object({
         name: z
@@ -505,6 +508,23 @@ export function buildAgentTools(
           .default(BoxType.EXPENSE)
           .describe(
             isEn ? 'expense (monthly) | fund (accumulates)' : 'expense (mensual) | fund (acumula)',
+          ),
+        mode: z
+          .enum(BoxMode)
+          .default(BoxMode.PERCENT)
+          .describe(
+            isEn
+              ? 'percent (default, uses % of income) | fixed (off-the-top monthly amount, personal only)'
+              : 'percent (default, usa % del ingreso) | fixed (monto fijo mensual, solo personal)',
+          ),
+        fixedAmount: z
+          .number()
+          .positive()
+          .optional()
+          .describe(
+            isEn
+              ? `Monthly fixed amount in ${ctx.currency}. Required when mode=fixed.`
+              : `Monto fijo mensual en ${ctx.currency}. Requerido cuando mode=fixed.`,
           ),
       }),
       execute: async (args) =>
@@ -532,37 +552,68 @@ export function buildAgentTools(
             pct: 0,
             type: args.type,
             scope: BoxScope.PERSONAL,
+            mode: args.mode,
+            fixedAmount: args.fixedAmount ?? null,
           });
-          return {
-            created: toBoxDto(box),
-            note: isEn
-              ? 'The box was created with 0% allocation: propose the new allocation with updateAllocation so the set sums 100 again.'
-              : 'La caja quedó con 0% de reparto: propón el nuevo reparto con updateAllocation para que el set vuelva a sumar 100.',
-          };
+          const note =
+            args.mode === BoxMode.FIXED
+              ? isEn
+                ? `Fixed box created with monthly amount of ${fmt(args.fixedAmount ?? 0)}.`
+                : `Caja fija creada con monto mensual de ${fmt(args.fixedAmount ?? 0)}.`
+              : isEn
+                ? 'The box was created with 0% allocation: propose the new allocation with updateAllocation so the set sums 100 again.'
+                : 'La caja quedó con 0% de reparto: propón el nuevo reparto con updateAllocation para que el set vuelva a sumar 100.';
+          return { created: toBoxDto(box), note };
         }),
     }),
 
     updateBox: tool({
       description: isEn
-        ? 'Renames, activates or deactivates an existing box. Structural change: ALWAYS ask the user ' +
-          'for confirmation first (userConfirmed=true only after an explicit yes). To change %, use ' +
-          'updateAllocation. Deactivating a box with % > 0 leaves the allocation below 100: propose ' +
-          'a rebalance with updateAllocation right after.'
-        : 'Renombra, activa o desactiva una caja existente. Cambio estructural: SIEMPRE pide confirmación ' +
-          'al usuario antes (userConfirmed=true solo tras su sí explícito). Para cambiar %, usa ' +
-          'updateAllocation. Desactivar una caja con % > 0 deja el reparto debajo de 100: propón ' +
-          'un rebalanceo con updateAllocation justo después.',
+        ? 'Renames, activates, deactivates, or switches the mode of an existing box. ' +
+          'Structural change: ALWAYS ask the user for confirmation first (userConfirmed=true only after an explicit yes). ' +
+          'To change % allocation only, use updateAllocation. ' +
+          'To switch to fixed mode: provide mode=fixed + fixedAmount. ' +
+          'Deactivating a percent box with % > 0 leaves the allocation below 100: propose a rebalance right after.'
+        : 'Renombra, activa, desactiva o cambia el modo de una caja existente. ' +
+          'Cambio estructural: SIEMPRE pide confirmación al usuario antes (userConfirmed=true solo tras su sí explícito). ' +
+          'Para cambiar solo el %, usa updateAllocation. ' +
+          'Para cambiar a modo fijo: indica mode=fixed + fixedAmount. ' +
+          'Desactivar una caja percent con % > 0 deja el reparto debajo de 100: propón un rebalanceo después.',
       inputSchema: z.object({
         boxName: z.string().describe(isEn ? 'Current exact box name' : 'Nombre exacto actual'),
         newName: z.string().min(1).max(60).optional(),
         active: z.boolean().optional(),
+        mode: z
+          .enum(BoxMode)
+          .optional()
+          .describe(
+            isEn
+              ? 'Switch to percent or fixed mode. When switching to fixed, also provide fixedAmount.'
+              : 'Cambia a modo percent o fixed. Al cambiar a fixed, también indica fixedAmount.',
+          ),
+        fixedAmount: z
+          .number()
+          .positive()
+          .optional()
+          .describe(
+            isEn
+              ? `New monthly fixed amount in ${ctx.currency}. Required when mode=fixed.`
+              : `Nuevo monto fijo mensual en ${ctx.currency}. Requerido cuando mode=fixed.`,
+          ),
         userConfirmed: z.boolean().default(false),
       }),
       execute: async (args) =>
         audited(ctx, 'updateBox', args, async () => {
-          if (args.newName === undefined && args.active === undefined) {
+          if (
+            args.newName === undefined &&
+            args.active === undefined &&
+            args.mode === undefined &&
+            args.fixedAmount === undefined
+          ) {
             return {
-              error: isEn ? 'Provide newName and/or active.' : 'Indica newName y/o active.',
+              error: isEn
+                ? 'Provide at least one of: newName, active, mode, fixedAmount.'
+                : 'Indica al menos uno de: newName, active, mode, fixedAmount.',
             };
           }
           const all = await ctx.boxes.findAll(ctx.userId);
@@ -595,6 +646,8 @@ export function buildAgentTools(
               changes: {
                 ...(args.newName !== undefined ? { newName: args.newName } : {}),
                 ...(args.active !== undefined ? { active: args.active } : {}),
+                ...(args.mode !== undefined ? { mode: args.mode } : {}),
+                ...(args.fixedAmount !== undefined ? { fixedAmount: args.fixedAmount } : {}),
               },
               message: isEn
                 ? 'Show the change to the user and ask for confirmation before applying.'
@@ -607,11 +660,14 @@ export function buildAgentTools(
             {
               ...(args.newName !== undefined ? { name: args.newName.trim() } : {}),
               ...(args.active !== undefined ? { active: args.active } : {}),
+              ...(args.mode !== undefined ? { mode: args.mode } : {}),
+              ...(args.fixedAmount !== undefined ? { fixedAmount: args.fixedAmount } : {}),
             },
             ctx.locale,
           );
           const pct = parseFloat(updated.pct);
-          if (args.active === false && pct > 0) {
+          const updatedMode = updated.mode ?? BoxMode.PERCENT;
+          if (args.active === false && updatedMode === BoxMode.PERCENT && pct > 0) {
             return {
               updated: toBoxDto(updated),
               warning: isEn

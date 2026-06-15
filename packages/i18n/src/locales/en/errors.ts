@@ -63,6 +63,9 @@ export const errors = {
     not_found: 'Box not found',
     not_in_allocation: 'Box {{id}} does not exist or is not part of the split',
     allocation_must_sum_100: 'Percentages must add up to 100 (they add up to {{total}})',
+    fixed_requires_amount: 'A fixed-mode box requires a fixedAmount greater than 0',
+    fixed_exceeds_income: 'Total fixed boxes ({{fixedTotal}}) exceeds monthly income ({{income}})',
+    mode_not_supported_for_scope: 'Fixed mode is only supported for personal-scope boxes',
   },
   recurring: {
     not_found: 'Recurring expense not found',
