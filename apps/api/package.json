@@ -18,6 +18,7 @@
   "dependencies": {
     "@ai-sdk/azure": "^3.0.71",
     "@ai-sdk/openai": "^3.0.69",
+    "@ai-sdk/openai-compatible": "^2.0.50",
     "@app/contracts": "workspace:*",
     "@app/i18n": "workspace:*",
     "@nestjs/common": "^11.0.1",

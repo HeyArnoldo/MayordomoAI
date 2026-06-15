@@ -46,6 +46,14 @@ export const envSchema = z.object({
   // a SERVICE_UNAVAILABLE error when FOUNDRY_DEMO_USER_ID is absent.
   AGENT_TOOL_INTERNAL_KEY: z.string().optional(),
   FOUNDRY_DEMO_USER_ID: z.string().optional(),
+
+  // Azure AI Foundry OpenAI-compatible endpoint (e.g. Grok from xAI).
+  // When FOUNDRY_API_KEY + FOUNDRY_BASE_URL are set, the agent routes to Foundry
+  // regardless of whether OPENAI_API_KEY is also present (transcription decoupling).
+  FOUNDRY_API_KEY: z.string().optional(),
+  FOUNDRY_BASE_URL: z.string().optional(),
+  FOUNDRY_AGENT_MODEL: z.string().optional(),
+  FOUNDRY_PARSER_MODEL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
