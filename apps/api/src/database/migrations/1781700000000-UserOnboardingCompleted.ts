@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Default = false so all existing users are treated as needing onboarding
  * until they explicitly complete it (or an admin sets it via data migration).
  */
-export class UserOnboardingCompleted1781600000000 implements MigrationInterface {
-  name = 'UserOnboardingCompleted1781600000000';
+export class UserOnboardingCompleted1781700000000 implements MigrationInterface {
+  name = 'UserOnboardingCompleted1781700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
