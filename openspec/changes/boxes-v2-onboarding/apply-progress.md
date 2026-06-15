@@ -641,3 +641,43 @@ No real WhatsApp sends in tests: `EvolutionClient.sendText` is mocked in `phone-
 | S4-T7 WhatsApp proactive starter       | [x] Done                         |
 | S4-T8 Web onboarding flow              | [x] Done                         |
 | S4-T9 Root CI gate                     | [x] Done (all gates green above) |
+
+---
+
+## Integration (S2 + S3 + S4)
+
+**Date**: 2026-06-15
+**Branch**: feat/boxes-v2-epic (single PR combining S2, S3, S4)
+**Merged in order**: S3 (remove-transit) -> S2 (recurring-into-fixed-boxes) -> S4 (ai-onboarding), each with `--no-ff`.
+
+### Conflicts resolved
+
+- `apps/api/src/agent/agent-tools.ts`, `agent.service.ts`, `agent.module.ts`, `agent.service.spec.ts`, `packages/i18n/src/locales/{en,es}/api.ts` — auto-merged by git; manually audited to confirm the UNION of intent: transit text removed (S3), `recurring` dropped from `AgentToolsContext` + RecurringService removed from constructors and `listRecurringExpenses` remapped to fixed boxes (S2), optional `onboarding` added to context + `confirmOnboarding` tool + OnboardingService injected + `resolveOnboardingMode` (S4).
+- `openspec/changes/boxes-v2-onboarding/apply-progress.md` — content conflict on each merge; resolved by keeping ALL slice batch records (S3 + S2 + S4 sections preserved).
+- No conflicts in `app.module.ts`, `whatsapp.module.ts`, `whatsapp.service.ts`, or the i18n transactions/chat/errors locales — git auto-merged cleanly; verified RecurringModule/RecurringReminderService removed, OnboardingModule added, S4 onboarding trigger and S2 reminder removal both present, and en/es locales in sync (no transit, no reminder, onboarding keys present).
+
+### Combined migration run (dev DB, port 55432) — applied in timestamp order
+
+1. `1781510000000-RemoveTransitType` (S3) — **executed** (after fix, see below)
+2. `1781600000000-UnifyRecurringIntoFixedBoxes` (S2) — **executed** (recurring rows -> fixed boxes, table dropped)
+3. `1781700000000-UserOnboardingCompleted` (S4) — **executed** (column added)
+
+Post-migration DB verified: `transactions_type_enum` is now `{income, expense}` (no transit), no rows of type 'transit' remain, `recurring_expenses` table dropped, `users.onboardingCompleted` column present.
+
+### Combined-state bug found and fixed
+
+**S3 RemoveTransitType migration was broken against a DB containing a real transit row.** The verify-zero gate only checked `deletedAt IS NULL`, but step 1 voided transit rows (set status='voided' + deletedAt) WITHOUT changing their `type` column. The irreversible enum-narrow cast (`USING type::text::new_enum`) runs over EVERY row — including the just-voided ones still carrying `type='transit'` — so it failed with `invalid input value for enum transactions_type_enum: "transit"`. Fix: step 1 now also reassigns ALL transit rows to `type='expense'` (an inert placeholder for voided, balance-excluded rows, consistent with the S3 web UI fallback), and the verify-zero gate now asserts zero rows of type 'transit' regardless of `deletedAt`. The migration then applies cleanly.
+
+### Combined gates (ROOT, like CI)
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, warnings only)           |
+| `pnpm typecheck` (ROOT)                      | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS (api + web + mcp-server + packages) |
+| `pnpm test` (ROOT)                           | PASS — 374 tests, 27 suites              |
+
+Combined test count (374) is the coherent union of the slices (S3 367, S2 357, S4 368): onboarding tests added, recurring tests removed, transit-rejection tests added. No combined-state test breakage.
