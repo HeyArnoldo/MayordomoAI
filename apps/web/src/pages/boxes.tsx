@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Check, Minus, PackagePlus, Pencil, Plus, TriangleAlert } from 'lucide-react';
-import type { BoxBalance } from '@app/contracts';
+import { Check, Minus, PackagePlus, Pencil, Plus, RotateCcw, TriangleAlert } from 'lucide-react';
+import { BoxMode, type BoxBalance } from '@app/contracts';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Money } from '@/components/mayordomo/money';
 import { NewBoxDialog } from '@/features/boxes/new-box-dialog';
 import { EditBoxDialog } from '@/features/boxes/edit-box-dialog';
 import { useBoxBalances, useUpdateAllocation, useUpdateBox } from '@/hooks/use-finance';
+import { translateApiError } from '@/lib/api-error';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
@@ -21,32 +22,45 @@ export default function BoxesPage() {
   const [pcts, setPcts] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState<BoxBalance | null>(null);
 
-  const editable = boxes.filter((b) => b.active && b.scope === 'personal');
-  const archived = boxes.filter((b) => !b.active && b.scope === 'personal');
+  const activePersonal = boxes.filter((b) => b.active && b.scope === 'personal');
+  const percentBoxes = activePersonal.filter(
+    (b) => (b.mode ?? BoxMode.PERCENT) === BoxMode.PERCENT,
+  );
+  const fixedBoxes = activePersonal.filter((b) => b.mode === BoxMode.FIXED);
+  const archivedBoxes = boxes.filter((b) => !b.active);
 
   useEffect(() => {
-    if (editable.length > 0 && Object.keys(pcts).length === 0) {
-      setPcts(Object.fromEntries(editable.map((b) => [b.id, b.pct])));
+    if (percentBoxes.length > 0 && Object.keys(pcts).length === 0) {
+      setPcts(Object.fromEntries(percentBoxes.map((b) => [b.id, b.pct])));
     }
-  }, [editable, pcts]);
+  }, [percentBoxes, pcts]);
 
-  // Total sobre las cajas REALES (no solo el estado): una caja recién creada
-  // cuenta aunque pcts aún no la tenga.
-  const total = editable.reduce((s, b) => s + (pcts[b.id] ?? b.pct), 0);
+  // Total computed only over percent boxes (fixed are excluded from the 100% invariant).
+  const total = percentBoxes.reduce((s, b) => s + (pcts[b.id] ?? b.pct), 0);
   const ok = Math.round(total * 100) === 10000;
-  const dirty = editable.some((b) => pcts[b.id] !== undefined && pcts[b.id] !== b.pct);
+  const dirty = percentBoxes.some((b) => pcts[b.id] !== undefined && pcts[b.id] !== b.pct);
 
   const bump = (id: string, delta: number) =>
     setPcts((p) => ({ ...p, [id]: Math.min(100, Math.max(0, (p[id] ?? 0) + delta)) }));
 
   const save = () =>
     update.mutate(
-      { items: editable.map((b) => ({ id: b.id, pct: pcts[b.id] ?? b.pct })) },
+      { items: percentBoxes.map((b) => ({ id: b.id, pct: pcts[b.id] ?? b.pct })) },
       {
         onSuccess: () => toast.success(t('editor.updated')),
-        onError: (e) => toast.error(e.message),
+        onError: (e) => toast.error(translateApiError(e)),
       },
     );
+
+  const handleReactivate = (box: BoxBalance) => {
+    reactivate.mutate(
+      { id: box.id, input: { active: true } },
+      {
+        onSuccess: () => toast.success(t('editor.reactivated', { name: box.name })),
+        onError: (err) => toast.error(translateApiError(err)),
+      },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -58,26 +72,183 @@ export default function BoxesPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <section
-        className={cn(
-          'flex items-center justify-between rounded-2xl border p-4 shadow-card',
-          ok ? 'border-line bg-surface' : 'border-negative/40 bg-negative-soft',
-        )}
-      >
-        <div className="flex items-center gap-2">
-          {ok ? (
-            <Check className="size-5 text-positive" />
-          ) : (
-            <TriangleAlert className="size-5 text-negative" />
-          )}
-          <span className={cn('text-sm font-bold', ok ? 'text-ink' : 'text-negative')}>
-            {ok ? t('editor.sumOk') : t('editor.sumError', { total: total.toFixed(2) })}
-          </span>
-        </div>
-        <Button size="sm" disabled={!ok || !dirty || update.isPending} onClick={save}>
-          {t('common:save')}
-        </Button>
-      </section>
+      {/* ── Percent-boxes allocation editor ────────────────────────────── */}
+      {percentBoxes.length > 0 && (
+        <>
+          <section
+            className={cn(
+              'flex items-center justify-between rounded-2xl border p-4 shadow-card',
+              ok ? 'border-line bg-surface' : 'border-negative/40 bg-negative-soft',
+            )}
+          >
+            <div className="flex items-center gap-2">
+              {ok ? (
+                <Check className="size-5 text-positive" />
+              ) : (
+                <TriangleAlert className="size-5 text-negative" />
+              )}
+              <span className={cn('text-sm font-bold', ok ? 'text-ink' : 'text-negative')}>
+                {ok ? t('editor.sumOk') : t('editor.sumError', { total: total.toFixed(2) })}
+              </span>
+            </div>
+            <Button size="sm" disabled={!ok || !dirty || update.isPending} onClick={save}>
+              {t('common:save')}
+            </Button>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
+            <p className="pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+              {t('editor.percentBoxesTitle')}
+            </p>
+            {percentBoxes.map((b, i) => {
+              const color = boxColor(b.name, b.colorKey);
+              const pct = pcts[b.id] ?? b.pct;
+              return (
+                <div
+                  key={b.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 py-3',
+                    i < percentBoxes.length - 1 && 'border-b border-line',
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate text-[13.5px] font-semibold text-ink">{b.name}</span>
+                    {b.accumulated !== null && (
+                      <span className="rounded-full bg-surface-alt px-2 py-px text-[10.5px] font-bold text-ink-3">
+                        {t('editor.fundBadge')}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setEditing(b)}
+                      className="shrink-0 rounded-lg p-1 text-ink-3 transition-colors hover:bg-surface-alt hover:text-ink"
+                      title={t('editor.editBox')}
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Money value={b.allocated} className="hidden text-xs text-ink-3 sm:inline" />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => bump(b.id, -5)}
+                    >
+                      <Minus className="size-3.5" />
+                    </Button>
+                    {/* % editable a mano; los ± siguen para ajustes rápidos */}
+                    <div className="relative">
+                      <input
+                        value={pct}
+                        inputMode="decimal"
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(',', '.');
+                          if (!/^\d{0,3}(\.\d{0,2})?$/.test(raw)) return;
+                          const n = raw === '' ? 0 : parseFloat(raw);
+                          if (n <= 100) setPcts((p) => ({ ...p, [b.id]: n }));
+                        }}
+                        className="money h-8 w-[64px] rounded-lg border border-line bg-surface pr-5 text-center text-sm font-semibold text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                      />
+                      <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[11px] text-ink-3">
+                        %
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => bump(b.id, 5)}
+                    >
+                      <Plus className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+
+          <p className="text-center text-xs text-ink-3">{t('editor.futureNote')}</p>
+        </>
+      )}
+
+      {/* ── Fixed-amount boxes ──────────────────────────────────────────── */}
+      {fixedBoxes.length > 0 && (
+        <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
+          <div className="flex items-center justify-between pb-1 pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+              {t('editor.fixedBoxesTitle')}
+            </p>
+            <p className="text-[11px] text-ink-3">{t('editor.fixedBoxesNote')}</p>
+          </div>
+          {fixedBoxes.map((b, i) => {
+            const color = boxColor(b.name, b.colorKey);
+            const remaining = b.remainingToFill ?? 0;
+            const fillPct =
+              b.fixedAmount && b.fixedAmount > 0
+                ? Math.min(100, Math.round(((b.fixedAmount - remaining) / b.fixedAmount) * 100))
+                : 100;
+            const fullyFunded = remaining === 0;
+
+            return (
+              <div
+                key={b.id}
+                className={cn('py-3', i < fixedBoxes.length - 1 && 'border-b border-line')}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate text-[13.5px] font-semibold text-ink">{b.name}</span>
+                    {b.accumulated !== null && (
+                      <span className="rounded-full bg-surface-alt px-2 py-px text-[10.5px] font-bold text-ink-3">
+                        {t('editor.fundBadge')}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setEditing(b)}
+                      className="shrink-0 rounded-lg p-1 text-ink-3 transition-colors hover:bg-surface-alt hover:text-ink"
+                      title={t('editor.editBox')}
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Money
+                      value={b.fixedAmount ?? 0}
+                      className="text-[13px] font-semibold text-ink"
+                    />
+                  </div>
+                </div>
+
+                {/* Remaining-to-fill indicator */}
+                <div className="mt-2 space-y-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-alt">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        fullyFunded ? 'bg-positive' : 'bg-brand',
+                      )}
+                      style={{ width: `${fillPct}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-ink-3">
+                      {fullyFunded ? t('editor.fullyFunded') : t('editor.remainingToFill')}
+                    </span>
+                    {!fullyFunded && <Money value={remaining} className="text-[11px] text-ink-3" />}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       <NewBoxDialog
         trigger={
@@ -88,126 +259,42 @@ export default function BoxesPage() {
         }
       />
 
-      <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
-        {editable.map((b, i) => {
-          const color = boxColor(b.name, b.colorKey);
-          const pct = pcts[b.id] ?? b.pct;
-          return (
-            <div
-              key={b.id}
-              className={cn(
-                'flex items-center justify-between gap-3 py-3',
-                i < editable.length - 1 && 'border-b border-line',
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="truncate text-[13.5px] font-semibold text-ink">{b.name}</span>
-                {b.accumulated !== null && (
-                  <span className="rounded-full bg-surface-alt px-2 py-px text-[10.5px] font-bold text-ink-3">
-                    {t('editor.fundBadge')}
-                  </span>
+      {/* ── Archived boxes ──────────────────────────────────────────────── */}
+      {archivedBoxes.length > 0 && (
+        <section className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
+          <p className="pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+            {t('editor.reactivateSection')}
+          </p>
+          {archivedBoxes.map((b, i) => {
+            const color = boxColor(b.name, b.colorKey);
+            return (
+              <div
+                key={b.id}
+                className={cn(
+                  'flex items-center justify-between gap-3 py-3',
+                  i < archivedBoxes.length - 1 && 'border-b border-line',
                 )}
-                <button
-                  onClick={() => setEditing(b)}
-                  className="shrink-0 rounded-lg p-1 text-ink-3 transition-colors hover:bg-surface-alt hover:text-ink"
-                  title={t('editor.editBox')}
-                >
-                  <Pencil className="size-3.5" />
-                </button>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Money value={b.allocated} className="hidden text-xs text-ink-3 sm:inline" />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => bump(b.id, -5)}
-                >
-                  <Minus className="size-3.5" />
-                </Button>
-                {/* % editable a mano; los ± siguen para ajustes rápidos */}
-                <div className="relative">
-                  <input
-                    value={pct}
-                    inputMode="decimal"
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(',', '.');
-                      if (!/^\d{0,3}(\.\d{0,2})?$/.test(raw)) return;
-                      const n = raw === '' ? 0 : parseFloat(raw);
-                      if (n <= 100) setPcts((p) => ({ ...p, [b.id]: n }));
-                    }}
-                    className="money h-8 w-[64px] rounded-lg border border-line bg-surface pr-5 text-center text-sm font-semibold text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              >
+                <div className="flex min-w-0 items-center gap-2 opacity-50">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
                   />
-                  <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[11px] text-ink-3">
-                    %
-                  </span>
+                  <span className="truncate text-[13.5px] font-semibold text-ink">{b.name}</span>
                 </div>
                 <Button
                   variant="outline"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => bump(b.id, 5)}
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  disabled={reactivate.isPending}
+                  onClick={() => handleReactivate(b)}
                 >
-                  <Plus className="size-3.5" />
+                  <RotateCcw className="size-3" />
+                  {t('editor.reactivate')}
                 </Button>
               </div>
-            </div>
-          );
-        })}
-      </section>
-
-      <p className="text-center text-xs text-ink-3">{t('editor.futureNote')}</p>
-
-      {archived.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-3">
-            {t('archived.title')}
-          </h2>
-          <div className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
-            {archived.map((b, i) => {
-              const color = boxColor(b.name, b.colorKey);
-              return (
-                <div
-                  key={b.id}
-                  className={cn(
-                    'flex items-center justify-between gap-3 py-3',
-                    i < archived.length - 1 && 'border-b border-line',
-                  )}
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full opacity-40"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="truncate text-[13.5px] font-semibold text-ink-3">
-                      {b.name}
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={reactivate.isPending}
-                    onClick={() =>
-                      reactivate.mutate(
-                        { id: b.id, input: { active: true } },
-                        {
-                          onSuccess: () =>
-                            toast.success(t('archived.reactivated', { name: b.name })),
-                          onError: () => toast.error(t('archived.reactivateError')),
-                        },
-                      )
-                    }
-                  >
-                    {t('archived.reactivate')}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+            );
+          })}
         </section>
       )}
 
