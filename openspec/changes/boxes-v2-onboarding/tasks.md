@@ -215,17 +215,17 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Independent of S1, S2, S4 — can land any time.  
 > Recommended: land after S1 to reduce i18n churn, but not required.
 
-- [ ] **S3-T1** Void all transit transaction rows in a migration  
+- [x] **S3-T1** Void all transit transaction rows in a migration  
        **Spec req**: transactions spec §transit-removal.  
        **Action**:
   1. Generate + write migration that sets `type = 'expense'` (or flags as voided) for all rows with `type = 'transit'`
   2. Add verify-zero gate: the migration must assert zero transit rows remain before altering the enum  
      **Files**:
-  - `apps/api/src/migrations/YYYYMMDD_VoidTransitRows.ts`  
+  - `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts`  
     **TDD**: write invariant validator test: `assertNoTransitRows(rows)` throws if any transit row exists  
     **Parallel**: no — must complete before S3-T2
 
-- [ ] **S3-T2** Narrow the transaction type enum (rename+create+alter+drop dance)  
+- [x] **S3-T2** Narrow the transaction type enum (rename+create+alter+drop dance)  
        **Spec req**: transactions spec §enum-narrowing; constraint: must use rename+create+alter+drop sequence, not simple ALTER TYPE.  
        **Action**:
   1. Rename old enum `transaction_type` → `transaction_type_old`
@@ -233,47 +233,47 @@ Recommended merge order: S1 → S3 → S2 → S4
   3. ALTER TABLE to use new enum (cast with USING clause)
   4. DROP old enum  
      **Files**:
-  - `apps/api/src/migrations/YYYYMMDD_NarrowTransactionTypeEnum.ts`
-  - `apps/api/src/transactions/transaction.entity.ts` — update TypeScript enum  
+  - `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts` (combined with S3-T1)
+  - `apps/api/src/transactions/transaction.entity.ts` — entity comment updated  
     **TDD**: no (DDL migration)  
     **Depends on**: S3-T1
 
-- [ ] **S3-T3** Update contracts enum: remove transit from TypeScript union/enum  
+- [x] **S3-T3** Update contracts enum: remove transit from TypeScript union/enum  
        **Spec req**: transactions spec §contracts.  
        **Files**:
-  - `packages/shared/src/contracts/transaction.contracts.ts`
-  - `apps/api/src/transactions/dto/*.ts`  
+  - `packages/contracts/src/transactions.ts`  
     **TDD**: no — typecheck will catch remaining usages  
     **Depends on**: S3-T2
 
-- [ ] **S3-T4** Remove transit from all agent tools, MCP tools, and executor  
+- [x] **S3-T4** Remove transit from all agent tools, MCP tools, and executor  
        **Spec req**: transactions spec §agent-cleanup.  
        **Action**: Remove any `transit` from tool input schemas, output formatters, executor routing.  
        **Files**:
-  - `apps/api/src/agent/tools/*.tool.ts` (grep for transit)
-  - `apps/api/src/mcp/tools/*.ts`
-  - `apps/api/src/agent/executor.ts`  
+  - `apps/api/src/agent/agent-tools.ts`
+  - `apps/mcp-server/src/tools/register-transaction.ts`
+  - `apps/mcp-server/src/tools/query-transactions.ts`  
     **TDD**: no  
     **Depends on**: S3-T3
 
-- [ ] **S3-T5** Remove transit from i18n catalogs  
+- [x] **S3-T5** Remove transit from i18n catalogs  
        **Spec req**: transactions spec §i18n.  
        **Files**:
-  - `packages/i18n/src/en/*.ts`
-  - `packages/i18n/src/es/*.ts`  
+  - `packages/i18n/src/locales/en/transactions.ts`
+  - `packages/i18n/src/locales/es/transactions.ts`  
     **TDD**: no  
     **Parallel**: can run alongside S3-T4
 
-- [ ] **S3-T6** Web: remove transit from transaction-row display and transaction-detail selectors  
+- [x] **S3-T6** Web: remove transit from transaction-row display and transaction-detail selectors  
        **Spec req**: transactions spec §web-cleanup.  
        **Files**:
-  - `apps/web/src/features/transactions/components/TransactionRow.tsx`
-  - `apps/web/src/features/transactions/components/TransactionDetail.tsx`
-  - Any type filter/selector components that list transaction types  
+  - `apps/web/src/components/mayordomo/transaction-row.tsx`
+  - `apps/web/src/components/mayordomo/transaction-detail.tsx`
+  - `apps/web/src/features/registro/registro-dialog.tsx`
+  - `apps/web/src/pages/transactions.tsx`  
     **TDD**: no  
     **Parallel**: can run alongside S3-T4 and S3-T5
 
-- [ ] **S3-T7** Run root CI gate before PR  
+- [x] **S3-T7** Run root CI gate before PR  
        **Action**: same gate as S1-T10  
        **Depends on**: all S3 tasks complete
 
