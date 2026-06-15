@@ -35,7 +35,7 @@ export class Transaction {
   @Column({ type: 'enum', enum: TransactionType })
   type: TransactionType;
 
-  // Null en ingresos (se reparten por %) y tránsito.
+  // Null en ingresos (se reparten por %).
   @Column({ type: 'uuid', nullable: true })
   boxId: string | null;
 
