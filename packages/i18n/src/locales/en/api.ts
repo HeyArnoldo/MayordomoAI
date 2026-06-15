@@ -24,10 +24,6 @@ export const api = {
       "Hi 👋 I can't find an account linked to this number. Sign up at https://mayordomoai.xyz and link your number from Settings.",
     verificationCode: 'Your MayordomoAI verification code is *{{code}}*. It expires in 10 minutes.',
   },
-  reminders: {
-    dueToday:
-      '📌 Reminder: *{{name}}* is due today — {{amount}} (box {{box}}). Should I log it? Reply "yes" and I\'ll note it down.',
-  },
   defaultBoxes: {
     savings: 'Savings',
     misc: 'Misc',

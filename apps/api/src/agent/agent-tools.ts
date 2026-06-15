@@ -14,7 +14,6 @@ import {
 import { formatMoney } from '@app/i18n';
 import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
-import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
 import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
@@ -37,7 +36,6 @@ export interface AgentToolsContext {
   conversationId: string | null;
   boxes: BoxesService;
   transactions: TransactionsService;
-  recurring: RecurringService;
   users: UsersService;
   audits: Repository<ToolAudit>;
   /** Idioma del usuario (persistido en DB). */
@@ -103,8 +101,7 @@ export function buildAgentTools(
   // Build or reuse executor. When omitted (in-app agent path), construct from
   // ctx service handles so agent-tools.spec.ts stays green without DI changes.
   const exec =
-    executor ??
-    new AgentToolExecutorService(ctx.boxes, ctx.transactions, ctx.recurring, ctx.users, ctx.audits);
+    executor ?? new AgentToolExecutorService(ctx.boxes, ctx.transactions, ctx.users, ctx.audits);
 
   // Per-call context for the executor (strips service handles).
   const ec = {
@@ -272,115 +269,31 @@ export function buildAgentTools(
 
     listRecurringExpenses: tool({
       description: isEn
-        ? "Lists the user's monthly fixed expenses (phone plan, subscriptions, rent) with " +
-          'amount, due day, box and total monthly committed. Use for "my fixed expenses", ' +
-          '"how much am I committed to", and ALWAYS before advising on box allocation.'
-        : 'Lista los gastos fijos mensuales del usuario (línea celular, suscripciones, alquiler) con ' +
-          'monto, día de vencimiento, caja y el total mensual comprometido. Úsala para "mis fijos", ' +
-          '"cuánto tengo comprometido", y SIEMPRE antes de aconsejar sobre el reparto de cajas.',
+        ? "Lists the user's fixed-mode expense boxes (previously called recurring expenses). " +
+          'Use for "my fixed expenses", "how much am I committed to", and ALWAYS before advising on box allocation. ' +
+          'To add a new fixed expense, use createBox with mode=fixed. To remove one, use updateBox with active=false.'
+        : 'Lista las cajas de gasto de monto fijo del usuario (antes llamadas gastos recurrentes). ' +
+          'Úsala para "mis fijos", "cuánto tengo comprometido", y SIEMPRE antes de aconsejar sobre el reparto de cajas. ' +
+          'Para agregar un gasto fijo usa createBox con mode=fixed. Para darlo de baja, usa updateBox con active=false.',
       inputSchema: z.object({}),
       execute: async (args) =>
-        audited(ctx, 'listRecurringExpenses', args, async () => ({
-          items: await ctx.recurring.list(ctx.userId),
-          monthlyTotal: await ctx.recurring.monthlyTotal(ctx.userId),
-        })),
-    }),
-
-    addRecurringExpense: tool({
-      description: isEn
-        ? "Records a monthly fixed expense (NOT today's expense: it is a recurring commitment). " +
-          'Mayordomo will remind via WhatsApp on the due day and only records it when the user confirms. ' +
-          `E.g.: "my phone plan is ${fmt(39.9)} every 5th, comes from Miscellaneous".`
-        : 'Registra un gasto fijo mensual (NO es un gasto de hoy: es un compromiso recurrente). ' +
-          'El mayordomo recordará por WhatsApp el día del vencimiento y solo se anota cuando el ' +
-          `usuario confirma. Ej: "mi línea celular son ${fmt(39.9)} cada día 5, sale de Varios".`,
-      inputSchema: z.object({
-        name: z
-          .string()
-          .min(1)
-          .max(120)
-          .describe(isEn ? 'Name, e.g. "Phone plan"' : 'Nombre, ej "Línea celular"'),
-        amount: z
-          .number()
-          .positive()
-          .describe(
-            isEn ? `Monthly amount in ${ctx.currency}` : `Monto mensual en ${ctx.currency}`,
-          ),
-        dayOfMonth: z
-          .number()
-          .int()
-          .min(1)
-          .max(31)
-          .describe(isEn ? 'Day of month the expense is due' : 'Día del mes en que vence'),
-        boxName: z
-          .string()
-          .describe(
-            isEn ? 'Box to deduct from, e.g. "Miscellaneous"' : 'Caja de la que sale, ej "Varios"',
-          ),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'addRecurringExpense', args, async () => {
+        audited(ctx, 'listRecurringExpenses', args, async () => {
           const all = await ctx.boxes.findAll(ctx.userId);
-          const box = all.find(
-            (b) => b.active && b.name.toLowerCase() === args.boxName.trim().toLowerCase(),
+          const fixedExpenseBoxes = all.filter(
+            (b) => b.active && b.mode === BoxMode.FIXED && b.type === 'expense',
           );
-          if (!box) {
-            return {
-              error: isEn
-                ? `Box "${args.boxName}" does not exist`
-                : `No existe la caja "${args.boxName}"`,
-              availableBoxes: all.filter((b) => b.active).map((b) => b.name),
-            };
-          }
-          const created = await ctx.recurring.create(ctx.userId, {
-            name: args.name,
-            amount: args.amount,
-            dayOfMonth: args.dayOfMonth,
-            boxId: box.id,
-          });
+          const monthlyTotal = fixedExpenseBoxes.reduce(
+            (sum, b) => sum + (b.fixedAmount != null ? parseFloat(b.fixedAmount) : 0),
+            0,
+          );
           return {
-            created,
-            note: isEn
-              ? 'The reminder arrives via WhatsApp on the due day; it is recorded only when the user confirms.'
-              : 'El recordatorio llega por WhatsApp el día del vencimiento; se registra solo cuando el usuario confirma.',
+            items: fixedExpenseBoxes.map((b) => ({
+              id: b.id,
+              name: b.name,
+              fixedAmount: b.fixedAmount != null ? parseFloat(b.fixedAmount) : 0,
+            })),
+            monthlyTotal: Math.round(monthlyTotal * 100) / 100,
           };
-        }),
-    }),
-
-    removeRecurringExpense: tool({
-      description: isEn
-        ? 'Removes a fixed expense (stops reminding; history is not affected). ALWAYS ask the user for confirmation first.'
-        : 'Da de baja un gasto fijo (deja de recordarse; el historial no se toca). SIEMPRE pide confirmación al usuario antes.',
-      inputSchema: z.object({
-        name: z
-          .string()
-          .describe(
-            isEn ? 'Name of the fixed expense to remove' : 'Nombre del gasto fijo a dar de baja',
-          ),
-        userConfirmed: z.boolean().default(false),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'removeRecurringExpense', args, async () => {
-          const items = await ctx.recurring.list(ctx.userId);
-          const match = items.find((i) => i.name.toLowerCase() === args.name.trim().toLowerCase());
-          if (!match) {
-            return {
-              error: isEn
-                ? `No fixed expense named "${args.name}" found`
-                : `No hay un gasto fijo llamado "${args.name}"`,
-              available: items.map((i) => i.name),
-            };
-          }
-          if (!args.userConfirmed) {
-            return {
-              needsConfirmation: true,
-              item: match,
-              message: isEn
-                ? 'Ask the user for confirmation before removing this fixed expense.'
-                : 'Pide confirmación antes de dar de baja este gasto fijo.',
-            };
-          }
-          return { removed: await ctx.recurring.deactivate(ctx.userId, match.id) };
         }),
     }),
 

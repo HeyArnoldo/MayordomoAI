@@ -70,9 +70,6 @@ export const errors = {
       'El total de cajas fijas ({{fixedTotal}}) supera el ingreso mensual ({{income}})',
     mode_not_supported_for_scope: 'El modo fijo solo aplica a cajas personales',
   },
-  recurring: {
-    not_found: 'Gasto fijo no encontrado',
-  },
   server: {
     internal_error: 'Ocurrió un error inesperado',
   },

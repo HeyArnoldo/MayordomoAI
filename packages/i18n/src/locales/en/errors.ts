@@ -67,9 +67,6 @@ export const errors = {
     fixed_exceeds_income: 'Total fixed boxes ({{fixedTotal}}) exceeds monthly income ({{income}})',
     mode_not_supported_for_scope: 'Fixed mode is only supported for personal-scope boxes',
   },
-  recurring: {
-    not_found: 'Recurring expense not found',
-  },
   server: {
     internal_error: 'An unexpected error occurred',
   },

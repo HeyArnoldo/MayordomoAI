@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BoxesModule } from '../boxes/boxes.module';
 import { TransactionsModule } from '../transactions/transactions.module';
-import { RecurringModule } from '../recurring/recurring.module';
 import { AiUsageModule } from '../ai-usage/ai-usage.module';
 import { UsersModule } from '../users/users.module';
 import { AgentController } from './agent.controller';
@@ -15,7 +14,6 @@ import { ToolAudit } from './tool-audit.entity';
     TypeOrmModule.forFeature([ToolAudit]),
     BoxesModule,
     TransactionsModule,
-    RecurringModule,
     AiUsageModule,
     UsersModule,
   ],

@@ -25,10 +25,6 @@ export const api = {
     verificationCode:
       'Tu código de verificación de MayordomoAI es *{{code}}*. Vence en 10 minutos.',
   },
-  reminders: {
-    dueToday:
-      '📌 Recordatorio: hoy vence *{{name}}* — {{amount}} (caja {{box}}). ¿Lo registro? Responde "sí" y lo anoto.',
-  },
   // Nombres de las cajas que se crean al activar una cuenta. Solo aplican al
   // crearlas: después son data del usuario y jamás se tocan.
   defaultBoxes: {
