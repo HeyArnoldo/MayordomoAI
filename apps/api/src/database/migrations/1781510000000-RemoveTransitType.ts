@@ -4,9 +4,16 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Slice 3 — Remove transit transaction type.
  *
  * Safety sequence:
- *  1. Void all non-voided transit rows (status = 'voided', deletedAt = now()).
- *  2. Verify-zero gate: assert no non-voided transit rows remain before narrowing the enum.
- *     This is the only safety net — the enum narrowing is irreversible.
+ *  1. Void all non-voided transit rows (status = 'voided', deletedAt = now()) AND
+ *     reassign their type to 'expense'. The type reassignment is required: the
+ *     enum-narrow cast in step 3 casts EVERY row (voided rows included), so any
+ *     row still carrying type='transit' — even a voided one — would break the cast.
+ *     Voided rows do not affect balances, so 'expense' is an inert, consistent
+ *     placeholder (matches the web UI fallback that renders legacy voided transit
+ *     rows as 'expense').
+ *  2. Verify-zero gate: assert no rows of type 'transit' remain at all before
+ *     narrowing the enum. This is the only safety net — the enum narrowing is
+ *     irreversible.
  *  3. Rename existing 3-value enum, create 2-value enum, migrate column, drop old enum.
  *
  * down() notes:
@@ -20,26 +27,35 @@ export class RemoveTransitType1781510000000 implements MigrationInterface {
   name = 'RemoveTransitType1781510000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Step 1: Void all non-voided transit rows.
+    // Step 1: Void all non-voided transit rows, then reassign EVERY transit row's
+    // type to 'expense' so the enum-narrow cast in step 3 cannot hit a 'transit'
+    // value. The void carries the audit intent; the type reassignment is what
+    // makes the irreversible cast safe. Voided rows are excluded from balances,
+    // so 'expense' is an inert placeholder.
     await queryRunner.query(`
       UPDATE "transactions"
       SET "status" = 'voided', "deletedAt" = now()
       WHERE "type" = 'transit'
         AND "deletedAt" IS NULL
     `);
+    await queryRunner.query(`
+      UPDATE "transactions"
+      SET "type" = 'expense'
+      WHERE "type" = 'transit'
+    `);
 
-    // Step 2: Verify-zero gate — enum narrowing MUST NOT proceed if any active transit rows remain.
+    // Step 2: Verify-zero gate — enum narrowing MUST NOT proceed if ANY row still
+    // carries type 'transit' (the cast in step 3 touches voided rows too).
     const remaining = await queryRunner.query(`
       SELECT COUNT(*)::int AS cnt
       FROM "transactions"
       WHERE "type" = 'transit'
-        AND "deletedAt" IS NULL
     `);
     const count: number = (remaining as Array<{ cnt: number }>)[0]?.cnt ?? 0;
     if (count > 0) {
       throw new Error(
-        `[RemoveTransitType] Verify-zero failed: ${count} non-voided transit row(s) remain. ` +
-          `Aborting enum narrowing — re-run or void them manually first.`,
+        `[RemoveTransitType] Verify-zero failed: ${count} transit row(s) remain. ` +
+          `Aborting enum narrowing — re-run or reassign them manually first.`,
       );
     }
 
@@ -53,10 +69,9 @@ export class RemoveTransitType1781510000000 implements MigrationInterface {
       `CREATE TYPE "public"."transactions_type_enum" AS ENUM('income', 'expense')`,
     );
 
-    // Step 3c: Migrate the column — USING cast; transit rows are already voided so their
-    // type value will fail the cast. They must be handled first (already done in step 1).
-    // Any row that still carries 'transit' at this point is a bug and will cause an error,
-    // which is the desired behavior (fail-loud rather than silently corrupt data).
+    // Step 3c: Migrate the column — USING cast over every row. Step 1 reassigned all
+    // transit rows (including the just-voided ones) to 'expense', and step 2's
+    // verify-zero gate guarantees no 'transit' value survives, so this cast is safe.
     await queryRunner.query(`
       ALTER TABLE "transactions"
         ALTER COLUMN "type" TYPE "public"."transactions_type_enum"
