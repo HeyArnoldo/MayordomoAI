@@ -51,8 +51,9 @@ export const createBoxSchema = z
     /**
      * Allocation mode. Defaults to 'percent' for backward-compatibility.
      * When omitted, existing behavior (percent-based split) is preserved.
+     * Optional in the TypeScript input type so existing callers need not change.
      */
-    mode: z.enum(BoxMode).default(BoxMode.PERCENT),
+    mode: z.enum(BoxMode).optional().default(BoxMode.PERCENT),
     /**
      * Required when mode='fixed'. Must be > 0. Ignored (null) for percent boxes.
      */
@@ -137,7 +138,7 @@ export const boxSchema = z.object({
   active: z.boolean(),
   createdAt: z.string(),
   /** Allocation mode. 'percent' is the default for existing boxes. */
-  mode: z.enum(BoxMode).default(BoxMode.PERCENT),
+  mode: z.enum(BoxMode).optional().default(BoxMode.PERCENT),
   /** Fixed monthly amount in the user's currency. Null for percent-mode boxes. */
   fixedAmount: z.number().nullable().optional(),
 });

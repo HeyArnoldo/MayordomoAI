@@ -195,3 +195,60 @@
 - `openspec/changes/boxes-v2-onboarding/specs/boxes/spec.md` — scenario updated to reflect corrected semantics
 
 **Gate results**: packages build PASS, lint PASS (0 errors), typecheck PASS, tests 359/359 PASS (27 suites).
+
+---
+
+## Batch: 2 — S1b (Web box editor)
+
+**Date**: 2026-06-15
+**Branch**: feat/boxes-v2-web
+**Mode**: Standard (no jest in web; UI component task)
+**Slice**: S1b — Web layer only
+
+---
+
+### S1-T9 — Web box editor: mode toggle (percent / fixed) + fixedAmount input
+
+**Status**: [x] Done
+
+**Files changed**:
+
+- `apps/web/src/features/boxes/new-box-dialog.tsx` — Added `BoxMode` import, `MODE_OPTIONS` constant, mode state, fixedAmount state; dialog description switches based on mode; mode toggle (2-up card buttons identical to type toggle) hidden when business scope; fixedAmount Input shown only when mode=fixed; business scope checkbox hidden for fixed mode (API rejects fixed+business); submit passes `mode` + `fixedAmount` for fixed or `mode: percent` for percent; toast message is mode-aware (`new.createdFixed` for fixed); dialog reset on close
+- `apps/web/src/features/boxes/edit-box-dialog.tsx` — Added `BoxMode` import; mode state seeded from `box.mode ?? PERCENT`; fixedAmount state seeded from `box.fixedAmount`; mode toggle shown only for personal-scope boxes; fixedAmount input shown when mode=fixed; dirty check includes mode + fixedAmount changes; save payload is mode-discriminated; archive behavior (`{active: false, pct: 0}`) is unchanged
+- `apps/web/src/pages/boxes.tsx` — Split active personal boxes into `percentBoxes` and `fixedBoxes`; allocation editor (100% sum) applies to `percentBoxes` only; fixed boxes rendered in a separate labeled section with amount + fill-progress bar + remaining-to-fill from `box.remainingToFill`; `RotateCcw` archived section with `handleReactivate` that calls `useUpdateBox({active:true})`; all `onError` handlers use `translateApiError` (covers `box.fixed_exceeds_income`)
+- `packages/i18n/src/locales/es/boxes.ts` — Added keys: `editor.percentBoxesTitle`, `editor.fixedBoxesTitle`, `editor.fixedBoxesNote`, `editor.remainingToFill`, `editor.fullyFunded`, `editor.reactivateSection`, `editor.reactivate`, `editor.reactivated`; `new.descriptionFixed`, `new.modeLabel`, `new.modePercent`, `new.modePercentHint`, `new.modeFixed`, `new.modeFixedHint`, `new.fixedAmountLabel`, `new.fixedAmountPlaceholder`, `new.createdFixed`; `edit.modeLabel`, `edit.modePercent`, `edit.modeFixed`, `edit.fixedAmountLabel`, `edit.fixedAmountPlaceholder`
+- `packages/i18n/src/locales/en/boxes.ts` — Identical set of keys (required for `satisfies typeof es` to compile)
+- `packages/contracts/src/boxes.ts` — `CreateBoxInput = z.input<>` (not `z.infer<>`) so `mode` is optional for callers; `mode` field uses `.optional().default()` to match input semantics
+
+**Commit**: `9e56440` — `feat(web): box editor supports fixed/percent modes and remaining-to-fill`
+
+---
+
+### S1-T9 Gate Results
+
+| Gate                                      | Result                                                  |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `pnpm --filter "./packages/**" run build` | PASS                                                    |
+| `pnpm --filter @app/web run typecheck`    | PASS (0 errors)                                         |
+| `pnpm typecheck` (root)                   | PASS (all 6 packages)                                   |
+| `pnpm --filter @app/web run build`        | PASS (no errors, pre-existing chunk size warnings only) |
+| `pnpm lint` (root)                        | PASS (0 errors, 4 pre-existing warnings)                |
+
+---
+
+## S1 Complete Summary
+
+All S1 tasks (S1-D1 + S1-T1 through S1-T9) are done. S1-T10 root CI gate can now be run.
+
+| Task                             | Status   |
+| -------------------------------- | -------- |
+| S1-D1 Income source              | [x] Done |
+| S1-T1 Contracts BoxMode          | [x] Done |
+| S1-T2 Error codes + i18n         | [x] Done |
+| S1-T3 money.ts unit tests        | [x] Done |
+| S1-T4 money.ts implementation    | [x] Done |
+| S1-T5 Migration                  | [x] Done |
+| S1-T6 withBalances rework        | [x] Done |
+| S1-T7 createBox/updateBox guards | [x] Done |
+| S1-T8 Agent tools                | [x] Done |
+| S1-T9 Web editor                 | [x] Done |
