@@ -23,10 +23,8 @@ export const api = {
     unknownNumber:
       "Hi 👋 I can't find an account linked to this number. Sign up at https://mayordomoai.xyz and link your number from Settings.",
     verificationCode: 'Your MayordomoAI verification code is *{{code}}*. It expires in 10 minutes.',
-  },
-  reminders: {
-    dueToday:
-      '📌 Reminder: *{{name}}* is due today — {{amount}} (box {{box}}). Should I log it? Reply "yes" and I\'ll note it down.',
+    onboardingStarter:
+      "Hi, {{name}}! 🎉 Your number is now linked to MayordomoAI.\n\nLet me help you build your personalized budget in just a few minutes. Together we'll:\n\n💼 Set up your fixed expenses (rent, subscriptions...)\n🎯 Create your savings goals\n📊 Distribute the rest across your spending categories\n\nWhat's your monthly income? I'll suggest a starting point 👇",
   },
   defaultBoxes: {
     savings: 'Savings',

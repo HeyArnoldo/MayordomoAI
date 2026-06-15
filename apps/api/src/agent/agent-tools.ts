@@ -14,8 +14,8 @@ import {
 import { formatMoney } from '@app/i18n';
 import { BoxesService, toBoxDto } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
-import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 import type { I18nService } from '../i18n/i18n.service';
 import { ToolAudit } from './tool-audit.entity';
 import { toolErrorMessage } from './tool-error.helper';
@@ -37,8 +37,9 @@ export interface AgentToolsContext {
   conversationId: string | null;
   boxes: BoxesService;
   transactions: TransactionsService;
-  recurring: RecurringService;
   users: UsersService;
+  /** OnboardingService — required for confirmOnboarding tool; optional for backward compat. */
+  onboarding?: OnboardingService;
   audits: Repository<ToolAudit>;
   /** Idioma del usuario (persistido en DB). */
   locale: Locale;
@@ -103,8 +104,7 @@ export function buildAgentTools(
   // Build or reuse executor. When omitted (in-app agent path), construct from
   // ctx service handles so agent-tools.spec.ts stays green without DI changes.
   const exec =
-    executor ??
-    new AgentToolExecutorService(ctx.boxes, ctx.transactions, ctx.recurring, ctx.users, ctx.audits);
+    executor ?? new AgentToolExecutorService(ctx.boxes, ctx.transactions, ctx.users, ctx.audits);
 
   // Per-call context for the executor (strips service handles).
   const ec = {
@@ -132,13 +132,13 @@ export function buildAgentTools(
     queryTransactions: tool({
       description: isEn
         ? "Flexible query over the user's transactions: filtering, text search and aggregation in ONE tool. " +
-          'ALL filters are optional: without type it returns income+expenses+transits; without boxNames it searches ALL boxes; ' +
+          'ALL filters are optional: without type it returns income+expenses; without boxNames it searches ALL boxes; ' +
           'without dates it returns the most recent. textQuery searches the note ("taxi", "supermarket"). ' +
           'groupBy=box/day/week/month aggregates with total, count and average per group — use it for ' +
           '"where am I overspending", "which box do I spend the most in", monthly comparisons. ' +
           'orderBy=amount for the biggest expenses. Dates in YYYY-MM-DD (America/Lima timezone).'
         : 'Consulta flexible sobre los movimientos del usuario: filtros, búsqueda por texto y agregación en UNA tool. ' +
-          'TODOS los filtros son opcionales: sin type trae ingresos+gastos+tránsitos; sin boxNames busca en TODAS las cajas; ' +
+          'TODOS los filtros son opcionales: sin type trae ingresos+gastos; sin boxNames busca en TODAS las cajas; ' +
           'sin fechas trae lo más reciente. textQuery busca en la nota ("taxi", "supermercado"). ' +
           'groupBy=box/day/week/month agrega con total, cantidad y promedio por grupo — úsala para ' +
           '"en qué me excedo", "en qué caja gasto más", comparativas mensuales. ' +
@@ -149,8 +149,8 @@ export function buildAgentTools(
           .optional()
           .describe(
             isEn
-              ? 'income | expense | transit. OMIT for all types.'
-              : 'income | expense | transit. OMITIR para todos los tipos.',
+              ? 'income | expense. OMIT for all types.'
+              : 'income | expense. OMITIR para todos los tipos.',
           ),
         boxNames: z
           .array(z.string())
@@ -186,10 +186,10 @@ export function buildAgentTools(
 
     registerTransaction: tool({
       description: isEn
-        ? `Records a transaction (expense in a box, income distributed by %, or transit). ` +
+        ? `Records a transaction (expense in a box, or income distributed by %). ` +
           `RULE: if it is an expense >= ${threshold} or comes from a doubtful voice transcription, ` +
           `FIRST ask the user and call this tool with userConfirmed=true only after their explicit "yes".`
-        : `Registra un movimiento (gasto en una caja, ingreso que se reparte por %, o tránsito). ` +
+        : `Registra un movimiento (gasto en una caja, o ingreso que se reparte por %). ` +
           `REGLA: si es un gasto >= ${threshold} o viene de una transcripción de voz dudosa, ` +
           `PRIMERO pregunta al usuario y llama esta tool con userConfirmed=true solo después de su "sí".`,
       inputSchema: z.object({
@@ -272,115 +272,31 @@ export function buildAgentTools(
 
     listRecurringExpenses: tool({
       description: isEn
-        ? "Lists the user's monthly fixed expenses (phone plan, subscriptions, rent) with " +
-          'amount, due day, box and total monthly committed. Use for "my fixed expenses", ' +
-          '"how much am I committed to", and ALWAYS before advising on box allocation.'
-        : 'Lista los gastos fijos mensuales del usuario (línea celular, suscripciones, alquiler) con ' +
-          'monto, día de vencimiento, caja y el total mensual comprometido. Úsala para "mis fijos", ' +
-          '"cuánto tengo comprometido", y SIEMPRE antes de aconsejar sobre el reparto de cajas.',
+        ? "Lists the user's fixed-mode expense boxes (previously called recurring expenses). " +
+          'Use for "my fixed expenses", "how much am I committed to", and ALWAYS before advising on box allocation. ' +
+          'To add a new fixed expense, use createBox with mode=fixed. To remove one, use updateBox with active=false.'
+        : 'Lista las cajas de gasto de monto fijo del usuario (antes llamadas gastos recurrentes). ' +
+          'Úsala para "mis fijos", "cuánto tengo comprometido", y SIEMPRE antes de aconsejar sobre el reparto de cajas. ' +
+          'Para agregar un gasto fijo usa createBox con mode=fixed. Para darlo de baja, usa updateBox con active=false.',
       inputSchema: z.object({}),
       execute: async (args) =>
-        audited(ctx, 'listRecurringExpenses', args, async () => ({
-          items: await ctx.recurring.list(ctx.userId),
-          monthlyTotal: await ctx.recurring.monthlyTotal(ctx.userId),
-        })),
-    }),
-
-    addRecurringExpense: tool({
-      description: isEn
-        ? "Records a monthly fixed expense (NOT today's expense: it is a recurring commitment). " +
-          'Mayordomo will remind via WhatsApp on the due day and only records it when the user confirms. ' +
-          `E.g.: "my phone plan is ${fmt(39.9)} every 5th, comes from Miscellaneous".`
-        : 'Registra un gasto fijo mensual (NO es un gasto de hoy: es un compromiso recurrente). ' +
-          'El mayordomo recordará por WhatsApp el día del vencimiento y solo se anota cuando el ' +
-          `usuario confirma. Ej: "mi línea celular son ${fmt(39.9)} cada día 5, sale de Varios".`,
-      inputSchema: z.object({
-        name: z
-          .string()
-          .min(1)
-          .max(120)
-          .describe(isEn ? 'Name, e.g. "Phone plan"' : 'Nombre, ej "Línea celular"'),
-        amount: z
-          .number()
-          .positive()
-          .describe(
-            isEn ? `Monthly amount in ${ctx.currency}` : `Monto mensual en ${ctx.currency}`,
-          ),
-        dayOfMonth: z
-          .number()
-          .int()
-          .min(1)
-          .max(31)
-          .describe(isEn ? 'Day of month the expense is due' : 'Día del mes en que vence'),
-        boxName: z
-          .string()
-          .describe(
-            isEn ? 'Box to deduct from, e.g. "Miscellaneous"' : 'Caja de la que sale, ej "Varios"',
-          ),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'addRecurringExpense', args, async () => {
+        audited(ctx, 'listRecurringExpenses', args, async () => {
           const all = await ctx.boxes.findAll(ctx.userId);
-          const box = all.find(
-            (b) => b.active && b.name.toLowerCase() === args.boxName.trim().toLowerCase(),
+          const fixedExpenseBoxes = all.filter(
+            (b) => b.active && b.mode === BoxMode.FIXED && b.type === 'expense',
           );
-          if (!box) {
-            return {
-              error: isEn
-                ? `Box "${args.boxName}" does not exist`
-                : `No existe la caja "${args.boxName}"`,
-              availableBoxes: all.filter((b) => b.active).map((b) => b.name),
-            };
-          }
-          const created = await ctx.recurring.create(ctx.userId, {
-            name: args.name,
-            amount: args.amount,
-            dayOfMonth: args.dayOfMonth,
-            boxId: box.id,
-          });
+          const monthlyTotal = fixedExpenseBoxes.reduce(
+            (sum, b) => sum + (b.fixedAmount != null ? parseFloat(b.fixedAmount) : 0),
+            0,
+          );
           return {
-            created,
-            note: isEn
-              ? 'The reminder arrives via WhatsApp on the due day; it is recorded only when the user confirms.'
-              : 'El recordatorio llega por WhatsApp el día del vencimiento; se registra solo cuando el usuario confirma.',
+            items: fixedExpenseBoxes.map((b) => ({
+              id: b.id,
+              name: b.name,
+              fixedAmount: b.fixedAmount != null ? parseFloat(b.fixedAmount) : 0,
+            })),
+            monthlyTotal: Math.round(monthlyTotal * 100) / 100,
           };
-        }),
-    }),
-
-    removeRecurringExpense: tool({
-      description: isEn
-        ? 'Removes a fixed expense (stops reminding; history is not affected). ALWAYS ask the user for confirmation first.'
-        : 'Da de baja un gasto fijo (deja de recordarse; el historial no se toca). SIEMPRE pide confirmación al usuario antes.',
-      inputSchema: z.object({
-        name: z
-          .string()
-          .describe(
-            isEn ? 'Name of the fixed expense to remove' : 'Nombre del gasto fijo a dar de baja',
-          ),
-        userConfirmed: z.boolean().default(false),
-      }),
-      execute: async (args) =>
-        audited(ctx, 'removeRecurringExpense', args, async () => {
-          const items = await ctx.recurring.list(ctx.userId);
-          const match = items.find((i) => i.name.toLowerCase() === args.name.trim().toLowerCase());
-          if (!match) {
-            return {
-              error: isEn
-                ? `No fixed expense named "${args.name}" found`
-                : `No hay un gasto fijo llamado "${args.name}"`,
-              available: items.map((i) => i.name),
-            };
-          }
-          if (!args.userConfirmed) {
-            return {
-              needsConfirmation: true,
-              item: match,
-              message: isEn
-                ? 'Ask the user for confirmation before removing this fixed expense.'
-                : 'Pide confirmación antes de dar de baja este gasto fijo.',
-            };
-          }
-          return { removed: await ctx.recurring.deactivate(ctx.userId, match.id) };
         }),
     }),
 
@@ -676,6 +592,44 @@ export function buildAgentTools(
             };
           }
           return { updated: toBoxDto(updated) };
+        }),
+    }),
+
+    confirmOnboarding: tool({
+      description: isEn
+        ? 'Marks the AI onboarding flow as complete. Call this ONLY after: (1) all desired boxes have been created, (2) all active percent-mode boxes sum to exactly 100%, and (3) the user has confirmed the setup looks correct. Calling this exits onboarding mode and switches the agent to standard mode for future messages.'
+        : 'Marca el flujo de onboarding de IA como completado. Llama a esta tool SOLO después de: (1) todas las cajas deseadas fueron creadas, (2) las cajas en modo percent activas suman exactamente 100%, y (3) el usuario confirmó que la configuración está correcta. Llamar esto sale del modo onboarding y cambia el agente a modo estándar para mensajes futuros.',
+      inputSchema: z.object({}),
+      execute: async (_args) =>
+        audited(ctx, 'confirmOnboarding', _args, async () => {
+          if (!ctx.onboarding) {
+            return {
+              error: isEn
+                ? 'Onboarding service not available in this context.'
+                : 'El servicio de onboarding no está disponible en este contexto.',
+            };
+          }
+          // Validate percent-box invariant before marking complete
+          const personal = await ctx.boxes.activePersonal(ctx.userId);
+          const percentBoxes = personal.filter((b) => (b.mode ?? 'percent') === 'percent');
+          const pctSum =
+            Math.round(percentBoxes.reduce((s, b) => s + parseFloat(b.pct), 0) * 100) / 100;
+          if (percentBoxes.length > 0 && pctSum !== 100) {
+            return {
+              error: isEn
+                ? `Cannot complete onboarding: percent boxes sum to ${pctSum}%, not 100%. Adjust the allocation with updateAllocation first.`
+                : `No se puede completar el onboarding: las cajas percent suman ${pctSum}%, no 100%. Ajusta el reparto con updateAllocation primero.`,
+              currentPctSum: pctSum,
+              percentBoxes: percentBoxes.map((b) => ({ name: b.name, pct: parseFloat(b.pct) })),
+            };
+          }
+          await ctx.onboarding.confirmOnboarding(ctx.userId);
+          return {
+            completed: true,
+            message: isEn
+              ? 'Onboarding complete! The agent is now in standard mode.'
+              : '¡Onboarding completado! El agente está ahora en modo estándar.',
+          };
         }),
     }),
 

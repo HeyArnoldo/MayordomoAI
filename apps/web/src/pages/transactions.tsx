@@ -31,7 +31,6 @@ const FILTERS = [
   { labelKey: 'filters.all', value: undefined },
   { labelKey: 'filters.expenses', value: TransactionType.EXPENSE },
   { labelKey: 'filters.income', value: TransactionType.INCOME },
-  { labelKey: 'filters.transit', value: TransactionType.TRANSIT },
 ] as const;
 
 /** Agrupa por fecha contable con etiquetas humanas (Hoy / Ayer / fecha). */

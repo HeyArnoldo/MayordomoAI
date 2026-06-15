@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowDown, ArrowUp, ArrowUpDown, Mic, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Mic, Trash2, X } from 'lucide-react';
 import type { BoxBalance, Transaction } from '@app/contracts';
 import { TransactionSource, TransactionStatus, TransactionType } from '@app/contracts';
 import type { Locale } from '@app/contracts';
@@ -53,20 +53,16 @@ export function TransactionDetailDialog({
 
   const box = boxes.find((b) => b.id === tx.boxId);
   const isIncome = tx.type === TransactionType.INCOME;
-  const isTransit = tx.type === TransactionType.TRANSIT;
   const voided = tx.status === TransactionStatus.VOIDED;
   const color = box
     ? boxColor(box.name, box.colorKey)
     : isIncome
       ? 'var(--positive)'
       : 'var(--ink-3)';
-  const Icon = isIncome ? ArrowDown : isTransit ? ArrowUpDown : ArrowUp;
+  const Icon = isIncome ? ArrowDown : ArrowUp;
 
   const rows: Array<[string, string]> = [
-    [
-      t('detail.rows.type'),
-      isIncome ? t('types.income') : isTransit ? t('types.transit') : t('types.expense'),
-    ],
+    [t('detail.rows.type'), isIncome ? t('types.income') : t('types.expense')],
     [t('detail.rows.box'), box?.name ?? '—'],
     [t('detail.rows.date'), fechaLabel(tx, locale)],
     [t('detail.rows.source'), t(SOURCE_LABEL_KEYS[tx.source])],
@@ -100,7 +96,7 @@ export function TransactionDetailDialog({
           </div>
           <Money
             value={tx.amount}
-            sign={isIncome ? '+' : isTransit ? '↔' : '−'}
+            sign={isIncome ? '+' : '−'}
             className={cn(
               'text-[38px]',
               isIncome ? 'text-positive' : 'text-ink',

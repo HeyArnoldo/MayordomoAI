@@ -72,8 +72,10 @@ export class AdminService {
     const saved = await this.users.save(user);
 
     if (status === UserStatus.ACTIVE) {
-      // Idioma del usuario aprobado (no del admin que aprueba).
-      await this.ensureDefaultBoxes(saved.id, saved.language);
+      // AI onboarding (S4): new users start with NO boxes — the onboarding agent
+      // creates them conversationally. ensureDefaultBoxes is no longer called on
+      // account approval. Existing users already have their boxes in the DB and
+      // are unaffected. The method is kept below for any manual back-fill needs.
     }
     this.logger.log(`status de ${user.email} → ${status} (por ${actor.email})`);
     const phone = await this.phones.findOne({ where: { userId: id } });

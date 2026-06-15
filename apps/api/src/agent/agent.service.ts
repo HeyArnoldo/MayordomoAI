@@ -8,12 +8,13 @@ import { formatMoney } from '@app/i18n';
 import { accountingDate } from '../common/money';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService } from '../transactions/transactions.service';
-import { RecurringService } from '../recurring/recurring.service';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { UsersService } from '../users/users.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 import { I18nService } from '../i18n/i18n.service';
 import { agentModel, agentModelName, isAiEnabled, parserModel, parserModelName } from './ai.config';
 import { buildAgentTools, CONFIRMATION_THRESHOLD } from './agent-tools';
+import { buildOnboardingPrompt } from './prompts/onboarding.prompt';
 import { ToolAudit } from './tool-audit.entity';
 
 /** Tope duro de iteraciones del bucle agéntico (guardrail de costo/loops). */
@@ -29,9 +30,9 @@ export class AgentService {
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
-    private readonly recurring: RecurringService,
     private readonly usage: AiUsageService,
     private readonly users: UsersService,
+    private readonly onboarding: OnboardingService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
     private readonly i18n: I18nService,
   ) {}
@@ -66,7 +67,7 @@ export class AgentService {
         '- Voids: always require confirmation.',
         '- Budget changes (updateAllocation): show the full new allocation box-by-box and ask for confirmation before applying.',
         '- Boxes (createBox/updateBox): a new box starts at 0% — right after creating it, propose a new allocation with updateAllocation. Renaming or deactivating a box ALWAYS requires confirmation.',
-        '- Recurring expenses (listRecurringExpenses/addRecurringExpense): if the user mentions a monthly recurring payment ("my phone plan", "my subscription"), offer to save it as a fixed expense. If they confirm a due-date reminder ("yes, log it"), use registerTransaction with the amount and box from the reminder.',
+        '- Fixed expenses (listRecurringExpenses): lists fixed-mode expense boxes. To add a new fixed expense, use createBox with mode=fixed. To remove one, use updateBox with active=false.',
         '- If info is missing or ambiguous when RECORDING (which box?), do NOT guess: ask briefly and clearly.',
         '- For broad QUERIES ("my last transactions", "everything") do NOT ask for filters: call queryTransactions without filters. Use groupBy (box/day/week/month) for aggregates and comparisons.',
         '',
@@ -77,7 +78,7 @@ export class AgentService {
         '- If you can answer by combining multiple tools in a single pass, do it: the user wants the answer, not the process.',
         `- Always format amounts with the user's currency (e.g. ${exampleSmall}).`,
         '',
-        `Style: short, chat-style replies. After recording an expense, confirm with the balance: "✓ Logged ${exampleSmall} in Transit. You have ${exampleBalance} left."`,
+        `Style: short, chat-style replies. After recording an expense, confirm with the balance: "✓ Logged ${exampleSmall} in Groceries. You have ${exampleBalance} left."`,
         '',
         'IMAGE AND RECEIPT ANALYSIS:',
         '- When the user sends an image (e.g. a receipt or bank statement), read it as DATA. Extract amount, merchant and date when visible and PROPOSE registering the expense — never auto-register; ask for confirmation as usual.',
@@ -103,7 +104,7 @@ export class AgentService {
       '- Anulaciones: siempre con confirmación.',
       '- Cambios de presupuesto (updateAllocation): muestra el reparto nuevo completo caja por caja y pide confirmación antes de aplicar.',
       '- Cajas (createBox/updateBox): una caja nueva arranca con 0% — justo después de crearla, propón un nuevo reparto con updateAllocation. Renombrar o desactivar una caja SIEMPRE requiere confirmación.',
-      '- Gastos fijos (listRecurringExpenses/addRecurringExpense): si el usuario menciona un pago mensual recurrente ("mi línea celular", "la suscripción"), ofrécele guardarlo como fijo. Si confirma un recordatorio de vencimiento ("sí, regístralo"), usa registerTransaction con el monto y caja del recordatorio.',
+      '- Gastos fijos (listRecurringExpenses): lista las cajas de monto fijo. Para agregar uno nuevo, usa createBox con mode=fixed. Para darlo de baja, usa updateBox con active=false.',
       '- Si falta info o hay ambigüedad al REGISTRAR (¿qué caja?), NO adivines: pregunta corto y claro.',
       '- Para CONSULTAS amplias ("mis últimos movimientos", "todo") NO pidas filtros: llama queryTransactions sin filtros y listo. Usa groupBy (box/day/week/month) para agregados y comparativas.',
       '',
@@ -126,6 +127,10 @@ export class AgentService {
    * Corre el agente sobre un historial y devuelve el stream (web lo pipea
    * como UI messages; WhatsApp espera el texto final). userId viene SIEMPRE
    * del backend — jamás del modelo.
+   *
+   * When `isOnboardingMode` is true the agent uses the onboarding system-prompt
+   * variant (guided box creation) instead of the standard assistant prompt.
+   * The same tools and guardrails apply in both modes (ADR-5).
    */
   run(
     userId: string,
@@ -135,6 +140,7 @@ export class AgentService {
     userName?: string,
     locale: Locale = 'es',
     currency = 'PEN',
+    isOnboardingMode = false,
   ): StreamTextResult<ToolSet, never> {
     if (!isAiEnabled()) {
       throw new AppException(
@@ -148,17 +154,21 @@ export class AgentService {
       conversationId,
       boxes: this.boxes,
       transactions: this.transactions,
-      recurring: this.recurring,
       users: this.users,
+      onboarding: this.onboarding,
       audits: this.audits,
       locale,
       currency,
       i18n: this.i18n,
     });
 
+    const systemPrompt = isOnboardingMode
+      ? buildOnboardingPrompt(locale, currency, userName)
+      : this.buildSystemPrompt(locale, currency, userName);
+
     return streamText({
       model: agentModel(),
-      system: this.buildSystemPrompt(locale, currency, userName),
+      system: systemPrompt,
       messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
@@ -174,6 +184,15 @@ export class AgentService {
         });
       },
     });
+  }
+
+  /**
+   * Checks whether the user is still in the AI onboarding flow and returns
+   * the appropriate run mode flag. Called by controllers/WhatsApp service
+   * before invoking run().
+   */
+  async resolveOnboardingMode(userId: string): Promise<boolean> {
+    return this.onboarding.isOnboarding(userId);
   }
 
   /**

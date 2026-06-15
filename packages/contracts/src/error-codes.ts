@@ -45,7 +45,6 @@ export const ERROR_CODES = [
   'box.fixed_requires_amount',
   'box.fixed_exceeds_income',
   'box.mode_not_supported_for_scope',
-  'recurring.not_found',
   'server.internal_error',
   'agent_tools.demo_user_missing',
   'agent_tools.demo_user_not_found',

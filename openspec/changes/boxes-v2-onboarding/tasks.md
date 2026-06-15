@@ -148,7 +148,7 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Depends on: Slice 1 merged to main.  
 > Target branch: `main`.
 
-- [ ] **S2-T1** Data migration: convert `recurring_expenses` rows to fixed-mode boxes  
+- [x] **S2-T1** Data migration: convert `recurring_expenses` rows to fixed-mode boxes  
        **Spec req**: recurring-expenses spec §migration; design ADR-2 (drop reminders/dayOfMonth).  
        **Action**:
   1. Generate migration that reads all `recurring_expenses` rows
@@ -160,7 +160,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: write a migration-transform unit test covering the mapping logic before writing the SQL  
     **Parallel**: no — must be first S2 task
 
-- [ ] **S2-T2** Remove recurring module, entity, and table references from API  
+- [x] **S2-T2** Remove recurring module, entity, and table references from API  
        **Spec req**: recurring-expenses spec §removal.  
        **Action**: Delete or strip `RecurringExpense` entity, module, service, controller, repository. Remove from `AppModule` imports.  
        **Files**:
@@ -169,7 +169,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (deletion task; verify by running typecheck)  
     **Depends on**: S2-T1
 
-- [ ] **S2-T3** Remove/remap the 3 recurring-expense agent tools  
+- [x] **S2-T3** Remove/remap the 3 recurring-expense agent tools  
        **Spec req**: recurring-expenses spec §agent-tools (3 tools: list, create, delete recurring expenses).  
        **Action**: Delete tool files. Update executor's tool registry. If any tool is referenced in onboarding prompts, remove those references.  
        **Files**:
@@ -179,7 +179,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Depends on**: S2-T2
 
-- [ ] **S2-T4** Update i18n: remove recurring-expense keys, add any new fixed-box keys if needed  
+- [x] **S2-T4** Update i18n: remove recurring-expense keys, add any new fixed-box keys if needed  
        **Spec req**: recurring-expenses spec §i18n.  
        **Files**:
   - `packages/i18n/src/en/*.ts`
@@ -187,7 +187,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Parallel**: can run alongside S2-T2 and S2-T3
 
-- [ ] **S2-T5** Web: remove recurring-expense screens/components  
+- [x] **S2-T5** Web: remove recurring-expense screens/components  
        **Spec req**: recurring-expenses spec §web-removal.  
        **Action**: Delete recurring expense list/create/edit UI. Remove nav links.  
        **Files**:
@@ -196,12 +196,12 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Parallel**: can run alongside S2-T2 through S2-T4
 
-- [ ] **S2-T6** Executor cleanup: verify no dead tool references remain  
+- [x] **S2-T6** Executor cleanup: verify no dead tool references remain  
        **Action**: `pnpm typecheck` + manual grep for `recurring` in agent/executor code.  
        **TDD**: no  
        **Depends on**: S2-T3
 
-- [ ] **S2-T7** Run root CI gate before PR  
+- [x] **S2-T7** Run root CI gate before PR  
        **Action**: same gate as S1-T10  
        **Depends on**: all S2 tasks complete
 
@@ -215,17 +215,17 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Independent of S1, S2, S4 — can land any time.  
 > Recommended: land after S1 to reduce i18n churn, but not required.
 
-- [ ] **S3-T1** Void all transit transaction rows in a migration  
+- [x] **S3-T1** Void all transit transaction rows in a migration  
        **Spec req**: transactions spec §transit-removal.  
        **Action**:
   1. Generate + write migration that sets `type = 'expense'` (or flags as voided) for all rows with `type = 'transit'`
   2. Add verify-zero gate: the migration must assert zero transit rows remain before altering the enum  
      **Files**:
-  - `apps/api/src/migrations/YYYYMMDD_VoidTransitRows.ts`  
+  - `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts`  
     **TDD**: write invariant validator test: `assertNoTransitRows(rows)` throws if any transit row exists  
     **Parallel**: no — must complete before S3-T2
 
-- [ ] **S3-T2** Narrow the transaction type enum (rename+create+alter+drop dance)  
+- [x] **S3-T2** Narrow the transaction type enum (rename+create+alter+drop dance)  
        **Spec req**: transactions spec §enum-narrowing; constraint: must use rename+create+alter+drop sequence, not simple ALTER TYPE.  
        **Action**:
   1. Rename old enum `transaction_type` → `transaction_type_old`
@@ -233,47 +233,47 @@ Recommended merge order: S1 → S3 → S2 → S4
   3. ALTER TABLE to use new enum (cast with USING clause)
   4. DROP old enum  
      **Files**:
-  - `apps/api/src/migrations/YYYYMMDD_NarrowTransactionTypeEnum.ts`
-  - `apps/api/src/transactions/transaction.entity.ts` — update TypeScript enum  
+  - `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts` (combined with S3-T1)
+  - `apps/api/src/transactions/transaction.entity.ts` — entity comment updated  
     **TDD**: no (DDL migration)  
     **Depends on**: S3-T1
 
-- [ ] **S3-T3** Update contracts enum: remove transit from TypeScript union/enum  
+- [x] **S3-T3** Update contracts enum: remove transit from TypeScript union/enum  
        **Spec req**: transactions spec §contracts.  
        **Files**:
-  - `packages/shared/src/contracts/transaction.contracts.ts`
-  - `apps/api/src/transactions/dto/*.ts`  
+  - `packages/contracts/src/transactions.ts`  
     **TDD**: no — typecheck will catch remaining usages  
     **Depends on**: S3-T2
 
-- [ ] **S3-T4** Remove transit from all agent tools, MCP tools, and executor  
+- [x] **S3-T4** Remove transit from all agent tools, MCP tools, and executor  
        **Spec req**: transactions spec §agent-cleanup.  
        **Action**: Remove any `transit` from tool input schemas, output formatters, executor routing.  
        **Files**:
-  - `apps/api/src/agent/tools/*.tool.ts` (grep for transit)
-  - `apps/api/src/mcp/tools/*.ts`
-  - `apps/api/src/agent/executor.ts`  
+  - `apps/api/src/agent/agent-tools.ts`
+  - `apps/mcp-server/src/tools/register-transaction.ts`
+  - `apps/mcp-server/src/tools/query-transactions.ts`  
     **TDD**: no  
     **Depends on**: S3-T3
 
-- [ ] **S3-T5** Remove transit from i18n catalogs  
+- [x] **S3-T5** Remove transit from i18n catalogs  
        **Spec req**: transactions spec §i18n.  
        **Files**:
-  - `packages/i18n/src/en/*.ts`
-  - `packages/i18n/src/es/*.ts`  
+  - `packages/i18n/src/locales/en/transactions.ts`
+  - `packages/i18n/src/locales/es/transactions.ts`  
     **TDD**: no  
     **Parallel**: can run alongside S3-T4
 
-- [ ] **S3-T6** Web: remove transit from transaction-row display and transaction-detail selectors  
+- [x] **S3-T6** Web: remove transit from transaction-row display and transaction-detail selectors  
        **Spec req**: transactions spec §web-cleanup.  
        **Files**:
-  - `apps/web/src/features/transactions/components/TransactionRow.tsx`
-  - `apps/web/src/features/transactions/components/TransactionDetail.tsx`
-  - Any type filter/selector components that list transaction types  
+  - `apps/web/src/components/mayordomo/transaction-row.tsx`
+  - `apps/web/src/components/mayordomo/transaction-detail.tsx`
+  - `apps/web/src/features/registro/registro-dialog.tsx`
+  - `apps/web/src/pages/transactions.tsx`  
     **TDD**: no  
     **Parallel**: can run alongside S3-T4 and S3-T5
 
-- [ ] **S3-T7** Run root CI gate before PR  
+- [x] **S3-T7** Run root CI gate before PR  
        **Action**: same gate as S1-T10  
        **Depends on**: all S3 tasks complete
 
@@ -287,7 +287,7 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Depends on: Slice 1 merged (needs `boxes.mode` model to exist before onboarding can create fixed boxes).  
 > Independent of S2 and S3.
 
-- [ ] **S4-T1** Migration: add `onboarding_completed` boolean column to `users` table  
+- [x] **S4-T1** Migration: add `onboarding_completed` boolean column to `users` table  
        **Spec req**: ai-onboarding spec §persistence.  
        **Action**: `pnpm migration:generate` after adding field to User entity. Default = false for existing users.  
        **Files**:
@@ -295,7 +295,7 @@ Recommended merge order: S1 → S3 → S2 → S4
   - `apps/api/src/migrations/YYYYMMDD_AddUserOnboardingCompleted.ts`  
     **TDD**: no (DDL)
 
-- [ ] **S4-T2** Guard `ensureDefaultBoxes` for new accounts: skip if onboarding flag will be set  
+- [x] **S4-T2** Guard `ensureDefaultBoxes` for new accounts: skip if onboarding flag will be set  
        **Spec req**: ai-onboarding spec §auto-seed removal; design §stop-auto-seed.  
        **Action**: Wrap `ensureDefaultBoxes` call in a guard: if `onboardingCompleted = false` AND new account, do NOT auto-create default boxes — onboarding will create them instead.  
        **Files**:
@@ -304,7 +304,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — unit test: new user → `ensureDefaultBoxes` NOT called; existing user (migrated) → NOT affected  
     **Depends on**: S4-T1
 
-- [ ] **S4-T3** Onboarding state-machine unit tests (TDD — write first)  
+- [x] **S4-T3** Onboarding state-machine unit tests (TDD — write first)  
        **Spec req**: ai-onboarding spec §state-machine; resumable/idempotent requirement.  
        **Tests cover**:
   - New user → `onboardingCompleted = false` → onboarding variant active
@@ -315,7 +315,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — write before S4-T4  
     **Depends on**: S4-T1
 
-- [ ] **S4-T4** Implement `OnboardingService`: `isOnboarding(userId)`, `confirmOnboarding(userId)`  
+- [x] **S4-T4** Implement `OnboardingService`: `isOnboarding(userId)`, `confirmOnboarding(userId)`  
        **Spec req**: ai-onboarding spec §service.  
        **Files**:
   - `apps/api/src/onboarding/onboarding.service.ts` (new)
@@ -323,7 +323,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — implement to pass S4-T3 tests  
     **Depends on**: S4-T3
 
-- [ ] **S4-T5** Thread onboarding context flag through `agent.run`  
+- [x] **S4-T5** Thread onboarding context flag through `agent.run`  
        **Spec req**: ai-onboarding spec §agent-context.  
        **Action**: Before calling `agent.run`, call `isOnboarding(userId)`. Pass result as `context.isOnboarding` to executor. Executor selects system-prompt variant based on flag.  
        **Files**:
@@ -332,7 +332,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (wiring)  
     **Depends on**: S4-T4
 
-- [ ] **S4-T6** Write onboarding system-prompt variant (persuasive, box-setup focused)  
+- [x] **S4-T6** Write onboarding system-prompt variant (persuasive, box-setup focused)  
        **Spec req**: ai-onboarding spec §onboarding-prompt.  
        **Action**: Separate prompt string/template for onboarding mode. Prompt must: introduce Mayordomo, ask for income, propose a box structure, call `createBox` with appropriate modes, confirm completion, call `confirmOnboarding`.  
        **Files**:
@@ -341,7 +341,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (prompt text)  
     **Depends on**: S4-T5
 
-- [ ] **S4-T7** WhatsApp proactive starter: send welcome message on account confirmation  
+- [x] **S4-T7** WhatsApp proactive starter: send welcome message on account confirmation  
        **Spec req**: ai-onboarding spec §proactive-starter.  
        **Action**: On new account confirmed (registration or first login), send a proactive WhatsApp message that opens the onboarding conversation. Must be idempotent (send only once).  
        **Files**:
@@ -350,7 +350,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (external integration)  
     **Depends on**: S4-T4 (needs onboarding flag to check idempotency)
 
-- [ ] **S4-T8** Web: onboarding flow — show flag + navigate into chat  
+- [x] **S4-T8** Web: onboarding flow — show flag + navigate into chat  
        **Spec req**: ai-onboarding spec §web-onboarding.  
        **Action**: On login, if `onboardingCompleted = false`, redirect to chat view with an onboarding banner/state. On completion event (flag flips to true), navigate away from onboarding state.  
        **Files**:

@@ -5,7 +5,6 @@ export const transactions = {
     all: 'All',
     expenses: 'Expenses',
     income: 'Income',
-    transit: 'Transit',
   },
   dates: {
     today: 'Today',
@@ -27,7 +26,6 @@ export const transactions = {
     title: 'Log a transaction',
     typeExpense: 'Expense',
     typeIncome: 'Income',
-    typeTransit: 'Transit',
     incomeHint: 'It gets split automatically across your boxes by %.',
     notePlaceholder: 'Note (optional)',
     submit: 'Log it',
@@ -37,7 +35,6 @@ export const transactions = {
   types: {
     expense: 'Expense',
     income: 'Income',
-    transit: 'Transit',
   },
   row: {
     voided: 'voided',

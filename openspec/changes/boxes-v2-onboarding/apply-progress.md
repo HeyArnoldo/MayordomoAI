@@ -252,3 +252,432 @@ All S1 tasks (S1-D1 + S1-T1 through S1-T9) are done. S1-T10 root CI gate can now
 | S1-T7 createBox/updateBox guards | [x] Done |
 | S1-T8 Agent tools                | [x] Done |
 | S1-T9 Web editor                 | [x] Done |
+
+---
+
+## Batch: 3 — S3 (Remove transit)
+
+**Date**: 2026-06-15
+**Branch**: feat/remove-transit
+**Mode**: Standard (TDD for S3-T1 invariant validator; no test runner for web)
+**Slice**: S3 — Remove transit transaction type (independent slice)
+
+---
+
+## Completed Tasks (S3)
+
+### S3-T1 — Migration: void transit rows + verify-zero gate
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/api/src/database/migrations/1781510000000-RemoveTransitType.ts` — hand-written (NOT generated; DB must not be touched)
+  - `up()` step 1: `UPDATE transactions SET status='voided', deletedAt=now() WHERE type='transit' AND deletedAt IS NULL`
+  - `up()` step 2: verify-zero COUNT gate — throws and aborts if any non-voided transit rows remain
+  - `up()` step 3a–d: RENAME old enum → CREATE 2-value enum → ALTER COLUMN USING cast → DROP old enum
+  - `down()`: restores 3-value enum; voided transit rows cannot auto-restore their type (documented)
+- `apps/api/src/database/seeds/run-seed.ts` — removed TRANSIT seed row; updated count comment (15→14)
+
+**TDD**: `assertNoTransitRows` pure helper tested in `transactions.service.spec.ts` — 4 cases (empty, all voided, one active, multiple active)
+
+### S3-T2 — Enum narrow (combined into S3-T1 migration)
+
+**Status**: [x] Done (part of 1781510000000-RemoveTransitType.ts)
+
+### S3-T3 — Remove TRANSIT from TransactionType enum (contracts)
+
+**Status**: [x] Done
+
+**Files**:
+
+- `packages/contracts/src/transactions.ts` — removed `TRANSIT = 'transit'` from `TransactionType` enum; removed transit comment from `createTransactionSchema` boxId field; `z.enum(TransactionType)` now auto-rejects transit in all schemas
+- `apps/api/src/transactions/transaction.entity.ts` — removed transit comment from boxId field
+- `apps/api/src/transactions/transactions.service.ts` — removed transit comment from create() jsdoc
+
+### S3-T4 — Remove transit from agent tools and MCP tools
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/api/src/agent/agent-tools.ts` — updated `queryTransactions` description (removed "transits" references); updated `registerTransaction` description; updated `type` field describe text to `income | expense` (removed "| transit")
+- `apps/mcp-server/src/tools/register-transaction.ts` — schema changed from `z.enum(['income','expense','transit'])` to `z.enum(['income','expense'])`; boxName describe updated; tool description updated
+- `apps/mcp-server/src/tools/query-transactions.ts` — schema type field changed from 3-value to 2-value enum
+
+### S3-T5 — Remove transit from i18n catalogs
+
+**Status**: [x] Done
+
+**Files**:
+
+- `packages/i18n/src/locales/es/transactions.ts` — removed `filters.transit`, `registro.typeTransit`, `types.transit`
+- `packages/i18n/src/locales/en/transactions.ts` — same removals (kept in sync; `satisfies typeof es` constraint passes)
+
+### S3-T6 — Web: remove transit from UI components
+
+**Status**: [x] Done
+
+**Files**:
+
+- `apps/web/src/features/registro/registro-dialog.tsx` — removed `TransactionType.TRANSIT` entry from `TYPES` array
+- `apps/web/src/pages/transactions.tsx` — removed `{ labelKey: 'filters.transit', value: TransactionType.TRANSIT }` from `FILTERS` array
+- `apps/web/src/components/mayordomo/transaction-row.tsx` — removed `ArrowUpDown` import; removed `isTransit` const; `Icon` simplified to `ArrowDown : ArrowUp`; `label` fallback uses `t('types.expense')` for legacy voided transit rows (no-box case); `Money` sign/className simplified
+- `apps/web/src/components/mayordomo/transaction-detail.tsx` — removed `ArrowUpDown` import; removed `isTransit` const; `Icon` simplified; type row uses `t('types.expense')` for all non-income; `Money` sign simplified
+
+**Safe fallback for legacy transit rows**: voided transit rows that may exist pre-migration will display as "expense" category with a minus sign — inert, no balance impact, consistent with voided status.
+
+### S3-T7 — Root CI gate
+
+**Status**: [x] Done
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, 4 pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS (all 5 packages)                    |
+| `pnpm --filter @app/api run test`            | PASS — 367 tests, 27 suites              |
+
+---
+
+## TDD Cycle Evidence (S3)
+
+| Task                        | RED                                       | GREEN                                    | REFACTOR |
+| --------------------------- | ----------------------------------------- | ---------------------------------------- | -------- |
+| S3-T1 assertNoTransitRows   | Tests written before migration helper     | 4 tests pass (pure helper)               | —        |
+| S3-T3 schema transit reject | Tests written first (transit not in enum) | 4 schema tests pass (2 reject, 2 accept) | —        |
+
+---
+
+## Commits (S3)
+
+1. `253676c` — `feat(contracts): remove transit from TransactionType enum and i18n catalogs`
+2. `5fb6440` — `feat(migrations): add RemoveTransitType migration — void transit rows then narrow enum`
+3. `55e55b2` — `feat(api): remove transit type from service, entity, seed, and agent tool descriptions`
+4. `c3086ed` — `feat(mcp-server): remove transit from register and query transaction tool schemas`
+5. `2b2de78` — `feat(web): remove transit type from UI components and transaction filter`
+6. `c8b59c1` — `test(transactions): add transit-rejection and assertNoTransitRows invariant tests for S3`
+
+---
+
+## S3 Complete Summary
+
+All S3 tasks (S3-T1 through S3-T7) are done. Ready for sdd-verify.
+
+| Task                            | Status   |
+| ------------------------------- | -------- |
+| S3-T1 Migration (void + narrow) | [x] Done |
+| S3-T2 Enum narrow               | [x] Done |
+| S3-T3 Contracts enum            | [x] Done |
+| S3-T4 Agent + MCP tools         | [x] Done |
+| S3-T5 i18n catalogs             | [x] Done |
+| S3-T6 Web UI                    | [x] Done |
+| S3-T7 Root CI gate              | [x] Done |
+
+---
+
+## Batch: 3 — S2 (Unify recurring into fixed boxes)
+
+**Date**: 2026-06-15
+**Branch**: feat/boxes-v2-recurring
+**Mode**: Standard (deletions dominate; no pure business logic to TDD)
+**Slice**: S2 — Unify recurring→fixed boxes (all 7 tasks)
+
+---
+
+### S2-T1 — Data migration: convert recurring_expenses to fixed boxes
+
+**Status**: [x] Done
+
+**File**: `apps/api/src/database/migrations/1781600000000-UnifyRecurringIntoFixedBoxes.ts`
+
+**up()**: INSERT INTO boxes selecting from recurring_expenses (mode='fixed', fixedAmount=amount, type='expense', scope='personal', pct=0, active=true); then DROP INDEX, DROP TABLE recurring_expenses.
+
+**down()**: best-effort recreate recurring_expenses schema (data cannot be auto-restored from boxes).
+
+**Commit**: `ec04fb5` — feat(migration): add UnifyRecurringIntoFixedBoxes - move recurring to fixed boxes and drop table
+
+---
+
+### S2-T2 — Remove recurring module, entity, and table references from API
+
+**Status**: [x] Done
+
+**Files deleted**:
+
+- `apps/api/src/recurring/recurring-expense.entity.ts`
+- `apps/api/src/recurring/recurring.module.ts`
+- `apps/api/src/recurring/recurring.service.ts`
+- `apps/api/src/recurring/recurring.service.spec.ts`
+- `apps/api/src/whatsapp/recurring-reminder.service.ts`
+
+**Files modified**:
+
+- `apps/api/src/agent/agent.module.ts` — removed RecurringModule import
+- `apps/api/src/whatsapp/whatsapp.module.ts` — removed RecurringModule import and RecurringReminderService provider
+
+**Commit**: `8db9126` — feat(recurring): remove recurring module, entity, service, and reminder cron
+
+---
+
+### S2-T3 — Remove/remap the 3 recurring-expense agent tools
+
+**Status**: [x] Done
+
+**What changed**:
+
+- `apps/api/src/agent/agent-tools.ts`: removed `addRecurringExpense` and `removeRecurringExpense` tools; remapped `listRecurringExpenses` to query active fixed-expense boxes from BoxesService; removed `recurring` from AgentToolsContext; updated executor construction call
+- `apps/api/src/agent/agent-tool-executor.service.ts`: removed RecurringService from constructor and imports
+- `apps/api/src/agent/agent.service.ts`: removed RecurringService import and constructor arg; updated system prompt recurring references; removed `recurring` from buildAgentTools call
+- `apps/api/src/agent/agent-tools.spec.ts`: removed `recurring` from makeCtx stub
+- `apps/api/src/agent/agent-tool-executor.service.spec.ts`: removed `recurring` from makeService stub
+- `apps/api/src/agent/agent.service.spec.ts`: removed extra constructor argument
+
+**listRecurringExpenses remapped to**: filter `BoxesService.findAll()` for `active && mode === 'fixed' && type === 'expense'`; returns `{items: [{id, name, fixedAmount}], monthlyTotal}` — same shape as before for backward compat.
+
+**Commit**: `46ce23d` — feat(agent): remove add/removeRecurringExpense tools, remap listRecurringExpenses to fixed boxes
+
+---
+
+### S2-T4 — Update i18n: remove recurring error code and reminder strings
+
+**Status**: [x] Done
+
+**Files modified**:
+
+- `packages/contracts/src/error-codes.ts`: removed `'recurring.not_found'` from ERROR_CODES
+- `packages/i18n/src/locales/es/errors.ts`: removed `recurring.not_found` translation
+- `packages/i18n/src/locales/en/errors.ts`: removed `recurring.not_found` translation
+- `packages/i18n/src/locales/es/api.ts`: removed `reminders.dueToday` key (used only by deleted RecurringReminderService)
+- `packages/i18n/src/locales/en/api.ts`: removed `reminders.dueToday` key
+
+**Commit**: `f1da26d` — feat(i18n): remove recurring error code and reminder strings (S2)
+
+---
+
+### S2-T5 — Web: remove recurring-expense screens/components
+
+**Status**: [x] Done (no action required)
+
+The web app had zero recurring-expense UI (verified by grep). No files to delete or redirect.
+
+---
+
+### S2-T6 — Executor cleanup: verify no dead tool references remain
+
+**Status**: [x] Done
+
+`pnpm typecheck` passes clean (0 errors). No dead recurring references remain in agent/executor code.
+
+---
+
+### S2-T7 — Root CI gate
+
+**Status**: [x] Done
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, 4 pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS                                     |
+| `pnpm test`                                  | PASS — 357 tests, 26 suites              |
+
+Note: Test count dropped from 359 to 357 — the 2 deleted RecurringService unit tests (deactivate tests) are accounted for.
+
+---
+
+## S2 Complete Summary
+
+| Task                                         | Status           |
+| -------------------------------------------- | ---------------- |
+| S2-T1 Migration UnifyRecurringIntoFixedBoxes | [x] Done         |
+| S2-T2 Remove recurring module                | [x] Done         |
+| S2-T3 Remap/remove agent tools               | [x] Done         |
+| S2-T4 i18n cleanup                           | [x] Done         |
+| S2-T5 Web cleanup                            | [x] Done (no-op) |
+| S2-T6 Executor cleanup verify                | [x] Done         |
+| S2-T7 Root CI gate                           | [x] Done         |
+
+---
+
+## Batch: 3 — Slice 4 (AI Onboarding)
+
+**Date**: 2026-06-15
+**Branch**: feat/ai-onboarding
+**Mode**: Strict TDD (for S4-T2, S4-T3, S4-T4)
+**Slice**: S4 — AI-driven onboarding (web + WhatsApp)
+
+---
+
+## Completed Tasks
+
+### S4-T1 — Migration: add onboardingCompleted column
+
+**Status**: [x] Done
+
+- Migration file: `apps/api/src/database/migrations/1781600000000-UserOnboardingCompleted.ts`
+- SQL up: `ALTER TABLE "users" ADD "onboardingCompleted" boolean NOT NULL DEFAULT false`
+- SQL down: `ALTER TABLE "users" DROP COLUMN "onboardingCompleted"`
+- Column added to `apps/api/src/users/user.entity.ts` (distinct from `onboardedAt`)
+- Commit: `d6c9b00` — feat(users): add onboardingCompleted boolean to User entity and hand-written migration
+
+### S4-T2 — Guard ensureDefaultBoxes for new accounts
+
+**Status**: [x] Done
+
+- `apps/api/src/admin/admin.service.ts`: removed call to `ensureDefaultBoxes` in `updateStatus` when approving to ACTIVE
+- New accounts start with zero boxes; AI onboarding creates them conversationally
+- Existing users unaffected: their boxes are already in DB; `ensureDefaultBoxes` was already a no-op for them
+- `ensureDefaultBoxes` method preserved for back-fill needs
+- Commit: `1b242ac` — feat(admin): stop auto-seeding boxes on account approval (S4 onboarding takes over)
+
+### S4-T3 — Onboarding state-machine unit tests (TDD RED first)
+
+**Status**: [x] Done
+
+- `apps/api/src/onboarding/onboarding.service.spec.ts` (new)
+- Tests cover: `isOnboarding` returns true/false, `confirmOnboarding` idempotent, auto-seed guard scenarios
+- Written BEFORE implementation (RED state confirmed)
+
+### S4-T4 — Implement OnboardingService
+
+**Status**: [x] Done
+
+- `apps/api/src/onboarding/onboarding.service.ts` (new): `isOnboarding(userId)`, `confirmOnboarding(userId)`
+- `apps/api/src/onboarding/onboarding.module.ts` (new): exports OnboardingService
+- `apps/api/src/onboarding/onboarding.controller.ts` (new): `POST /me/onboarding/ai-complete`
+- All 8 spec tests GREEN
+- Commit: `48352cf` — feat(onboarding): add OnboardingService with isOnboarding/confirmOnboarding (TDD)
+
+### S4-T5 — Thread onboarding context flag through agent.run
+
+**Status**: [x] Done
+
+- `apps/api/src/agent/agent.service.ts`: added `isOnboardingMode` param to `run()` (default false); added `resolveOnboardingMode(userId)` helper; injected `OnboardingService`
+- `apps/api/src/agent/agent.module.ts`: imports `OnboardingModule`
+- `apps/api/src/agent/agent-tools.ts`: `OnboardingService` added to `AgentToolsContext` (optional for backward compat); `confirmOnboarding` tool added
+- `apps/api/src/chat/chat.controller.ts`: calls `resolveOnboardingMode` before `agent.run`, passes `isOnboardingMode`
+- `apps/api/src/whatsapp/whatsapp.service.ts`: same pattern in `resolveReply`
+- `apps/api/src/agent/agent.service.spec.ts` + `apps/api/src/chat/chat.controller.spec.ts`: updated mocks for new signature
+- Commit: `968b02c` — feat(agent): add onboarding mode flag and confirmOnboarding tool
+
+### S4-T6 — Onboarding system-prompt variant
+
+**Status**: [x] Done
+
+- `apps/api/src/agent/prompts/onboarding.prompt.ts` (new): `buildOnboardingPrompt(locale, currency, userName)`
+- Covers both `es` and `en` locales
+- Guides: income → fixed bills (createBox mode=fixed) → savings goals (createBox type=fund) → percent categories → validate 100% → call confirmOnboarding
+- Persuasive, conversational tone; validates percent sum before allowing completion
+- Selected in `agent.service.ts` when `isOnboardingMode = true`
+- Same tools and guardrails as standard mode (ADR-5)
+
+### S4-T7 — WhatsApp proactive starter on phone verification
+
+**Status**: [x] Done
+
+- `apps/api/src/users/phone-verification.service.ts`: added `sendOnboardingStarterIfNeeded()` called after `verify()` completes; re-reads `onboardingCompleted` from DB for idempotency
+- `packages/i18n/src/locales/es/api.ts`: added `whatsapp.onboardingStarter` key (persuasive ES copy)
+- `packages/i18n/src/locales/en/api.ts`: matching EN key (satisfies typeof es constraint)
+- `apps/api/src/whatsapp/whatsapp.service.ts`: `resolveReply` now passes `isOnboardingMode` to `agent.run`
+- WhatsApp Evolution client is NOT called in tests (existing `evolution: { sendText: jest.fn() }` mock in phone-verification.service.spec.ts prevents real sends)
+- Commit: `29c6253` — feat(whatsapp): send proactive onboarding starter on phone verification
+
+### S4-T8 — Web onboarding flow
+
+**Status**: [x] Done
+
+- `packages/contracts/src/auth.ts`: added `onboardingCompleted: z.boolean()` to `authUserSchema`
+- `apps/api/src/auth/auth.controller.ts`: `toAuthUser` now includes `onboardingCompleted`
+- `apps/web/src/pages/onboarding.tsx`: `finish()` now navigates to `/chat` instead of `/` (so AI onboarding starts in chat)
+- `apps/web/src/features/auth/hooks/useOnboardingGuard.ts` (new): polls `/me` every 3s; returns `{ isOnboarding, isLoading }`
+- `apps/web/src/pages/chat.tsx`: imports `useOnboardingGuard`; shows `OnboardingBanner` when `isOnboarding = true`; navigates to `/` when flag flips to false (onboarding complete)
+- `packages/i18n/src/locales/es/chat.ts` + `en/chat.ts`: added `onboardingBanner` key
+- Commit: `8f3b434` — feat(web): add onboarding guard hook and banner; route to /chat after phone step
+
+---
+
+## ROOT Gate Results (S4)
+
+| Gate                                         | Result                                 |
+| -------------------------------------------- | -------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                   |
+| `pnpm --filter "./packages/**" run build`    | PASS                                   |
+| `pnpm lint`                                  | PASS (0 errors, pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                  |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS                                   |
+| `pnpm build`                                 | PASS                                   |
+| `pnpm --filter @app/api run test`            | PASS — 368 tests, 28 suites            |
+
+No real WhatsApp sends in tests: `EvolutionClient.sendText` is mocked in `phone-verification.service.spec.ts` (`evolution = { sendText: jest.fn() }`).
+
+---
+
+## TDD Cycle Evidence (S4)
+
+| Task                    | RED                                                  | GREEN                                   | REFACTOR         |
+| ----------------------- | ---------------------------------------------------- | --------------------------------------- | ---------------- |
+| S4-T3 (onboarding spec) | TS error: OnboardingService not found                | 8 tests pass after S4-T4 implementation | Idempotent guard |
+| S4-T2 (auto-seed guard) | Test for "new user → no boxes created" written first | Guard confirmed by removing the call    | —                |
+
+---
+
+## Slice 4 Summary
+
+| Task                                   | Status                           |
+| -------------------------------------- | -------------------------------- |
+| S4-T1 Migration onboardingCompleted    | [x] Done                         |
+| S4-T2 ensureDefaultBoxes guard         | [x] Done                         |
+| S4-T3 Onboarding state-machine tests   | [x] Done                         |
+| S4-T4 OnboardingService implementation | [x] Done                         |
+| S4-T5 Context flag in agent.run        | [x] Done                         |
+| S4-T6 Onboarding prompt variant        | [x] Done                         |
+| S4-T7 WhatsApp proactive starter       | [x] Done                         |
+| S4-T8 Web onboarding flow              | [x] Done                         |
+| S4-T9 Root CI gate                     | [x] Done (all gates green above) |
+
+---
+
+## Integration (S2 + S3 + S4)
+
+**Date**: 2026-06-15
+**Branch**: feat/boxes-v2-epic (single PR combining S2, S3, S4)
+**Merged in order**: S3 (remove-transit) -> S2 (recurring-into-fixed-boxes) -> S4 (ai-onboarding), each with `--no-ff`.
+
+### Conflicts resolved
+
+- `apps/api/src/agent/agent-tools.ts`, `agent.service.ts`, `agent.module.ts`, `agent.service.spec.ts`, `packages/i18n/src/locales/{en,es}/api.ts` — auto-merged by git; manually audited to confirm the UNION of intent: transit text removed (S3), `recurring` dropped from `AgentToolsContext` + RecurringService removed from constructors and `listRecurringExpenses` remapped to fixed boxes (S2), optional `onboarding` added to context + `confirmOnboarding` tool + OnboardingService injected + `resolveOnboardingMode` (S4).
+- `openspec/changes/boxes-v2-onboarding/apply-progress.md` — content conflict on each merge; resolved by keeping ALL slice batch records (S3 + S2 + S4 sections preserved).
+- No conflicts in `app.module.ts`, `whatsapp.module.ts`, `whatsapp.service.ts`, or the i18n transactions/chat/errors locales — git auto-merged cleanly; verified RecurringModule/RecurringReminderService removed, OnboardingModule added, S4 onboarding trigger and S2 reminder removal both present, and en/es locales in sync (no transit, no reminder, onboarding keys present).
+
+### Combined migration run (dev DB, port 55432) — applied in timestamp order
+
+1. `1781510000000-RemoveTransitType` (S3) — **executed** (after fix, see below)
+2. `1781600000000-UnifyRecurringIntoFixedBoxes` (S2) — **executed** (recurring rows -> fixed boxes, table dropped)
+3. `1781700000000-UserOnboardingCompleted` (S4) — **executed** (column added)
+
+Post-migration DB verified: `transactions_type_enum` is now `{income, expense}` (no transit), no rows of type 'transit' remain, `recurring_expenses` table dropped, `users.onboardingCompleted` column present.
+
+### Combined-state bug found and fixed
+
+**S3 RemoveTransitType migration was broken against a DB containing a real transit row.** The verify-zero gate only checked `deletedAt IS NULL`, but step 1 voided transit rows (set status='voided' + deletedAt) WITHOUT changing their `type` column. The irreversible enum-narrow cast (`USING type::text::new_enum`) runs over EVERY row — including the just-voided ones still carrying `type='transit'` — so it failed with `invalid input value for enum transactions_type_enum: "transit"`. Fix: step 1 now also reassigns ALL transit rows to `type='expense'` (an inert placeholder for voided, balance-excluded rows, consistent with the S3 web UI fallback), and the verify-zero gate now asserts zero rows of type 'transit' regardless of `deletedAt`. The migration then applies cleanly.
+
+### Combined gates (ROOT, like CI)
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, warnings only)           |
+| `pnpm typecheck` (ROOT)                      | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS (api + web + mcp-server + packages) |
+| `pnpm test` (ROOT)                           | PASS — 374 tests, 27 suites              |
+
+Combined test count (374) is the coherent union of the slices (S3 367, S2 357, S4 368): onboarding tests added, recurring tests removed, transit-rejection tests added. No combined-state test breakage.

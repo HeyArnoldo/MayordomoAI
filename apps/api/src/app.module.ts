@@ -10,6 +10,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { BoxesModule } from './boxes/boxes.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 import { AgentModule } from './agent/agent.module';
 import { AgentToolsApiModule } from './agent-tools-api/agent-tools-api.module';
 import { ChatModule } from './chat/chat.module';
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module';
     AuthModule,
     BoxesModule,
     TransactionsModule,
+    OnboardingModule,
     AgentModule,
     AgentToolsApiModule,
     ChatModule,

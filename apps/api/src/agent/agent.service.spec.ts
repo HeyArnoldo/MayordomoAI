@@ -28,13 +28,18 @@ const makeI18n = () => ({
   t: jest.fn().mockReturnValue('translated'),
 });
 
+const makeOnboarding = () => ({
+  isOnboarding: jest.fn().mockResolvedValue(false),
+  confirmOnboarding: jest.fn().mockResolvedValue(undefined),
+});
+
 function makeService(): AgentService {
   return new AgentService(
     {} as never,
     {} as never,
-    {} as never,
     makeAiUsageService() as never,
     {} as never,
+    makeOnboarding() as never,
     { save: jest.fn(), create: jest.fn() } as never,
     makeI18n() as never,
   );

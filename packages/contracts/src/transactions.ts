@@ -3,8 +3,6 @@ import { z } from 'zod';
 export enum TransactionType {
   INCOME = 'income',
   EXPENSE = 'expense',
-  /** Dinero de paso (reembolsos que reenvías): no toca cajas ni %. */
-  TRANSIT = 'transit',
 }
 
 export enum TransactionSource {
@@ -21,7 +19,7 @@ export enum TransactionStatus {
 
 export const createTransactionSchema = z.object({
   type: z.enum(TransactionType),
-  /** Requerida para gastos; null en ingresos (se reparten por %) y tránsito. */
+  /** Requerida para gastos; null en ingresos (se reparten por %). */
   boxId: z.uuid().nullable().optional(),
   amount: z.number().positive().multipleOf(0.01).max(9_999_999_999.99),
   note: z.string().max(300).optional(),

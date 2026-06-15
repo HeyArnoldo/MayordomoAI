@@ -34,7 +34,6 @@ const makeCtx = (overrides?: Partial<ToolExecCtx>): ToolExecCtx => ({
 function makeService(deps?: {
   boxes?: unknown;
   transactions?: unknown;
-  recurring?: unknown;
   users?: unknown;
   audits?: unknown;
 }) {
@@ -47,7 +46,6 @@ function makeService(deps?: {
       create: jest.fn(),
       list: jest.fn().mockResolvedValue([]),
     }) as never,
-    (deps?.recurring ?? {}) as never,
     (deps?.users ?? {}) as never,
     (deps?.audits ?? makeAudits()) as never,
   );

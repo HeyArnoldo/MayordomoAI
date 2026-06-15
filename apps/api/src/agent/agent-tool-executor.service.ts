@@ -5,7 +5,6 @@ import { CreateTransactionInput, Locale, TransactionSource, TransactionType } fr
 import { formatMoney } from '@app/i18n';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService, toTransactionDto } from '../transactions/transactions.service';
-import { RecurringService } from '../recurring/recurring.service';
 import { UsersService } from '../users/users.service';
 import type { I18nService } from '../i18n/i18n.service';
 import { AppException } from '../common/errors/app.exception';
@@ -86,8 +85,6 @@ export class AgentToolExecutorService {
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
-    // Kept for DI completeness and future tools; not used by the 3 MVP tools directly.
-    private readonly recurring: RecurringService,
     private readonly users: UsersService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
   ) {}
