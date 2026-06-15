@@ -32,7 +32,6 @@ function makeService(): AgentService {
   return new AgentService(
     {} as never,
     {} as never,
-    {} as never,
     makeAiUsageService() as never,
     {} as never,
     { save: jest.fn(), create: jest.fn() } as never,

@@ -8,7 +8,6 @@ import { formatMoney } from '@app/i18n';
 import { accountingDate } from '../common/money';
 import { BoxesService } from '../boxes/boxes.service';
 import { TransactionsService } from '../transactions/transactions.service';
-import { RecurringService } from '../recurring/recurring.service';
 import { AiUsageService } from '../ai-usage/ai-usage.service';
 import { UsersService } from '../users/users.service';
 import { I18nService } from '../i18n/i18n.service';
@@ -29,7 +28,6 @@ export class AgentService {
   constructor(
     private readonly boxes: BoxesService,
     private readonly transactions: TransactionsService,
-    private readonly recurring: RecurringService,
     private readonly usage: AiUsageService,
     private readonly users: UsersService,
     @InjectRepository(ToolAudit) private readonly audits: Repository<ToolAudit>,
@@ -66,7 +64,7 @@ export class AgentService {
         '- Voids: always require confirmation.',
         '- Budget changes (updateAllocation): show the full new allocation box-by-box and ask for confirmation before applying.',
         '- Boxes (createBox/updateBox): a new box starts at 0% — right after creating it, propose a new allocation with updateAllocation. Renaming or deactivating a box ALWAYS requires confirmation.',
-        '- Recurring expenses (listRecurringExpenses/addRecurringExpense): if the user mentions a monthly recurring payment ("my phone plan", "my subscription"), offer to save it as a fixed expense. If they confirm a due-date reminder ("yes, log it"), use registerTransaction with the amount and box from the reminder.',
+        '- Fixed expenses (listRecurringExpenses): lists fixed-mode expense boxes. To add a new fixed expense, use createBox with mode=fixed. To remove one, use updateBox with active=false.',
         '- If info is missing or ambiguous when RECORDING (which box?), do NOT guess: ask briefly and clearly.',
         '- For broad QUERIES ("my last transactions", "everything") do NOT ask for filters: call queryTransactions without filters. Use groupBy (box/day/week/month) for aggregates and comparisons.',
         '',
@@ -103,7 +101,7 @@ export class AgentService {
       '- Anulaciones: siempre con confirmación.',
       '- Cambios de presupuesto (updateAllocation): muestra el reparto nuevo completo caja por caja y pide confirmación antes de aplicar.',
       '- Cajas (createBox/updateBox): una caja nueva arranca con 0% — justo después de crearla, propón un nuevo reparto con updateAllocation. Renombrar o desactivar una caja SIEMPRE requiere confirmación.',
-      '- Gastos fijos (listRecurringExpenses/addRecurringExpense): si el usuario menciona un pago mensual recurrente ("mi línea celular", "la suscripción"), ofrécele guardarlo como fijo. Si confirma un recordatorio de vencimiento ("sí, regístralo"), usa registerTransaction con el monto y caja del recordatorio.',
+      '- Gastos fijos (listRecurringExpenses): lista las cajas de monto fijo. Para agregar uno nuevo, usa createBox con mode=fixed. Para darlo de baja, usa updateBox con active=false.',
       '- Si falta info o hay ambigüedad al REGISTRAR (¿qué caja?), NO adivines: pregunta corto y claro.',
       '- Para CONSULTAS amplias ("mis últimos movimientos", "todo") NO pidas filtros: llama queryTransactions sin filtros y listo. Usa groupBy (box/day/week/month) para agregados y comparativas.',
       '',
@@ -148,7 +146,6 @@ export class AgentService {
       conversationId,
       boxes: this.boxes,
       transactions: this.transactions,
-      recurring: this.recurring,
       users: this.users,
       audits: this.audits,
       locale,

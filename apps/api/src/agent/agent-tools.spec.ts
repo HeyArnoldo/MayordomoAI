@@ -34,7 +34,6 @@ function makeCtx(overrides: Partial<AgentToolsContext>): AgentToolsContext {
     conversationId: null,
     boxes: {} as never,
     transactions: {} as never,
-    recurring: {} as never,
     users: {} as never,
     audits: makeAudits() as never,
     locale: 'es',
