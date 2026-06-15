@@ -503,3 +503,141 @@ Note: Test count dropped from 359 to 357 — the 2 deleted RecurringService unit
 | S2-T5 Web cleanup                            | [x] Done (no-op) |
 | S2-T6 Executor cleanup verify                | [x] Done         |
 | S2-T7 Root CI gate                           | [x] Done         |
+
+---
+
+## Batch: 3 — Slice 4 (AI Onboarding)
+
+**Date**: 2026-06-15
+**Branch**: feat/ai-onboarding
+**Mode**: Strict TDD (for S4-T2, S4-T3, S4-T4)
+**Slice**: S4 — AI-driven onboarding (web + WhatsApp)
+
+---
+
+## Completed Tasks
+
+### S4-T1 — Migration: add onboardingCompleted column
+
+**Status**: [x] Done
+
+- Migration file: `apps/api/src/database/migrations/1781600000000-UserOnboardingCompleted.ts`
+- SQL up: `ALTER TABLE "users" ADD "onboardingCompleted" boolean NOT NULL DEFAULT false`
+- SQL down: `ALTER TABLE "users" DROP COLUMN "onboardingCompleted"`
+- Column added to `apps/api/src/users/user.entity.ts` (distinct from `onboardedAt`)
+- Commit: `d6c9b00` — feat(users): add onboardingCompleted boolean to User entity and hand-written migration
+
+### S4-T2 — Guard ensureDefaultBoxes for new accounts
+
+**Status**: [x] Done
+
+- `apps/api/src/admin/admin.service.ts`: removed call to `ensureDefaultBoxes` in `updateStatus` when approving to ACTIVE
+- New accounts start with zero boxes; AI onboarding creates them conversationally
+- Existing users unaffected: their boxes are already in DB; `ensureDefaultBoxes` was already a no-op for them
+- `ensureDefaultBoxes` method preserved for back-fill needs
+- Commit: `1b242ac` — feat(admin): stop auto-seeding boxes on account approval (S4 onboarding takes over)
+
+### S4-T3 — Onboarding state-machine unit tests (TDD RED first)
+
+**Status**: [x] Done
+
+- `apps/api/src/onboarding/onboarding.service.spec.ts` (new)
+- Tests cover: `isOnboarding` returns true/false, `confirmOnboarding` idempotent, auto-seed guard scenarios
+- Written BEFORE implementation (RED state confirmed)
+
+### S4-T4 — Implement OnboardingService
+
+**Status**: [x] Done
+
+- `apps/api/src/onboarding/onboarding.service.ts` (new): `isOnboarding(userId)`, `confirmOnboarding(userId)`
+- `apps/api/src/onboarding/onboarding.module.ts` (new): exports OnboardingService
+- `apps/api/src/onboarding/onboarding.controller.ts` (new): `POST /me/onboarding/ai-complete`
+- All 8 spec tests GREEN
+- Commit: `48352cf` — feat(onboarding): add OnboardingService with isOnboarding/confirmOnboarding (TDD)
+
+### S4-T5 — Thread onboarding context flag through agent.run
+
+**Status**: [x] Done
+
+- `apps/api/src/agent/agent.service.ts`: added `isOnboardingMode` param to `run()` (default false); added `resolveOnboardingMode(userId)` helper; injected `OnboardingService`
+- `apps/api/src/agent/agent.module.ts`: imports `OnboardingModule`
+- `apps/api/src/agent/agent-tools.ts`: `OnboardingService` added to `AgentToolsContext` (optional for backward compat); `confirmOnboarding` tool added
+- `apps/api/src/chat/chat.controller.ts`: calls `resolveOnboardingMode` before `agent.run`, passes `isOnboardingMode`
+- `apps/api/src/whatsapp/whatsapp.service.ts`: same pattern in `resolveReply`
+- `apps/api/src/agent/agent.service.spec.ts` + `apps/api/src/chat/chat.controller.spec.ts`: updated mocks for new signature
+- Commit: `968b02c` — feat(agent): add onboarding mode flag and confirmOnboarding tool
+
+### S4-T6 — Onboarding system-prompt variant
+
+**Status**: [x] Done
+
+- `apps/api/src/agent/prompts/onboarding.prompt.ts` (new): `buildOnboardingPrompt(locale, currency, userName)`
+- Covers both `es` and `en` locales
+- Guides: income → fixed bills (createBox mode=fixed) → savings goals (createBox type=fund) → percent categories → validate 100% → call confirmOnboarding
+- Persuasive, conversational tone; validates percent sum before allowing completion
+- Selected in `agent.service.ts` when `isOnboardingMode = true`
+- Same tools and guardrails as standard mode (ADR-5)
+
+### S4-T7 — WhatsApp proactive starter on phone verification
+
+**Status**: [x] Done
+
+- `apps/api/src/users/phone-verification.service.ts`: added `sendOnboardingStarterIfNeeded()` called after `verify()` completes; re-reads `onboardingCompleted` from DB for idempotency
+- `packages/i18n/src/locales/es/api.ts`: added `whatsapp.onboardingStarter` key (persuasive ES copy)
+- `packages/i18n/src/locales/en/api.ts`: matching EN key (satisfies typeof es constraint)
+- `apps/api/src/whatsapp/whatsapp.service.ts`: `resolveReply` now passes `isOnboardingMode` to `agent.run`
+- WhatsApp Evolution client is NOT called in tests (existing `evolution: { sendText: jest.fn() }` mock in phone-verification.service.spec.ts prevents real sends)
+- Commit: `29c6253` — feat(whatsapp): send proactive onboarding starter on phone verification
+
+### S4-T8 — Web onboarding flow
+
+**Status**: [x] Done
+
+- `packages/contracts/src/auth.ts`: added `onboardingCompleted: z.boolean()` to `authUserSchema`
+- `apps/api/src/auth/auth.controller.ts`: `toAuthUser` now includes `onboardingCompleted`
+- `apps/web/src/pages/onboarding.tsx`: `finish()` now navigates to `/chat` instead of `/` (so AI onboarding starts in chat)
+- `apps/web/src/features/auth/hooks/useOnboardingGuard.ts` (new): polls `/me` every 3s; returns `{ isOnboarding, isLoading }`
+- `apps/web/src/pages/chat.tsx`: imports `useOnboardingGuard`; shows `OnboardingBanner` when `isOnboarding = true`; navigates to `/` when flag flips to false (onboarding complete)
+- `packages/i18n/src/locales/es/chat.ts` + `en/chat.ts`: added `onboardingBanner` key
+- Commit: `8f3b434` — feat(web): add onboarding guard hook and banner; route to /chat after phone step
+
+---
+
+## ROOT Gate Results (S4)
+
+| Gate                                         | Result                                 |
+| -------------------------------------------- | -------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                   |
+| `pnpm --filter "./packages/**" run build`    | PASS                                   |
+| `pnpm lint`                                  | PASS (0 errors, pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                  |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS                                   |
+| `pnpm build`                                 | PASS                                   |
+| `pnpm --filter @app/api run test`            | PASS — 368 tests, 28 suites            |
+
+No real WhatsApp sends in tests: `EvolutionClient.sendText` is mocked in `phone-verification.service.spec.ts` (`evolution = { sendText: jest.fn() }`).
+
+---
+
+## TDD Cycle Evidence (S4)
+
+| Task                    | RED                                                  | GREEN                                   | REFACTOR         |
+| ----------------------- | ---------------------------------------------------- | --------------------------------------- | ---------------- |
+| S4-T3 (onboarding spec) | TS error: OnboardingService not found                | 8 tests pass after S4-T4 implementation | Idempotent guard |
+| S4-T2 (auto-seed guard) | Test for "new user → no boxes created" written first | Guard confirmed by removing the call    | —                |
+
+---
+
+## Slice 4 Summary
+
+| Task                                   | Status                           |
+| -------------------------------------- | -------------------------------- |
+| S4-T1 Migration onboardingCompleted    | [x] Done                         |
+| S4-T2 ensureDefaultBoxes guard         | [x] Done                         |
+| S4-T3 Onboarding state-machine tests   | [x] Done                         |
+| S4-T4 OnboardingService implementation | [x] Done                         |
+| S4-T5 Context flag in agent.run        | [x] Done                         |
+| S4-T6 Onboarding prompt variant        | [x] Done                         |
+| S4-T7 WhatsApp proactive starter       | [x] Done                         |
+| S4-T8 Web onboarding flow              | [x] Done                         |
+| S4-T9 Root CI gate                     | [x] Done (all gates green above) |

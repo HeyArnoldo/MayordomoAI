@@ -469,6 +469,8 @@ export class WhatsappService {
       return this.i18n.t(user.language, 'whatsapp.aiDisabled');
     }
     const history = await this.historyAsModelMessages(user.id, conversationId);
+    // Use onboarding prompt variant when the user has not yet completed setup.
+    const isOnboardingMode = await this.agent.resolveOnboardingMode(user.id);
     const result = this.agent.run(
       user.id,
       conversationId,
@@ -477,6 +479,7 @@ export class WhatsappService {
       user.name,
       user.language,
       resolveCurrency(user.currency),
+      isOnboardingMode,
     );
     return (await result.text).trim();
   }

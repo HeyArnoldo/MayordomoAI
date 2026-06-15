@@ -4,6 +4,7 @@ import { BoxesModule } from '../boxes/boxes.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { AiUsageModule } from '../ai-usage/ai-usage.module';
 import { UsersModule } from '../users/users.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
 import { AgentController } from './agent.controller';
 import { AgentService } from './agent.service';
 import { AgentToolExecutorService } from './agent-tool-executor.service';
@@ -16,6 +17,7 @@ import { ToolAudit } from './tool-audit.entity';
     TransactionsModule,
     AiUsageModule,
     UsersModule,
+    OnboardingModule,
   ],
   controllers: [AgentController],
   providers: [AgentService, AgentToolExecutorService],

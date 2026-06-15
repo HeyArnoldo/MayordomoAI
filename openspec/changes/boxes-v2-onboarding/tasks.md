@@ -287,7 +287,7 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Depends on: Slice 1 merged (needs `boxes.mode` model to exist before onboarding can create fixed boxes).  
 > Independent of S2 and S3.
 
-- [ ] **S4-T1** Migration: add `onboarding_completed` boolean column to `users` table  
+- [x] **S4-T1** Migration: add `onboarding_completed` boolean column to `users` table  
        **Spec req**: ai-onboarding spec §persistence.  
        **Action**: `pnpm migration:generate` after adding field to User entity. Default = false for existing users.  
        **Files**:
@@ -295,7 +295,7 @@ Recommended merge order: S1 → S3 → S2 → S4
   - `apps/api/src/migrations/YYYYMMDD_AddUserOnboardingCompleted.ts`  
     **TDD**: no (DDL)
 
-- [ ] **S4-T2** Guard `ensureDefaultBoxes` for new accounts: skip if onboarding flag will be set  
+- [x] **S4-T2** Guard `ensureDefaultBoxes` for new accounts: skip if onboarding flag will be set  
        **Spec req**: ai-onboarding spec §auto-seed removal; design §stop-auto-seed.  
        **Action**: Wrap `ensureDefaultBoxes` call in a guard: if `onboardingCompleted = false` AND new account, do NOT auto-create default boxes — onboarding will create them instead.  
        **Files**:
@@ -304,7 +304,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — unit test: new user → `ensureDefaultBoxes` NOT called; existing user (migrated) → NOT affected  
     **Depends on**: S4-T1
 
-- [ ] **S4-T3** Onboarding state-machine unit tests (TDD — write first)  
+- [x] **S4-T3** Onboarding state-machine unit tests (TDD — write first)  
        **Spec req**: ai-onboarding spec §state-machine; resumable/idempotent requirement.  
        **Tests cover**:
   - New user → `onboardingCompleted = false` → onboarding variant active
@@ -315,7 +315,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — write before S4-T4  
     **Depends on**: S4-T1
 
-- [ ] **S4-T4** Implement `OnboardingService`: `isOnboarding(userId)`, `confirmOnboarding(userId)`  
+- [x] **S4-T4** Implement `OnboardingService`: `isOnboarding(userId)`, `confirmOnboarding(userId)`  
        **Spec req**: ai-onboarding spec §service.  
        **Files**:
   - `apps/api/src/onboarding/onboarding.service.ts` (new)
@@ -323,7 +323,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: YES — implement to pass S4-T3 tests  
     **Depends on**: S4-T3
 
-- [ ] **S4-T5** Thread onboarding context flag through `agent.run`  
+- [x] **S4-T5** Thread onboarding context flag through `agent.run`  
        **Spec req**: ai-onboarding spec §agent-context.  
        **Action**: Before calling `agent.run`, call `isOnboarding(userId)`. Pass result as `context.isOnboarding` to executor. Executor selects system-prompt variant based on flag.  
        **Files**:
@@ -332,7 +332,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (wiring)  
     **Depends on**: S4-T4
 
-- [ ] **S4-T6** Write onboarding system-prompt variant (persuasive, box-setup focused)  
+- [x] **S4-T6** Write onboarding system-prompt variant (persuasive, box-setup focused)  
        **Spec req**: ai-onboarding spec §onboarding-prompt.  
        **Action**: Separate prompt string/template for onboarding mode. Prompt must: introduce Mayordomo, ask for income, propose a box structure, call `createBox` with appropriate modes, confirm completion, call `confirmOnboarding`.  
        **Files**:
@@ -341,7 +341,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (prompt text)  
     **Depends on**: S4-T5
 
-- [ ] **S4-T7** WhatsApp proactive starter: send welcome message on account confirmation  
+- [x] **S4-T7** WhatsApp proactive starter: send welcome message on account confirmation  
        **Spec req**: ai-onboarding spec §proactive-starter.  
        **Action**: On new account confirmed (registration or first login), send a proactive WhatsApp message that opens the onboarding conversation. Must be idempotent (send only once).  
        **Files**:
@@ -350,7 +350,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (external integration)  
     **Depends on**: S4-T4 (needs onboarding flag to check idempotency)
 
-- [ ] **S4-T8** Web: onboarding flow — show flag + navigate into chat  
+- [x] **S4-T8** Web: onboarding flow — show flag + navigate into chat  
        **Spec req**: ai-onboarding spec §web-onboarding.  
        **Action**: On login, if `onboardingCompleted = false`, redirect to chat view with an onboarding banner/state. On completion event (flag flips to true), navigate away from onboarding state.  
        **Files**:

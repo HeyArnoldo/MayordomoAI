@@ -358,6 +358,10 @@ export class ChatController {
     // keep last user's file parts intact for the current model turn.
     const stripped = stripMediaFromHistory(body.messages);
     const modelMessages = await convertToModelMessages(stripped);
+
+    // Select onboarding prompt variant when the user has not yet completed setup.
+    const isOnboardingMode = await this.agent.resolveOnboardingMode(user.id);
+
     const result = this.agent.run(
       user.id,
       conv.id,
@@ -366,6 +370,7 @@ export class ChatController {
       user.name,
       user.language,
       resolveCurrency(user.currency),
+      isOnboardingMode,
     );
 
     result.pipeUIMessageStreamToResponse(res);

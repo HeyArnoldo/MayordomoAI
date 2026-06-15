@@ -37,6 +37,9 @@ export const authUserSchema = z.object({
   status: z.enum(UserStatus),
   // null hasta completar el onboarding (verificar número u omitirlo).
   onboardedAt: z.string().nullable(),
+  // false until the AI-driven onboarding flow finishes building the box structure.
+  // Distinct from onboardedAt (phone-link step). Added in S4.
+  onboardingCompleted: z.boolean(),
   createdAt: z.string(),
   language: localeSchema,
   // null = nunca eligió: la UI la resuelve como USD (resolveCurrency).

@@ -123,6 +123,12 @@ export class PhoneVerificationService {
 
     await this.markOnboarded(user);
     await this.deriveCurrencyIfUnset(user, saved.e164);
+
+    // If the user has not yet completed AI onboarding, send a proactive WhatsApp
+    // starter message to kick off the guided box-setup conversation. This is
+    // idempotent: onboardingCompleted is checked before sending.
+    await this.sendOnboardingStarterIfNeeded(user, saved.e164);
+
     return saved;
   }
 
@@ -143,6 +149,25 @@ export class PhoneVerificationService {
   async markOnboarded(user: User): Promise<void> {
     if (user.onboardedAt) return;
     await this.users.update(user.id, { onboardedAt: new Date() });
+  }
+
+  /**
+   * Sends a proactive onboarding starter message via WhatsApp when:
+   * - The user has just verified their phone number
+   * - onboardingCompleted is still false (has not run the AI onboarding flow)
+   *
+   * Idempotent: re-fetches onboardingCompleted from DB before sending to
+   * avoid duplicate messages on retry scenarios.
+   */
+  private async sendOnboardingStarterIfNeeded(user: User, e164: string): Promise<void> {
+    // Re-read from DB to get the latest onboardingCompleted value.
+    const fresh = await this.users.findOne({ where: { id: user.id } });
+    if (!fresh || fresh.onboardingCompleted) return;
+
+    const message = this.i18n.t(user.language, 'whatsapp.onboardingStarter', {
+      name: user.name,
+    });
+    await this.evolution.sendText(e164, message);
   }
 
   private async sendCode(phone: PhoneNumber, language: Locale): Promise<PhoneNumber> {
