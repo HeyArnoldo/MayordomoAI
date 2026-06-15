@@ -14,7 +14,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 // Input shape — ZodRawShapeCompat: keys mapped to zod schemas, NOT wrapped in z.object().
 // userId is intentionally absent — the server resolves identity from env, never from input.
 export const queryTransactionsInputShape = {
-  type: z.enum(['income', 'expense', 'transit']).optional().describe('Filter by transaction type.'),
+  type: z.enum(['income', 'expense']).optional().describe('Filter by transaction type.'),
   boxNames: z.array(z.string()).optional().describe('Filter to specific box names.'),
   textQuery: z
     .string()

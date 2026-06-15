@@ -21,14 +21,12 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 // userId is intentionally absent — never accepted from the caller.
 export const registerTransactionInputShape = {
   type: z
-    .enum(['income', 'expense', 'transit'])
-    .describe(
-      'Transaction type: income (money in), expense (money out of a box), or transit (between boxes).',
-    ),
+    .enum(['income', 'expense'])
+    .describe('Transaction type: income (money in) or expense (money out of a box).'),
   boxName: z
     .string()
     .optional()
-    .describe('Target box name for the transaction. Required for expenses and transit.'),
+    .describe('Target box name for the transaction. Required for expenses.'),
   amount: z.number().positive().describe('Amount in the account currency. Must be greater than 0.'),
   note: z.string().max(300).optional().describe('Optional note or description (max 300 chars).'),
   userConfirmed: z
@@ -43,8 +41,8 @@ export const registerTransactionInputShape = {
 export const registerTransactionTool = {
   name: 'registerTransaction',
   description:
-    'Records a transaction: expense charged to a box, income distributed by allocation %, ' +
-    'or transit between boxes. High-amount expenses (>= 100) require explicit user confirmation — ' +
+    'Records a transaction: expense charged to a box, or income distributed by allocation %. ' +
+    'High-amount expenses (>= 100) require explicit user confirmation — ' +
     'when the server returns needsConfirmation: true, ask the user to confirm before re-invoking ' +
     'with userConfirmed: true. Do NOT auto-confirm.',
   inputShape: registerTransactionInputShape,
