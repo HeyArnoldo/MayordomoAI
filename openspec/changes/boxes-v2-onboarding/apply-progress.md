@@ -252,3 +252,130 @@ All S1 tasks (S1-D1 + S1-T1 through S1-T9) are done. S1-T10 root CI gate can now
 | S1-T7 createBox/updateBox guards | [x] Done |
 | S1-T8 Agent tools                | [x] Done |
 | S1-T9 Web editor                 | [x] Done |
+
+---
+
+## Batch: 3 — S2 (Unify recurring into fixed boxes)
+
+**Date**: 2026-06-15
+**Branch**: feat/boxes-v2-recurring
+**Mode**: Standard (deletions dominate; no pure business logic to TDD)
+**Slice**: S2 — Unify recurring→fixed boxes (all 7 tasks)
+
+---
+
+### S2-T1 — Data migration: convert recurring_expenses to fixed boxes
+
+**Status**: [x] Done
+
+**File**: `apps/api/src/database/migrations/1781600000000-UnifyRecurringIntoFixedBoxes.ts`
+
+**up()**: INSERT INTO boxes selecting from recurring_expenses (mode='fixed', fixedAmount=amount, type='expense', scope='personal', pct=0, active=true); then DROP INDEX, DROP TABLE recurring_expenses.
+
+**down()**: best-effort recreate recurring_expenses schema (data cannot be auto-restored from boxes).
+
+**Commit**: `ec04fb5` — feat(migration): add UnifyRecurringIntoFixedBoxes - move recurring to fixed boxes and drop table
+
+---
+
+### S2-T2 — Remove recurring module, entity, and table references from API
+
+**Status**: [x] Done
+
+**Files deleted**:
+
+- `apps/api/src/recurring/recurring-expense.entity.ts`
+- `apps/api/src/recurring/recurring.module.ts`
+- `apps/api/src/recurring/recurring.service.ts`
+- `apps/api/src/recurring/recurring.service.spec.ts`
+- `apps/api/src/whatsapp/recurring-reminder.service.ts`
+
+**Files modified**:
+
+- `apps/api/src/agent/agent.module.ts` — removed RecurringModule import
+- `apps/api/src/whatsapp/whatsapp.module.ts` — removed RecurringModule import and RecurringReminderService provider
+
+**Commit**: `8db9126` — feat(recurring): remove recurring module, entity, service, and reminder cron
+
+---
+
+### S2-T3 — Remove/remap the 3 recurring-expense agent tools
+
+**Status**: [x] Done
+
+**What changed**:
+
+- `apps/api/src/agent/agent-tools.ts`: removed `addRecurringExpense` and `removeRecurringExpense` tools; remapped `listRecurringExpenses` to query active fixed-expense boxes from BoxesService; removed `recurring` from AgentToolsContext; updated executor construction call
+- `apps/api/src/agent/agent-tool-executor.service.ts`: removed RecurringService from constructor and imports
+- `apps/api/src/agent/agent.service.ts`: removed RecurringService import and constructor arg; updated system prompt recurring references; removed `recurring` from buildAgentTools call
+- `apps/api/src/agent/agent-tools.spec.ts`: removed `recurring` from makeCtx stub
+- `apps/api/src/agent/agent-tool-executor.service.spec.ts`: removed `recurring` from makeService stub
+- `apps/api/src/agent/agent.service.spec.ts`: removed extra constructor argument
+
+**listRecurringExpenses remapped to**: filter `BoxesService.findAll()` for `active && mode === 'fixed' && type === 'expense'`; returns `{items: [{id, name, fixedAmount}], monthlyTotal}` — same shape as before for backward compat.
+
+**Commit**: `46ce23d` — feat(agent): remove add/removeRecurringExpense tools, remap listRecurringExpenses to fixed boxes
+
+---
+
+### S2-T4 — Update i18n: remove recurring error code and reminder strings
+
+**Status**: [x] Done
+
+**Files modified**:
+
+- `packages/contracts/src/error-codes.ts`: removed `'recurring.not_found'` from ERROR_CODES
+- `packages/i18n/src/locales/es/errors.ts`: removed `recurring.not_found` translation
+- `packages/i18n/src/locales/en/errors.ts`: removed `recurring.not_found` translation
+- `packages/i18n/src/locales/es/api.ts`: removed `reminders.dueToday` key (used only by deleted RecurringReminderService)
+- `packages/i18n/src/locales/en/api.ts`: removed `reminders.dueToday` key
+
+**Commit**: `f1da26d` — feat(i18n): remove recurring error code and reminder strings (S2)
+
+---
+
+### S2-T5 — Web: remove recurring-expense screens/components
+
+**Status**: [x] Done (no action required)
+
+The web app had zero recurring-expense UI (verified by grep). No files to delete or redirect.
+
+---
+
+### S2-T6 — Executor cleanup: verify no dead tool references remain
+
+**Status**: [x] Done
+
+`pnpm typecheck` passes clean (0 errors). No dead recurring references remain in agent/executor code.
+
+---
+
+### S2-T7 — Root CI gate
+
+**Status**: [x] Done
+
+| Gate                                         | Result                                   |
+| -------------------------------------------- | ---------------------------------------- |
+| `pnpm install --frozen-lockfile`             | PASS                                     |
+| `pnpm --filter "./packages/**" run build`    | PASS                                     |
+| `pnpm lint`                                  | PASS (0 errors, 4 pre-existing warnings) |
+| `pnpm typecheck`                             | PASS (all 6 packages)                    |
+| `pnpm --filter @app/web exec tsc -b --force` | PASS (0 errors)                          |
+| `pnpm build`                                 | PASS                                     |
+| `pnpm test`                                  | PASS — 357 tests, 26 suites              |
+
+Note: Test count dropped from 359 to 357 — the 2 deleted RecurringService unit tests (deactivate tests) are accounted for.
+
+---
+
+## S2 Complete Summary
+
+| Task                                         | Status           |
+| -------------------------------------------- | ---------------- |
+| S2-T1 Migration UnifyRecurringIntoFixedBoxes | [x] Done         |
+| S2-T2 Remove recurring module                | [x] Done         |
+| S2-T3 Remap/remove agent tools               | [x] Done         |
+| S2-T4 i18n cleanup                           | [x] Done         |
+| S2-T5 Web cleanup                            | [x] Done (no-op) |
+| S2-T6 Executor cleanup verify                | [x] Done         |
+| S2-T7 Root CI gate                           | [x] Done         |

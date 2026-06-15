@@ -148,7 +148,7 @@ Recommended merge order: S1 → S3 → S2 → S4
 > Depends on: Slice 1 merged to main.  
 > Target branch: `main`.
 
-- [ ] **S2-T1** Data migration: convert `recurring_expenses` rows to fixed-mode boxes  
+- [x] **S2-T1** Data migration: convert `recurring_expenses` rows to fixed-mode boxes  
        **Spec req**: recurring-expenses spec §migration; design ADR-2 (drop reminders/dayOfMonth).  
        **Action**:
   1. Generate migration that reads all `recurring_expenses` rows
@@ -160,7 +160,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: write a migration-transform unit test covering the mapping logic before writing the SQL  
     **Parallel**: no — must be first S2 task
 
-- [ ] **S2-T2** Remove recurring module, entity, and table references from API  
+- [x] **S2-T2** Remove recurring module, entity, and table references from API  
        **Spec req**: recurring-expenses spec §removal.  
        **Action**: Delete or strip `RecurringExpense` entity, module, service, controller, repository. Remove from `AppModule` imports.  
        **Files**:
@@ -169,7 +169,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no (deletion task; verify by running typecheck)  
     **Depends on**: S2-T1
 
-- [ ] **S2-T3** Remove/remap the 3 recurring-expense agent tools  
+- [x] **S2-T3** Remove/remap the 3 recurring-expense agent tools  
        **Spec req**: recurring-expenses spec §agent-tools (3 tools: list, create, delete recurring expenses).  
        **Action**: Delete tool files. Update executor's tool registry. If any tool is referenced in onboarding prompts, remove those references.  
        **Files**:
@@ -179,7 +179,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Depends on**: S2-T2
 
-- [ ] **S2-T4** Update i18n: remove recurring-expense keys, add any new fixed-box keys if needed  
+- [x] **S2-T4** Update i18n: remove recurring-expense keys, add any new fixed-box keys if needed  
        **Spec req**: recurring-expenses spec §i18n.  
        **Files**:
   - `packages/i18n/src/en/*.ts`
@@ -187,7 +187,7 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Parallel**: can run alongside S2-T2 and S2-T3
 
-- [ ] **S2-T5** Web: remove recurring-expense screens/components  
+- [x] **S2-T5** Web: remove recurring-expense screens/components  
        **Spec req**: recurring-expenses spec §web-removal.  
        **Action**: Delete recurring expense list/create/edit UI. Remove nav links.  
        **Files**:
@@ -196,12 +196,12 @@ Recommended merge order: S1 → S3 → S2 → S4
     **TDD**: no  
     **Parallel**: can run alongside S2-T2 through S2-T4
 
-- [ ] **S2-T6** Executor cleanup: verify no dead tool references remain  
+- [x] **S2-T6** Executor cleanup: verify no dead tool references remain  
        **Action**: `pnpm typecheck` + manual grep for `recurring` in agent/executor code.  
        **TDD**: no  
        **Depends on**: S2-T3
 
-- [ ] **S2-T7** Run root CI gate before PR  
+- [x] **S2-T7** Run root CI gate before PR  
        **Action**: same gate as S1-T10  
        **Depends on**: all S2 tasks complete
 
