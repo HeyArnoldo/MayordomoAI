@@ -119,7 +119,7 @@ Recommended merge order: S1 → S3 → S2 → S4
 
 ### S1 — Web layer
 
-- [ ] **S1-T9** Web box editor: add mode toggle (percent / fixed) + fixedAmount input  
+- [x] **S1-T9** Web box editor: add mode toggle (percent / fixed) + fixedAmount input  
        **Spec req**: boxes spec §web-ui.  
        **Action**: Toggle shows fixedAmount numeric field when mode=fixed; hides it for percent. Disable fixedAmount field when mode=percent. Pass mode+fixedAmount to create/update API calls.  
        **Files**:
