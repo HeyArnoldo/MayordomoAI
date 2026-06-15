@@ -4,7 +4,6 @@ export const transactions = {
     all: 'Todos',
     expenses: 'Gastos',
     income: 'Ingresos',
-    transit: 'Tránsito',
   },
   dates: {
     today: 'Hoy',
@@ -26,7 +25,6 @@ export const transactions = {
     title: 'Registrar movimiento',
     typeExpense: 'Gasto',
     typeIncome: 'Ingreso',
-    typeTransit: 'Tránsito',
     incomeHint: 'Se reparte automáticamente entre tus cajas según %.',
     notePlaceholder: 'Nota (opcional)',
     submit: 'Registrar',
@@ -37,7 +35,6 @@ export const transactions = {
   types: {
     expense: 'Gasto',
     income: 'Ingreso',
-    transit: 'Tránsito',
   },
   row: {
     voided: 'anulado',
