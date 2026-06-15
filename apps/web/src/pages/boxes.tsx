@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Money } from '@/components/mayordomo/money';
 import { NewBoxDialog } from '@/features/boxes/new-box-dialog';
 import { EditBoxDialog } from '@/features/boxes/edit-box-dialog';
-import { useBoxBalances, useUpdateAllocation } from '@/hooks/use-finance';
+import { useBoxBalances, useUpdateAllocation, useUpdateBox } from '@/hooks/use-finance';
 import { boxColor } from '@/lib/boxes';
 import { cn } from '@/lib/utils';
 
@@ -17,10 +17,12 @@ export default function BoxesPage() {
   const { t } = useTranslation(['boxes', 'common']);
   const { data: boxes = [], isLoading } = useBoxBalances();
   const update = useUpdateAllocation();
+  const reactivate = useUpdateBox();
   const [pcts, setPcts] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState<BoxBalance | null>(null);
 
   const editable = boxes.filter((b) => b.active && b.scope === 'personal');
+  const archived = boxes.filter((b) => !b.active && b.scope === 'personal');
 
   useEffect(() => {
     if (editable.length > 0 && Object.keys(pcts).length === 0) {
@@ -159,6 +161,55 @@ export default function BoxesPage() {
       </section>
 
       <p className="text-center text-xs text-ink-3">{t('editor.futureNote')}</p>
+
+      {archived.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-3">
+            {t('archived.title')}
+          </h2>
+          <div className="rounded-2xl border border-line bg-surface px-5 py-2 shadow-card">
+            {archived.map((b, i) => {
+              const color = boxColor(b.name, b.colorKey);
+              return (
+                <div
+                  key={b.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 py-3',
+                    i < archived.length - 1 && 'border-b border-line',
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full opacity-40"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate text-[13.5px] font-semibold text-ink-3">
+                      {b.name}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={reactivate.isPending}
+                    onClick={() =>
+                      reactivate.mutate(
+                        { id: b.id, input: { active: true } },
+                        {
+                          onSuccess: () =>
+                            toast.success(t('archived.reactivated', { name: b.name })),
+                          onError: () => toast.error(t('archived.reactivateError')),
+                        },
+                      )
+                    }
+                  >
+                    {t('archived.reactivate')}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <EditBoxDialog box={editing} onClose={() => setEditing(null)} />
     </div>

@@ -62,6 +62,12 @@ export const boxes = {
       'It leaves the split and the dashboard, but its transaction history is kept. Its {{pct}}% will be freed up — you will need to redistribute it so the split adds up to 100.',
     confirmArchive: 'Archive',
   },
+  archived: {
+    title: 'Archived',
+    reactivate: 'Reactivate',
+    reactivated: '"{{name}}" reactivated — assign it a % and save the split',
+    reactivateError: 'Could not reactivate the box',
+  },
   card: {
     fundAccumulates: 'Fund · accumulates <amount/> this month',
     usedPct: 'Used {{pct}}%',
