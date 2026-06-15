@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { BoxesService } from './boxes.service';
 import { Box } from './box.entity';
-import { BoxScope, BoxType, DEFAULT_LOCALE } from '@app/contracts';
+import { BoxMode, BoxScope, BoxType, DEFAULT_LOCALE } from '@app/contracts';
 
 const makeBox = (overrides: Partial<Box> = {}): Box =>
   ({
@@ -13,6 +13,8 @@ const makeBox = (overrides: Partial<Box> = {}): Box =>
     scope: BoxScope.PERSONAL,
     active: true,
     sortOrder: 0,
+    mode: BoxMode.PERCENT,
+    fixedAmount: null,
     createdAt: new Date(),
     ...overrides,
   }) as Box;
@@ -106,6 +108,22 @@ describe('BoxesService', () => {
       }
       expect(caught?.code).toBe('box.allocation_must_sum_100');
       expect(caught?.params?.total).toBeDefined();
+    });
+
+    it('fixed boxes are excluded from the percent-sum invariant', async () => {
+      // One fixed box (id: 'f1') + one percent box at 100%: should pass
+      const fixedBox = makeBox({
+        id: 'f1',
+        mode: BoxMode.FIXED,
+        fixedAmount: '500.00',
+        pct: '0.00',
+      });
+      const pctBox = makeBox({ id: 'b1', mode: BoxMode.PERCENT, pct: '100.00' });
+      repo.find.mockResolvedValue([fixedBox, pctBox]);
+      repo.save.mockImplementation((boxes: Box[]) => Promise.resolve(boxes));
+      // Only updating the pct box; fixed box is excluded from invariant check
+      const result = await service.updateAllocation('u1', { items: [{ id: 'b1', pct: 100 }] });
+      expect(result).toHaveLength(2);
     });
   });
 
