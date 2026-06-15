@@ -289,7 +289,10 @@ export class BoxesService {
     const existingFixedCents = sumFixedCents(existingFixedBoxes);
     const proposedFixedCents = existingFixedCents + toCents(newFixedAmount);
 
-    if (proposedFixedCents >= incomeCents) {
+    // Only enforce the guard when income is known (> 0) AND fixed strictly exceeds it.
+    // income = 0  → no income recorded yet (e.g. new user); guard does not fire.
+    // fixed = income → entire income committed to fixed envelopes; valid (remainder 0).
+    if (incomeCents > 0 && proposedFixedCents > incomeCents) {
       throw new AppException(
         'box.fixed_exceeds_income',
         HttpStatus.UNPROCESSABLE_ENTITY,

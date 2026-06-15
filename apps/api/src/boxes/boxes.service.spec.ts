@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { BoxesService } from './boxes.service';
 import { Box } from './box.entity';
 import { BoxMode, BoxScope, BoxType, DEFAULT_LOCALE } from '@app/contracts';
+import type { CreateBoxInput } from '@app/contracts';
 
 const makeBox = (overrides: Partial<Box> = {}): Box =>
   ({
@@ -134,6 +135,65 @@ describe('BoxesService', () => {
       repo.save.mockImplementation((boxes: Box[]) => Promise.resolve(boxes));
       await service.seedDefaults('u1', DEFAULT_LOCALE);
       expect(i18n.t).toHaveBeenCalled();
+    });
+  });
+
+  describe('assertFixedDoesNotExceedIncome (via create)', () => {
+    const fixedInput: CreateBoxInput = {
+      name: 'Rent',
+      pct: 0,
+      type: BoxType.EXPENSE,
+      scope: BoxScope.PERSONAL,
+      mode: BoxMode.FIXED,
+      fixedAmount: 500,
+    };
+
+    beforeEach(() => {
+      repo.maximum.mockResolvedValue(0);
+      repo.create.mockImplementation((data: Partial<Box>) => ({ ...data }) as Box);
+      repo.save.mockImplementation((box: Box) => Promise.resolve(box));
+    });
+
+    it('allows creating a fixed box when income is 0 (zero-income trap)', async () => {
+      // income = 0 → no constraint yet; any fixed amount must be allowed
+      repo.manager.query.mockResolvedValue([{ total: '0' }]);
+      repo.find.mockResolvedValue([]); // no existing fixed boxes
+      await expect(service.create('u1', fixedInput)).resolves.toBeDefined();
+    });
+
+    it('allows creating a fixed box when fixed === income (all-fixed budget)', async () => {
+      // fixed (500) = income (500) → entire income in fixed envelopes; valid
+      repo.manager.query.mockResolvedValue([{ total: '500.00' }]);
+      repo.find.mockResolvedValue([]); // no other fixed boxes
+      await expect(
+        service.create('u1', { ...fixedInput, fixedAmount: 500 }),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects when fixed strictly exceeds income (income > 0)', async () => {
+      // existing fixed = 600, income = 500 → proposed 600 > 500 must be rejected
+      repo.manager.query.mockResolvedValue([{ total: '500.00' }]);
+      repo.find.mockResolvedValue([
+        makeBox({ id: 'f1', mode: BoxMode.FIXED, fixedAmount: '600.00' }),
+      ]);
+      await expect(service.create('u1', { ...fixedInput, fixedAmount: 100 })).rejects.toMatchObject(
+        {
+          code: 'box.fixed_exceeds_income',
+        },
+      );
+    });
+
+    it('rejects with box.fixed_exceeds_income error code only when income > 0', async () => {
+      // income = 1000, proposed = 800 + 300 = 1100 → rejected
+      repo.manager.query.mockResolvedValue([{ total: '1000.00' }]);
+      repo.find.mockResolvedValue([
+        makeBox({ id: 'f1', mode: BoxMode.FIXED, fixedAmount: '800.00' }),
+      ]);
+      await expect(service.create('u1', { ...fixedInput, fixedAmount: 300 })).rejects.toMatchObject(
+        {
+          code: 'box.fixed_exceeds_income',
+        },
+      );
     });
   });
 });

@@ -56,14 +56,29 @@ Percent boxes MUST split `remainder` by their `pct`.
 
 ### Requirement: Guard — Fixed Amounts Must Not Exceed Income
 
-If the sum of `fixedAmount` of all active personal fixed boxes exceeds the user's
-monthly income, the system MUST reject the create/update operation with error code
-`box.fixed_exceeds_income`. Partial proportional funding is NOT allowed.
+If the sum of `fixedAmount` of all active personal fixed boxes strictly exceeds the
+user's monthly income AND income is greater than zero, the system MUST reject the
+create/update operation with error code `box.fixed_exceeds_income`. When no income
+has been recorded yet (income = 0) the guard does NOT fire — the user can still
+create fixed boxes during onboarding before entering income. Committing all income to
+fixed envelopes (Σ fixed = income) is valid (remainder = 0).
 
-#### Scenario: Σ fixed exactly equals income is rejected
+#### Scenario: No income recorded yet (zero-income) — guard does not fire
+
+- GIVEN monthly income = 0 (new user, no income transactions yet)
+- WHEN `createBox` attempts to create a fixed box with any fixedAmount
+- THEN the box is saved successfully (guard does not fire when income is 0)
+
+#### Scenario: Σ fixed exactly equals income — ALLOWED
 
 - GIVEN monthly income = 1000 and existing fixed boxes totaling 900
 - WHEN `createBox` or `updateBox` attempts to add/change a fixed box making Σ fixed = 1000
+- THEN the box is saved successfully (entire income committed to fixed envelopes; remainder = 0)
+
+#### Scenario: Σ fixed strictly exceeds income — REJECTED
+
+- GIVEN monthly income = 1000 and existing fixed boxes totaling 900
+- WHEN `createBox` or `updateBox` attempts to add/change a fixed box making Σ fixed > 1000
 - THEN the request MUST be rejected with `box.fixed_exceeds_income`
 - AND the box is not saved
 

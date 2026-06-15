@@ -170,3 +170,28 @@
 - `assertFixedDoesNotExceedIncome` requires an active DB connection (integration test). Unit tests for service mock the repo, so this guard is not unit-tested — an integration test should be added in S1-verify.
 - `isValidPctSum` behavior change: now returns `false` for empty array (was `false` before since `total=0 !== 10000`; explicit guard added for clarity). Pre-existing tests still pass.
 - `CreateBoxInput` uses `z.input<>` instead of `z.infer<>` to keep `mode` optional in TypeScript callers — this is intentional for backward-compat.
+
+---
+
+## Post-S1a Correctness Fix
+
+**Commit**: `fix(boxes): fixed-income guard allows zero-income and equal-to-income budgets`
+
+**Problem**: `assertFixedDoesNotExceedIncome` used `proposedFixedCents >= incomeCents`, causing two bugs:
+
+1. Zero-income trap: new users with no income recorded (incomeCents = 0) could not create any fixed box because `proposedFixedCents >= 0` is always true.
+2. All-fixed budgets: `fixed == income` (entire income committed to fixed envelopes) was wrongly rejected.
+
+**Fix**: Condition changed to `incomeCents > 0 && proposedFixedCents > incomeCents`.
+
+- income = 0 → guard skipped (no constraint yet; AI onboarding can create boxes before income is entered).
+- fixed = income → allowed (remainder = 0 is valid).
+- fixed > income (income > 0) → rejected with `box.fixed_exceeds_income` as before.
+
+**Files changed**:
+
+- `apps/api/src/boxes/boxes.service.ts` line 292 — guard condition updated
+- `apps/api/src/boxes/boxes.service.spec.ts` — 4 new unit tests covering all three boundaries
+- `openspec/changes/boxes-v2-onboarding/specs/boxes/spec.md` — scenario updated to reflect corrected semantics
+
+**Gate results**: packages build PASS, lint PASS (0 errors), typecheck PASS, tests 359/359 PASS (27 suites).
