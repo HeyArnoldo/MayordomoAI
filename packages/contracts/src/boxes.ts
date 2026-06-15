@@ -79,7 +79,10 @@ export const createBoxSchema = z
     },
     { message: 'Fixed mode is not supported for business-scope boxes', path: ['mode'] },
   );
-export type CreateBoxInput = z.infer<typeof createBoxSchema>;
+// z.input (not z.infer): fields with .default() (e.g. `mode`) are OPTIONAL for
+// callers — existing create-box callers that omit `mode` still typecheck; the
+// schema applies the `percent` default at parse time.
+export type CreateBoxInput = z.input<typeof createBoxSchema>;
 
 export const updateBoxSchema = z
   .object({
