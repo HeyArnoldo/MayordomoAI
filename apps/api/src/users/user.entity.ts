@@ -40,6 +40,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   onboardedAt: Date | null;
 
+  // AI-driven onboarding flow. False until the agent finishes building the user's
+  // box structure. Distinct from onboardedAt (phone-link step). Defaults to false
+  // for all users including those created before this column was added.
+  @Column({ type: 'boolean', default: false })
+  onboardingCompleted: boolean;
+
   // Idioma de UI, WhatsApp y agente. Lo manda la web al registrarse (navigator.language).
   @Column({ type: 'varchar', length: 5, default: 'es' })
   language: Locale;
