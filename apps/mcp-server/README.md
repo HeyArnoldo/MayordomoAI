@@ -130,6 +130,32 @@ curl -X POST http://localhost:3000/api/agent-tools/get-box-balances \
 
 ---
 
+## Deploy on Coolify
+
+Each app in this monorepo deploys as its own Coolify **Application** (built from its Dockerfile). The MCP server is no exception.
+
+1. **Create a new Application** in Coolify:
+   - Source: the same Git repo, branch `main`.
+   - Build pack: **Dockerfile**.
+   - Dockerfile location: `apps/mcp-server/Dockerfile`.
+   - Build context / base directory: the **repo root** (it's a pnpm monorepo).
+   - Exposed port: `3001`. Coolify assigns an HTTPS domain → Foundry uses `https://<domain>/mcp`.
+   - Health check path: `/health` (the image also ships a Docker `HEALTHCHECK` on it).
+
+2. **Set its environment variables** (Coolify panel — not a `.env` file):
+   - `PORT=3001`
+   - `MAYORDOMO_API_BASE_URL` — the API URL **without** `/api`. Prefer the API's internal Coolify address (private network); otherwise its public domain.
+   - `AGENT_TOOL_INTERNAL_KEY` — the same value as the API.
+   - `MCP_AUTH_TOKEN` — the Bearer token you paste in Foundry.
+
+3. **Set the API's new env vars** on the existing `apps/api` Application: `AGENT_TOOL_INTERNAL_KEY` (same) and `FOUNDRY_DEMO_USER_ID` (a real user UUID). Until these are set, `/api/agent-tools/*` stays closed (401/503).
+
+4. The **frontend** (`apps/web`) needs **no** changes for this integration.
+
+5. In Foundry: Tools → Add → Custom → MCP → URL `https://<mcp-domain>/mcp` → Bearer = `MCP_AUTH_TOKEN`.
+
+---
+
 ## Security notes
 
 - **Two auth layers**: Foundry → MCP (`Authorization: Bearer MCP_AUTH_TOKEN`) and

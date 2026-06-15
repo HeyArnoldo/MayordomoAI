@@ -73,6 +73,14 @@ for (const t of tools) {
 // ---------------------------------------------------------------------------
 
 const httpServer = createServer(async (req, res) => {
+  // Health probe for Coolify / Docker HEALTHCHECK — unauthenticated, no secrets.
+  if (req.method === 'GET' && req.url === '/health') {
+    res
+      .writeHead(200, { 'Content-Type': 'application/json' })
+      .end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/mcp') {
     // Bearer auth BEFORE handing to the transport — 401 on fail.
     if (!checkBearer(req)) {
