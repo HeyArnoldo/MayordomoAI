@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { BoxColorKey, BoxScope, BoxType } from '@app/contracts';
+import { BoxColorKey, BoxMode, BoxScope, BoxType } from '@app/contracts';
 import { User } from '../users/user.entity';
 
 /**
@@ -48,6 +48,22 @@ export class Box {
 
   @Column({ type: 'boolean', default: true })
   active: boolean;
+
+  /**
+   * Allocation mode — added in boxes-v2.
+   *   percent (default): box receives pct × income_remainder per month.
+   *   fixed: box is funded off-the-top with fixedAmount each month.
+   * Existing rows default to 'percent' via the migration DEFAULT.
+   */
+  @Column({ type: 'varchar', length: 10, default: BoxMode.PERCENT })
+  mode: BoxMode;
+
+  /**
+   * Required when mode='fixed'. Stored as numeric(12,2) to avoid float drift.
+   * Null for percent-mode boxes.
+   */
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true, default: null })
+  fixedAmount: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
