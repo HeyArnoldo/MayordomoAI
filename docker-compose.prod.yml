@@ -37,6 +37,13 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin1234!}
       ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      # WhatsApp (Evolution API). Se inyectan desde el entorno del host; sin
+      # defaults para no commitear credenciales. Si faltan, el envío saliente
+      # queda en modo dev y NO entrega (ver EvolutionClient.enabled()).
+      EVOLUTION_URL: ${EVOLUTION_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      WA_WEBHOOK_TOKEN: ${WA_WEBHOOK_TOKEN:-}
     ports:
       - '3000:3000'
     depends_on:
