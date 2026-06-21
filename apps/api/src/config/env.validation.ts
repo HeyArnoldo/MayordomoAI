@@ -54,6 +54,15 @@ export const envSchema = z.object({
   FOUNDRY_BASE_URL: z.string().optional(),
   FOUNDRY_AGENT_MODEL: z.string().optional(),
   FOUNDRY_PARSER_MODEL: z.string().optional(),
+
+  // Evolution API (WhatsApp outbound). Opcionales para no romper despliegues
+  // que no usan WhatsApp; cuando se usan, las tres deben estar para que el
+  // envío salga del modo dev (ver EvolutionClient.enabled()).
+  EVOLUTION_URL: z.string().optional(),
+  EVOLUTION_API_KEY: z.string().optional(),
+  EVOLUTION_INSTANCE: z.string().optional(),
+  // Token compartido del webhook inbound de WhatsApp.
+  WA_WEBHOOK_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
