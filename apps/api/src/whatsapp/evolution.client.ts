@@ -1,12 +1,33 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 /**
  * Cliente HTTP de Evolution API. Plug & play por .env: si faltan las
  * credenciales, los envíos se loguean y no rompen nada (modo dev).
  */
 @Injectable()
-export class EvolutionClient {
+export class EvolutionClient implements OnModuleInit {
   private readonly logger = new Logger(EvolutionClient.name);
+
+  /**
+   * Al arrancar deja constancia en el log de si el contenedor ve las
+   * credenciales de Evolution. Nunca imprime la API key — solo instancia y
+   * URL — para confirmar de un vistazo que el deploy las inyectó.
+   */
+  onModuleInit(): void {
+    const missing = this.missingConfig();
+    if (missing.length === 0) {
+      this.logger.log(
+        `WhatsApp outbound HABILITADO — instancia="${process.env.EVOLUTION_INSTANCE}" url="${this.base()}"`,
+      );
+      return;
+    }
+    const detail = `WhatsApp outbound DESHABILITADO — faltan ${missing.join(', ')}. Los mensajes se generan pero NO se entregan.`;
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.error(detail);
+    } else {
+      this.logger.warn(detail);
+    }
+  }
 
   enabled(): boolean {
     return this.missingConfig().length === 0;
